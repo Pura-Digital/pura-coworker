@@ -22,7 +22,6 @@ import { Titlebar } from './components/Titlebar';
 import { SandboxSetupDialog } from './components/SandboxSetupDialog';
 import { SandboxSyncToast } from './components/SandboxSyncToast';
 import { GlobalNoticeToast } from './components/GlobalNoticeToast';
-import { PuraVoiceFloatingButton } from './components/PuraVoiceFloatingButton';
 import { PanelErrorBoundary } from './components/PanelErrorBoundary';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
@@ -94,7 +93,9 @@ function App() {
     if (isElectron) {
       listSessions();
     }
-  }, []); // Empty deps - run once
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only session list
+  }, []);
 
   // Apply theme to document root
   useEffect(() => {
@@ -140,7 +141,7 @@ function App() {
         setAppConfig(result.config);
       }
     },
-    [setIsConfigured, setAppConfig]
+    [isElectron, setIsConfigured, setAppConfig]
   );
 
   // Handle config modal close
@@ -255,8 +256,6 @@ function App() {
         onDismiss={clearGlobalNotice}
         onAction={handleGlobalNoticeAction}
       />
-
-      {/* <PuraVoiceFloatingButton /> */}
     </div>
   );
 }
