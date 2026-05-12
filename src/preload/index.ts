@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { PuraRealtimeSessionResult } from '../shared/pura-digital';
 import type {
   ClientEvent,
   ServerEvent,
@@ -34,7 +35,7 @@ import type {
   McpPresetsMap,
   RemoteConfig,
   GatewayConfig,
-  FeishuChannelConfig,
+  TelegramChannelConfig,
   PairedUser,
   PairingRequest,
   RemoteSessionMapping,
@@ -182,10 +183,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       apiKey: string;
       baseUrl?: string;
     }): Promise<ProviderModelInfo[]> => ipcRenderer.invoke('config.listModels', payload),
+    listOpenAICompatibleModels: (payload: {
+      baseUrl: string;
+      apiKey?: string;
+    }): Promise<ProviderModelInfo[]> =>
+      ipcRenderer.invoke('config.listOpenAICompatibleModels', payload),
     diagnose: (input: DiagnosticInput): Promise<DiagnosticResult> =>
       ipcRenderer.invoke('config.diagnose', input),
     discoverLocal: (payload?: { baseUrl?: string }): Promise<LocalOllamaDiscoveryResult> =>
       ipcRenderer.invoke('config.discover-local', payload),
+  },
+
+  puraDigital: {
+    createRealtimeSession: (): Promise<PuraRealtimeSessionResult> =>
+      ipcRenderer.invoke('puraDigital.realtimeSession'),
   },
 
   // Window control methods
@@ -360,10 +371,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       config: Partial<GatewayConfig>
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('remote.updateGatewayConfig', config),
-    updateFeishuConfig: (
-      config: FeishuChannelConfig
+    updateTelegramConfig: (
+      config: TelegramChannelConfig
     ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('remote.updateFeishuConfig', config),
+      ipcRenderer.invoke('remote.updateTelegramConfig', config),
     getPairedUsers: (): Promise<PairedUser[]> => ipcRenderer.invoke('remote.getPairedUsers'),
     getPendingPairings: (): Promise<PairingRequest[]> =>
       ipcRenderer.invoke('remote.getPendingPairings'),
@@ -411,7 +422,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   memory: {
-    getOverview: (cwd?: string): Promise<MemoryOverview> => ipcRenderer.invoke('memory.getOverview', cwd),
+    getOverview: (cwd?: string): Promise<MemoryOverview> =>
+      ipcRenderer.invoke('memory.getOverview', cwd),
     search: (payload: {
       query: string;
       cwd?: string;
@@ -424,7 +436,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('memory.rebuildWorkspace', cwd),
     clearWorkspace: (cwd: string): Promise<{ success: boolean; workspaceKey: string }> =>
       ipcRenderer.invoke('memory.clearWorkspace', cwd),
-    clearCoreMemory: (): Promise<{ success: boolean }> => ipcRenderer.invoke('memory.clearCoreMemory'),
+    clearCoreMemory: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('memory.clearCoreMemory'),
     rebuildAll: (): Promise<{ success: boolean; workspaceCount: number; sessionCount: number }> =>
       ipcRenderer.invoke('memory.rebuildAll'),
     listFiles: (): Promise<MemoryDebugFileInfo[]> => ipcRenderer.invoke('memory.listFiles'),
@@ -478,8 +491,15 @@ declare global {
           apiKey: string;
           baseUrl?: string;
         }) => Promise<ProviderModelInfo[]>;
+        listOpenAICompatibleModels: (payload: {
+          baseUrl: string;
+          apiKey?: string;
+        }) => Promise<ProviderModelInfo[]>;
         diagnose: (input: DiagnosticInput) => Promise<DiagnosticResult>;
         discoverLocal: (payload?: { baseUrl?: string }) => Promise<LocalOllamaDiscoveryResult>;
+      };
+      puraDigital: {
+        createRealtimeSession: () => Promise<PuraRealtimeSessionResult>;
       };
       window: {
         minimize: () => void;
@@ -616,8 +636,8 @@ declare global {
         updateGatewayConfig: (
           config: Partial<GatewayConfig>
         ) => Promise<{ success: boolean; error?: string }>;
-        updateFeishuConfig: (
-          config: FeishuChannelConfig
+        updateTelegramConfig: (
+          config: TelegramChannelConfig
         ) => Promise<{ success: boolean; error?: string }>;
         getPairedUsers: () => Promise<PairedUser[]>;
         getPendingPairings: () => Promise<PairingRequest[]>;
@@ -665,7 +685,11 @@ declare global {
         rebuildWorkspace: (cwd: string) => Promise<{ success: boolean; workspaceKey: string }>;
         clearWorkspace: (cwd: string) => Promise<{ success: boolean; workspaceKey: string }>;
         clearCoreMemory: () => Promise<{ success: boolean }>;
-        rebuildAll: () => Promise<{ success: boolean; workspaceCount: number; sessionCount: number }>;
+        rebuildAll: () => Promise<{
+          success: boolean;
+          workspaceCount: number;
+          sessionCount: number;
+        }>;
         listFiles: () => Promise<MemoryDebugFileInfo[]>;
         readFile: (filePath: string) => Promise<MemoryDebugFileContent>;
         inspectSession: (

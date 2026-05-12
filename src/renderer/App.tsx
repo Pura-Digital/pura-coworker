@@ -22,6 +22,7 @@ import { Titlebar } from './components/Titlebar';
 import { SandboxSetupDialog } from './components/SandboxSetupDialog';
 import { SandboxSyncToast } from './components/SandboxSyncToast';
 import { GlobalNoticeToast } from './components/GlobalNoticeToast';
+import { PuraVoiceFloatingButton } from './components/PuraVoiceFloatingButton';
 import { PanelErrorBoundary } from './components/PanelErrorBoundary';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
@@ -254,6 +255,8 @@ function App() {
         onDismiss={clearGlobalNotice}
         onAction={handleGlobalNoticeAction}
       />
+
+      {/* <PuraVoiceFloatingButton /> */}
     </div>
   );
 }

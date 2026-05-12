@@ -1,18 +1,18 @@
 {
   "schemaVersion": "1.0",
-  "name": "Open Cowork",
+  "name": "Aiden",
   "organization": "OpenCoworkAI",
-  "canonicalUrl": "https://opencoworkai.github.io/open-cowork/",
+  "canonicalUrl": "https://opencoworkai.github.io/aiden/",
   "localizedUrls": {
-    "en": "https://opencoworkai.github.io/open-cowork/",
-    "zh-CN": "https://opencoworkai.github.io/open-cowork/zh/"
+    "en": "https://opencoworkai.github.io/aiden/",
+    "zh-CN": "https://opencoworkai.github.io/aiden/zh/"
   },
-  "repository": "https://github.com/OpenCoworkAI/open-cowork",
-  "releases": "https://github.com/OpenCoworkAI/open-cowork/releases",
-  "issues": "https://github.com/OpenCoworkAI/open-cowork/issues",
+  "repository": "https://github.com/OpenCoworkAI/aiden",
+  "releases": "https://github.com/OpenCoworkAI/aiden/releases",
+  "issues": "https://github.com/OpenCoworkAI/aiden/issues",
   "license": {
     "name": "MIT",
-    "url": "https://github.com/OpenCoworkAI/open-cowork/blob/main/LICENSE"
+    "url": "https://github.com/OpenCoworkAI/aiden/blob/main/LICENSE"
   },
   "version": "3.3.0",
   "lastReviewed": "2026-05-01",
@@ -31,12 +31,12 @@
     {
       "platform": "macOS",
       "method": "Homebrew",
-      "commands": ["brew tap OpenCoworkAI/tap", "brew install --cask --no-quarantine open-cowork"]
+      "commands": ["brew tap OpenCoworkAI/tap", "brew install --cask --no-quarantine aiden"]
     },
     {
       "platform": "Windows and macOS",
       "method": "GitHub Releases",
-      "url": "https://github.com/OpenCoworkAI/open-cowork/releases"
+      "url": "https://github.com/OpenCoworkAI/aiden/releases"
     }
   ],
   "capabilities": [
@@ -80,21 +80,21 @@
     "localFirst": true,
     "workspaceBoundary": "File operations are restricted to the selected workspace folder.",
     "vmIsolation": ["WSL2 on Windows", "Lima on macOS"],
-    "dataPolicy": "Open Cowork runs locally; the external network path is the AI model API configured by the user. The project website states that Open Cowork does not send data to Open Cowork servers."
+    "dataPolicy": "Aiden runs locally; the external network path is the AI model API configured by the user. The project website states that Aiden does not send data to Aiden servers."
   },
   "machineReadableResources": {
-    "llmsTxt": "https://opencoworkai.github.io/open-cowork/llms.txt",
-    "llmsFullTxt": "https://opencoworkai.github.io/open-cowork/llms-full.txt",
-    "projectJson": "https://opencoworkai.github.io/open-cowork/project.json",
-    "sitemap": "https://opencoworkai.github.io/open-cowork/sitemap.xml",
-    "robots": "https://opencoworkai.github.io/open-cowork/robots.txt"
+    "llmsTxt": "https://opencoworkai.github.io/aiden/llms.txt",
+    "llmsFullTxt": "https://opencoworkai.github.io/aiden/llms-full.txt",
+    "projectJson": "https://opencoworkai.github.io/aiden/project.json",
+    "sitemap": "https://opencoworkai.github.io/aiden/sitemap.xml",
+    "robots": "https://opencoworkai.github.io/aiden/robots.txt"
   },
   "sourcePages": [
-    "https://github.com/OpenCoworkAI/open-cowork/blob/main/README.md",
-    "https://github.com/OpenCoworkAI/open-cowork/blob/main/README_zh.md",
-    "https://github.com/OpenCoworkAI/open-cowork/blob/main/CHANGELOG.md",
-    "https://github.com/OpenCoworkAI/open-cowork/blob/main/ROADMAP.md",
-    "https://github.com/OpenCoworkAI/open-cowork/blob/main/SECURITY.md",
-    "https://github.com/OpenCoworkAI/open-cowork/blob/main/CONTRIBUTING.md"
+    "https://github.com/OpenCoworkAI/aiden/blob/main/README.md",
+    "https://github.com/OpenCoworkAI/aiden/blob/main/README_zh.md",
+    "https://github.com/OpenCoworkAI/aiden/blob/main/CHANGELOG.md",
+    "https://github.com/OpenCoworkAI/aiden/blob/main/ROADMAP.md",
+    "https://github.com/OpenCoworkAI/aiden/blob/main/SECURITY.md",
+    "https://github.com/OpenCoworkAI/aiden/blob/main/CONTRIBUTING.md"
   ]
 }

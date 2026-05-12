@@ -15,6 +15,7 @@ import {
   BookOpen,
   FileSearch,
 } from 'lucide-react';
+import appLogo from '../assets/logo.png';
 
 type AttachedFile = {
   name: string;
@@ -23,8 +24,6 @@ type AttachedFile = {
   type: string;
   inlineDataBase64?: string;
 };
-
-import welcomeLogoSrc from '../assets/logo.png';
 
 export function WelcomeView() {
   const { t } = useTranslation();
@@ -444,17 +443,17 @@ export function WelcomeView() {
         <div className="space-y-4 text-center">
           <div className="flex items-center justify-center gap-4">
             <img
-              src={welcomeLogoSrc}
+              src={appLogo}
               alt={t('welcome.logoAlt')}
               className="w-16 h-16 md:w-20 md:h-20 rounded-[1.4rem] object-cover border border-border-subtle bg-background/60 shadow-soft"
             />
             <div className="text-left">
               <h1 className="text-[2.35rem] md:text-[3.1rem] leading-none font-semibold tracking-[-0.05em] text-text-primary">
-                Open Cowork
+                Aiden
               </h1>
             </div>
           </div>
-          <p className="heading-serif text-[1.15rem] md:text-[1.45rem] font-medium tracking-[-0.02em] text-text-secondary text-center">
+          <p className="text-[1.15rem] md:text-[1.45rem] font-medium tracking-[-0.02em] text-text-secondary text-center">
             {t('welcome.title')}
           </p>
         </div>

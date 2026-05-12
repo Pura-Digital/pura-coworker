@@ -3,34 +3,34 @@ layout: home
 head:
   - - link
     - rel: canonical
-      href: https://opencoworkai.github.io/open-cowork/zh/
+      href: https://opencoworkai.github.io/aiden/zh/
   - - link
     - rel: alternate
       hreflang: en
-      href: https://opencoworkai.github.io/open-cowork/
+      href: https://opencoworkai.github.io/aiden/
   - - link
     - rel: alternate
       hreflang: zh-CN
-      href: https://opencoworkai.github.io/open-cowork/zh/
+      href: https://opencoworkai.github.io/aiden/zh/
   - - link
     - rel: alternate
       hreflang: x-default
-      href: https://opencoworkai.github.io/open-cowork/
+      href: https://opencoworkai.github.io/aiden/
 
 hero:
-  name: Open Cowork
+  name: Aiden
   text: 开源 AI 智能助手桌面应用
   tagline: Windows & macOS 一键安装。多模型支持、虚拟机沙盒隔离、内置 Skills 技能系统、MCP 集成 — 无需编程。
   image:
     src: /logo.png
-    alt: Open Cowork Logo
+    alt: Aiden Logo
   actions:
     - theme: brand
       text: 立即下载
-      link: https://github.com/OpenCoworkAI/open-cowork/releases
+      link: https://github.com/OpenCoworkAI/aiden/releases
     - theme: alt
       text: GitHub 仓库
-      link: https://github.com/OpenCoworkAI/open-cowork
+      link: https://github.com/OpenCoworkAI/aiden
 
 features:
   - icon: 🚀
@@ -144,10 +144,10 @@ features:
 
 ## 功能对比
 
-|                 | MCP & Skills | 远程控制 | GUI 自动化 |
-| --------------- | :----------: | :------: | :--------: |
-| Claude Cowork   |      ✓       |    ✗     |     ✗      |
-| **Open Cowork** |    **✓**     |  **✓**   |   **✓**    |
+|               | MCP & Skills | 远程控制 | GUI 自动化 |
+| ------------- | :----------: | :------: | :--------: |
+| Claude Cowork |      ✓       |    ✗     |     ✗      |
+| **Aiden**     |    **✓**     |  **✓**   |   **✓**    |
 
 </div>
 
@@ -173,10 +173,10 @@ features:
 
 ```bash
 brew tap OpenCoworkAI/tap
-brew install --cask --no-quarantine open-cowork
+brew install --cask --no-quarantine aiden
 ```
 
-**Windows / macOS** — [前往下载页面 →](https://github.com/OpenCoworkAI/open-cowork/releases)
+**Windows / macOS** — [前往下载页面 →](https://github.com/OpenCoworkAI/aiden/releases)
 
 </div>
 
@@ -186,9 +186,9 @@ brew install --cask --no-quarantine open-cowork
 
 <div class="faq-item">
 
-### Open Cowork 是什么？
+### Aiden 是什么？
 
-Open Cowork 是一款免费开源的 AI 智能助手桌面应用，将 AI 模型（Claude、GPT、Gemini、DeepSeek 等）封装为图形界面，提供 Windows 和 macOS 一键安装包，无需命令行或编程知识。
+Aiden 是一款免费开源的 AI 智能助手桌面应用，将 AI 模型（Claude、GPT、Gemini、DeepSeek 等）封装为图形界面，提供 Windows 和 macOS 一键安装包，无需命令行或编程知识。
 
 </div>
 
@@ -204,7 +204,7 @@ Open Cowork 是一款免费开源的 AI 智能助手桌面应用，将 AI 模型
 
 ### 免费吗？
 
-Open Cowork 本身完全免费，采用 MIT 开源协议。你只需为所选 AI 模型服务商的 API 调用付费。
+Aiden 本身完全免费，采用 MIT 开源协议。你只需为所选 AI 模型服务商的 API 调用付费。
 
 </div>
 
@@ -212,7 +212,7 @@ Open Cowork 本身完全免费，采用 MIT 开源协议。你只需为所选 AI
 
 ### 沙盒隔离是怎么工作的？
 
-Open Cowork 使用 WSL2 (Windows) 或 Lima (macOS) 在隔离的 Linux 虚拟机中执行所有 AI 命令。即使 AI 操作失误，你的宿主机文件系统也不会受到影响。
+Aiden 使用 WSL2 (Windows) 或 Lima (macOS) 在隔离的 Linux 虚拟机中执行所有 AI 命令。即使 AI 操作失误，你的宿主机文件系统也不会受到影响。
 
 </div>
 
@@ -220,7 +220,7 @@ Open Cowork 使用 WSL2 (Windows) 或 Lima (macOS) 在隔离的 Linux 虚拟机�
 
 ### 数据安全吗？
 
-Open Cowork 完全在本地运行，你的文件保留在你的工作区内。唯一的外部通信是与你配置的 AI 模型 API 之间的交互。没有任何数据被发送到 Open Cowork 的服务器。
+Aiden 完全在本地运行，你的文件保留在你的工作区内。唯一的外部通信是与你配置的 AI 模型 API 之间的交互。没有任何数据被发送到 Aiden 的服务器。
 
 </div>
 
@@ -228,7 +228,7 @@ Open Cowork 完全在本地运行，你的文件保留在你的工作区内。�
 
 ### 支持 Linux 吗？
 
-目前提供 Windows 和 macOS 的预构建安装包。Linux 用户可以通过源码编译方式使用，详见 [GitHub 仓库](https://github.com/OpenCoworkAI/open-cowork)。
+目前提供 Windows 和 macOS 的预构建安装包。Linux 用户可以通过源码编译方式使用，详见 [GitHub 仓库](https://github.com/OpenCoworkAI/aiden)。
 
 </div>
 

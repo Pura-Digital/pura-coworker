@@ -9,9 +9,11 @@ import {
   AlertCircle,
   CheckCircle,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { useApiConfigState } from '../../hooks/useApiConfigState';
 import { ApiConfigSetManager } from '../ApiConfigSetManager';
+import { ProviderLogoBadge, protocolTabToLogoId, providerTabToLogoId } from '../ProviderLogoBadge';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from '../ProviderGuidance';
 import ApiDiagnosticsPanel from '../ApiDiagnosticsPanel';
 
@@ -45,8 +47,10 @@ export function SettingsAPI() {
     successMessage,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringPuraModels,
     enableThinking,
     isOllamaMode,
+    isPuraMode,
     requiresApiKey,
     protocolGuidanceText,
     protocolGuidanceTone,
@@ -81,6 +85,8 @@ export function SettingsAPI() {
     handleSave,
     refreshModelOptions,
     discoverLocalOllama,
+    applyPuraDigitalSetup,
+    discoverPuraDigitalModels,
     diagnosticResult,
     isDiagnosing,
     handleDiagnose,
@@ -128,22 +134,42 @@ export function SettingsAPI() {
         </label>
         <p className="text-xs leading-5 text-text-muted">{t('api.providerDescription')}</p>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-          {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'custom'] as const).map(
-            (p) => (
+          {(
+            ['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'pura', 'custom'] as const
+          ).map((p) => {
+            const isPuraTab = p === 'pura';
+            const isSelected = isPuraTab
+              ? isPuraMode
+              : provider === p && (p !== 'custom' || !isPuraMode);
+            const handleClick = () => {
+              if (isPuraTab) {
+                applyPuraDigitalSetup();
+              } else {
+                changeProvider(p);
+              }
+            };
+            const label = isPuraTab
+              ? t('api.puraDigital')
+              : p === 'custom'
+                ? t('api.moreModels')
+                : presets?.[p]?.name || p;
+            const logoId = providerTabToLogoId(p);
+            return (
               <button
                 key={p}
-                onClick={() => changeProvider(p)}
+                onClick={handleClick}
                 disabled={isLoadingConfig}
-                className={`px-3 py-2 rounded-lg text-sm transition-colors border ${
-                  provider === p
+                className={`px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-2 ${
+                  isSelected
                     ? 'border-accent bg-accent/10 text-accent font-medium'
                     : 'border-border-muted text-text-secondary hover:border-border hover:text-text-primary disabled:opacity-50'
                 }`}
               >
-                {p === 'custom' ? t('api.moreModels') : presets?.[p]?.name || p}
+                <ProviderLogoBadge id={logoId} />
+                <span className="min-w-0 truncate">{label}</span>
               </button>
-            )
-          )}
+            );
+          })}
         </div>
       </div>
 
@@ -165,13 +191,15 @@ export function SettingsAPI() {
           placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
           className="w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
         />
-        {currentPreset?.keyHint && (
-          <p className="text-xs text-text-muted">{currentPreset.keyHint}</p>
+        {(isPuraMode ? 'platform.puradigital.it' : currentPreset?.keyHint) && (
+          <p className="text-xs text-text-muted">
+            {isPuraMode ? 'platform.puradigital.it' : currentPreset?.keyHint}
+          </p>
         )}
       </div>
 
       {/* Custom Protocol */}
-      {provider === 'custom' && (
+      {provider === 'custom' && !isPuraMode && (
         <div className="space-y-3 py-5 border-b border-border-muted">
           <label
             id="api-protocol-label"
@@ -191,13 +219,14 @@ export function SettingsAPI() {
               <button
                 key={mode.id}
                 onClick={() => changeProtocol(mode.id)}
-                className={`px-3 py-2 rounded-lg text-sm transition-colors border ${
+                className={`px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-2 ${
                   customProtocol === mode.id
                     ? 'border-accent bg-accent/10 text-accent font-medium'
                     : 'border-border-muted text-text-secondary hover:border-border hover:text-text-primary'
                 }`}
               >
-                {mode.label}
+                <ProviderLogoBadge id={protocolTabToLogoId(mode.id)} />
+                <span className="min-w-0 truncate">{mode.label}</span>
               </button>
             ))}
           </div>
@@ -237,30 +266,40 @@ export function SettingsAPI() {
             type="text"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
+            readOnly={isPuraMode}
+            aria-readonly={isPuraMode}
             placeholder={
-              provider === 'ollama'
-                ? 'http://localhost:11434/v1'
-                : customProtocol === 'openai'
-                  ? 'https://api.openai.com/v1'
-                  : customProtocol === 'gemini'
-                    ? 'https://generativelanguage.googleapis.com'
-                    : currentPreset?.baseUrl || 'https://api.anthropic.com'
+              isPuraMode
+                ? 'https://llm.puradigital.it/v1'
+                : provider === 'ollama'
+                  ? 'http://localhost:11434/v1'
+                  : customProtocol === 'openai'
+                    ? 'https://api.openai.com/v1'
+                    : customProtocol === 'gemini'
+                      ? 'https://generativelanguage.googleapis.com'
+                      : currentPreset?.baseUrl || 'https://api.anthropic.com'
             }
-            className="w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
+            className={`w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all ${
+              isPuraMode ? 'cursor-not-allowed opacity-70' : ''
+            }`}
           />
           <p className="text-xs text-text-muted">
-            {provider === 'ollama'
-              ? t('api.enterOllamaUrl')
-              : customProtocol === 'openai'
-                ? t('api.enterOpenAIUrl')
-                : customProtocol === 'gemini'
-                  ? t('api.enterGeminiUrl')
-                  : t('api.enterAnthropicUrl')}
+            {isPuraMode
+              ? t('api.puraDigitalUrlHint')
+              : provider === 'ollama'
+                ? t('api.enterOllamaUrl')
+                : customProtocol === 'openai'
+                  ? t('api.enterOpenAIUrl')
+                  : customProtocol === 'gemini'
+                    ? t('api.enterGeminiUrl')
+                    : t('api.enterAnthropicUrl')}
           </p>
           {isOllamaMode && (
             <p className="text-xs text-text-muted">{t('api.discoverLocalOllamaHint')}</p>
           )}
-          {provider === 'custom' && <GuidanceInlineHint text={baseUrlGuidanceText} />}
+          {provider === 'custom' && !isPuraMode && (
+            <GuidanceInlineHint text={baseUrlGuidanceText} />
+          )}
         </div>
       )}
 
@@ -288,6 +327,21 @@ export function SettingsAPI() {
                 {isRefreshingModels ? t('api.refreshingModels') : t('api.refreshModels')}
               </button>
             )}
+            {isPuraMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  void discoverPuraDigitalModels();
+                }}
+                disabled={isDiscoveringPuraModels || !apiKey.trim()}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors active:scale-95 bg-accent-muted text-accent hover:bg-accent-muted/80 disabled:opacity-50"
+              >
+                <Sparkles className={`w-3 h-3 ${isDiscoveringPuraModels ? 'animate-pulse' : ''}`} />
+                {isDiscoveringPuraModels
+                  ? t('api.discoveringPuraModels')
+                  : t('api.discoverPuraModels')}
+              </button>
+            )}
             {shouldShowOllamaManualModelToggle && (
               <button
                 type="button"
@@ -299,7 +353,7 @@ export function SettingsAPI() {
                 }`}
               >
                 <Edit3 className="w-3 h-3" />
-                {isOllamaMode
+                {isOllamaMode || isPuraMode
                   ? useCustomModel
                     ? t('api.useDetectedModels')
                     : t('api.manualModel')
@@ -385,7 +439,7 @@ export function SettingsAPI() {
         )}
       </div>
 
-      {provider === 'custom' && (
+      {provider === 'custom' && !isPuraMode && (
         <CommonProviderSetupsCard
           setups={commonProviderSetups}
           onApplySetup={applyCommonProviderSetup}

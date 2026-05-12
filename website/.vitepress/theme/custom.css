@@ -21,7 +21,7 @@
 
 /* ── Light theme ─────────────────────────────────────── */
 :root:not(.dark) {
-  --vp-c-bg: #f5f3ed;
+  --vp-c-bg: #ffffff;
   --vp-c-bg-alt: #f0eee8;
   --vp-c-bg-elv: #faf9f4;
   --vp-c-bg-soft: #faf9f4;
@@ -61,7 +61,7 @@
 
 /* ── Dark theme ──────────────────────────────────────── */
 .dark {
-  --vp-c-bg: #171614;
+  --vp-c-bg: #000000;
   --vp-c-bg-alt: #1d1b18;
   --vp-c-bg-elv: #22201d;
   --vp-c-bg-soft: #22201d;

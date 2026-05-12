@@ -1,5 +1,5 @@
 {
-  "name": "open-cowork",
+  "name": "aiden",
   "version": "3.3.0",
   "description": "Open-source AI agent desktop app for Windows & macOS — one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
   "keywords": [
@@ -20,17 +20,17 @@
     "skills",
     "pptx-generator",
     "docx",
-    "feishu",
+    "telegram",
     "slack",
     "multi-model"
   ],
-  "homepage": "https://github.com/OpenCoworkAI/open-cowork",
+  "homepage": "https://github.com/OpenCoworkAI/aiden",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OpenCoworkAI/open-cowork.git"
+    "url": "https://github.com/OpenCoworkAI/aiden.git"
   },
   "bugs": {
-    "url": "https://github.com/OpenCoworkAI/open-cowork/issues"
+    "url": "https://github.com/OpenCoworkAI/aiden/issues"
   },
   "engines": {
     "node": ">=22"
@@ -67,7 +67,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/genai": "^1.44.0",
-    "@larksuiteoapi/node-sdk": "^1.59.0",
     "@mariozechner/pi-ai": "^0.60.0",
     "@mariozechner/pi-coding-agent": "^0.60.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -79,7 +78,9 @@
     "dotenv": "^17.2.3",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.3.0",
+    "framer-motion": "12.38.0",
     "glob": "^13.0.6",
+    "grammy": "1.42.0",
     "highlight.js": "^11.11.1",
     "i18next": "^25.10.1",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -133,7 +134,7 @@
     "fast-xml-parser": "^5.5.6",
     "tar": "^7.5.11"
   },
-  "author": "Open Cowork Team",
+  "author": "Aiden Team",
   "license": "MIT",
   "lint-staged": {
     "*.{ts,tsx}": [

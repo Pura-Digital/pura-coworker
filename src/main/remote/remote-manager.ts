@@ -8,15 +8,15 @@ import { log, logError, logWarn } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { RemoteGateway } from './gateway';
 import { MessageRouter } from './message-router';
-import { FeishuChannel } from './channels/feishu';
 import { SlackChannel } from './channels/slack';
+import { TelegramChannel } from './channels/telegram';
 import { remoteConfigStore } from './remote-config-store';
 import { tunnelManager, TunnelStatus } from './tunnel-manager';
 import { buildRemoteSessionTitle } from './remote-title';
 import type {
   GatewayStatus,
   GatewayConfig,
-  FeishuChannelConfig,
+  TelegramChannelConfig,
   ChannelType,
   RemoteSessionMapping,
   PairedUser,
@@ -213,7 +213,7 @@ export class RemoteManager extends EventEmitter {
       const tunnelUrl = await tunnelManager.start(config.gateway.port);
       if (tunnelUrl) {
         log('[RemoteManager] Tunnel URL:', tunnelUrl);
-        log('[RemoteManager] Feishu Webhook URL:', `${tunnelUrl}/webhook/feishu`);
+        log('[RemoteManager] Telegram Webhook URL:', `${tunnelUrl}/webhook/telegram`);
       }
 
       log('[RemoteManager] Remote control system started');
@@ -299,10 +299,10 @@ export class RemoteManager extends EventEmitter {
   }
 
   /**
-   * Get Feishu webhook URL (from tunnel)
+   * Get Telegram webhook URL (from tunnel)
    */
-  getFeishuWebhookUrl(): string | null {
-    return tunnelManager.getWebhookUrl();
+  getTelegramWebhookUrl(): string | null {
+    return tunnelManager.getWebhookUrl('telegram');
   }
 
   /**
@@ -318,16 +318,11 @@ export class RemoteManager extends EventEmitter {
   }
 
   /**
-   * Update feishu channel config
+   * Update Telegram channel config
    */
-  async updateFeishuConfig(config: FeishuChannelConfig): Promise<void> {
-    remoteConfigStore.setFeishuConfig(config);
+  async updateTelegramConfig(config: TelegramChannelConfig): Promise<void> {
+    remoteConfigStore.setTelegramConfig(config);
 
-    // Sync Feishu DM policy to gateway auth mode so checkAuthorization() matches.
-    // Note: gateway auth mode is a cross-channel setting — changing it here affects
-    // authorization for all channel types (feishu, telegram, etc.), not just Feishu.
-    // Skip sync if gateway is using token auth, as that would disable token protection
-    // for non-Feishu channels (e.g. WebSocket).
     if (config.dm) {
       const currentGateway = remoteConfigStore.getGatewayConfig();
       const currentAuth = currentGateway.auth;
@@ -339,33 +334,30 @@ export class RemoteManager extends EventEmitter {
       } else {
         switch (config.dm.policy) {
           case 'open':
-            remoteConfigStore.setGatewayConfig({
-              auth: { ...currentAuth, mode: 'open' },
-            });
-            break;
           case 'pairing':
             remoteConfigStore.setGatewayConfig({
-              auth: { ...currentAuth, mode: 'pairing' },
+              auth: {
+                ...currentAuth,
+                mode: config.dm.policy,
+                requirePairing: config.dm.policy === 'pairing',
+              },
             });
             break;
           case 'allowlist': {
-            // Scope Feishu IDs and merge with existing entries (preserving other channels)
-            const feishuEntries = (config.dm.allowFrom ?? []).map((id) => `feishu:${id}`);
-            const nonFeishuEntries = (currentAuth.allowlist ?? []).filter(
-              (entry) => !entry.startsWith('feishu:')
+            const telegramEntries = (config.dm.allowFrom ?? []).map((id) => `telegram:${id}`);
+            const nonTelegramEntries = (currentAuth.allowlist ?? []).filter(
+              (entry) => !entry.startsWith('telegram:')
             );
-            // Include paired Feishu users so they retain access when switching from pairing mode
-            // (syncAllowlist() only populates allowlist when already in allowlist mode)
-            const pairedFeishuEntries = remoteConfigStore
+            const pairedTelegramEntries = remoteConfigStore
               .getPairedUsers()
-              .filter((u) => u.channelType === 'feishu')
-              .map((u) => `feishu:${u.userId}`);
+              .filter((u) => u.channelType === 'telegram')
+              .map((u) => `telegram:${u.userId}`);
             remoteConfigStore.setGatewayConfig({
               auth: {
                 ...currentAuth,
                 mode: 'allowlist',
                 allowlist: [
-                  ...new Set([...nonFeishuEntries, ...pairedFeishuEntries, ...feishuEntries]),
+                  ...new Set([...nonTelegramEntries, ...pairedTelegramEntries, ...telegramEntries]),
                 ],
               },
             });
@@ -375,7 +367,6 @@ export class RemoteManager extends EventEmitter {
       }
     }
 
-    // Restart to apply changes
     if (this.gateway?.running) {
       await this.restart();
     }
@@ -509,8 +500,8 @@ export class RemoteManager extends EventEmitter {
 
     log('[RemoteManager] Handling question request for remote session:', remoteSessionId);
 
-    // Build question message for Feishu
-    let messageText = '🤔 **需要你的回答**\n\n';
+    // Build question message for the remote channel.
+    let messageText = '🤔 **Your input is needed**\n\n';
 
     questions.forEach((q, _qIdx) => {
       if (q.header) {
@@ -528,16 +519,16 @@ export class RemoteManager extends EventEmitter {
         });
         messageText += '\n';
         if (q.multiSelect) {
-          messageText += `*（可多选，用逗号分隔，如: 1,3）*\n\n`;
+          messageText += `*(Multiple selections allowed. Use commas, e.g. 1,3)*\n\n`;
         } else {
-          messageText += `*（请回复选项数字，如: 1）*\n\n`;
+          messageText += `*(Reply with the option number, e.g. 1)*\n\n`;
         }
       } else {
-        messageText += `*（请直接回复你的答案）*\n\n`;
+        messageText += `*(Reply directly with your answer)*\n\n`;
       }
     });
 
-    messageText += `---\n*回复此消息来作答，或发送 "跳过" 跳过问题*`;
+    messageText += `---\n*Reply to this message to answer, or send "skip" to skip this question*`;
 
     // Store pending interaction
     const interaction: RemoteInteraction = {
@@ -650,19 +641,19 @@ export class RemoteManager extends EventEmitter {
       if (safeTools.includes(toolName)) {
         log('[RemoteManager] Auto-approving safe tool:', toolName);
         // Send notification to user
-        await this.doSendToChannel(channelInfo, `🔧 自动执行: **${toolName}**`);
+        await this.doSendToChannel(channelInfo, `🔧 Auto-executed: **${toolName}**`);
         return { allow: true };
       }
     }
 
     // Build permission request message
-    let messageText = '⚠️ **需要你的授权**\n\n';
-    messageText += `工具: **${toolName}**\n\n`;
-    messageText += `参数:\n\`\`\`json\n${JSON.stringify(input, null, 2)}\n\`\`\`\n\n`;
+    let messageText = '⚠️ **Authorization required**\n\n';
+    messageText += `Tool: **${toolName}**\n\n`;
+    messageText += `Arguments:\n\`\`\`json\n${JSON.stringify(input, null, 2)}\n\`\`\`\n\n`;
     messageText += `---\n`;
-    messageText += `回复 "允许" 或 "y" 授权\n`;
-    messageText += `回复 "拒绝" 或 "n" 拒绝\n`;
-    messageText += `回复 "始终允许" 记住此授权`;
+    messageText += `Reply "allow" or "y" to approve\n`;
+    messageText += `Reply "deny" or "n" to reject\n`;
+    messageText += `Reply "always" to remember this decision`;
 
     // Store pending interaction
     const interaction: RemoteInteraction = {
@@ -702,14 +693,9 @@ export class RemoteManager extends EventEmitter {
     return new Promise((resolve) => {
       this.interactionResolvers.set(toolUseId, (response) => {
         const lowerResponse = response.toLowerCase().trim();
-        if (
-          lowerResponse === '允许' ||
-          lowerResponse === 'y' ||
-          lowerResponse === 'yes' ||
-          lowerResponse === '是'
-        ) {
+        if (lowerResponse === 'y' || lowerResponse === 'yes' || lowerResponse === 'allow') {
           resolve({ allow: true });
-        } else if (lowerResponse === '始终允许' || lowerResponse === 'always') {
+        } else if (lowerResponse === 'always') {
           resolve({ allow: true, remember: true });
         } else {
           resolve({ allow: false });
@@ -814,11 +800,8 @@ export class RemoteManager extends EventEmitter {
   ): string {
     const answers: Record<number, string[]> = {};
 
-    // Handle "跳过" response
-    if (
-      messageText.toLowerCase().trim() === '跳过' ||
-      messageText.toLowerCase().trim() === 'skip'
-    ) {
+    // Handle "skip" response
+    if (messageText.toLowerCase().trim() === 'skip') {
       return '{}';
     }
 
@@ -1011,18 +994,18 @@ export class RemoteManager extends EventEmitter {
     switch (status) {
       case 'running':
         emoji = '⏳';
-        statusText = `正在执行 **${toolName}**...`;
+        statusText = `Running **${toolName}**...`;
         break;
       case 'completed':
         emoji = '✅';
-        statusText = `**${toolName}** 执行完成`;
+        statusText = `**${toolName}** completed`;
         if (output && output.length < 200) {
           statusText += `\n\`\`\`\n${output}\n\`\`\``;
         }
         break;
       case 'error':
         emoji = '❌';
-        statusText = `**${toolName}** 执行失败`;
+        statusText = `**${toolName}** failed`;
         if (output) {
           statusText += `: ${output.substring(0, 100)}`;
         }
@@ -1116,26 +1099,25 @@ export class RemoteManager extends EventEmitter {
   private async registerChannels(config: RemoteConfig): Promise<void> {
     if (!this.gateway) return;
 
-    // Register Feishu channel if configured
-    const feishuConfig = config.channels.feishu;
-    if (feishuConfig && feishuConfig.appId && feishuConfig.appSecret) {
-      const feishuChannel = new FeishuChannel(feishuConfig);
-      this.gateway.registerChannel(feishuChannel);
+    // Register Telegram channel if configured
+    const telegramConfig = config.channels.telegram;
+    if (telegramConfig && telegramConfig.botToken) {
+      const telegramChannel = new TelegramChannel(telegramConfig);
+      this.gateway.registerChannel(telegramChannel);
 
-      // Set up webhook handler
       this.gateway.on(
-        'webhook:feishu',
-        (data: {
+        'webhook:telegram',
+        async (data: {
           headers: Record<string, string>;
           body: string;
           respond: (status: number, responseData: unknown) => void;
         }) => {
-          const result = feishuChannel.handleWebhook(data.headers, data.body);
+          const result = await telegramChannel.handleWebhook(data.body);
           data.respond(result.status, result.data);
         }
       );
 
-      log('[RemoteManager] Feishu channel registered');
+      log('[RemoteManager] Telegram channel registered');
     }
 
     // Register Slack channel if configured
@@ -1159,8 +1141,7 @@ export class RemoteManager extends EventEmitter {
 
       log('[RemoteManager] Slack channel registered');
     }
-
-    // TODO: Register other channels (WeChat, Telegram, DingTalk)
+    // TODO: Register other channels (WeChat, DingTalk)
   }
 
   /**

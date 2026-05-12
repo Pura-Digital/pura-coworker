@@ -8,14 +8,14 @@ import type { ConfigStep } from './types';
 
 interface Props {
   activeStep: ConfigStep;
-  isFeishuConfigured: boolean;
+  isTelegramConfigured: boolean;
   isConnectionConfigured: boolean;
   onStepChange: (step: ConfigStep) => void;
 }
 
 export function ConfigStepNav({
   activeStep,
-  isFeishuConfigured,
+  isTelegramConfigured,
   isConnectionConfigured,
   onStepChange,
 }: Props) {
@@ -23,10 +23,10 @@ export function ConfigStepNav({
 
   const steps: { id: ConfigStep; labelKey: string; icon: React.ElementType; done: boolean }[] = [
     {
-      id: 'feishu',
-      labelKey: 'remote.stepFeishu',
+      id: 'telegram',
+      labelKey: 'remote.stepTelegram',
       icon: MessageSquare,
-      done: isFeishuConfigured,
+      done: isTelegramConfigured,
     },
     {
       id: 'connection',

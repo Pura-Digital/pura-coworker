@@ -6,7 +6,11 @@ export function SettingsGeneral() {
   const { i18n, t } = useTranslation();
   const settings = useAppStore((s) => s.settings);
   const updateSettings = useAppStore((s) => s.updateSettings);
-  const currentLang = i18n.language.startsWith('zh') ? 'zh' : 'en';
+  const currentLang = i18n.language.startsWith('zh')
+    ? 'zh'
+    : i18n.language.startsWith('it')
+      ? 'it'
+      : 'en';
   const [appVer, setAppVer] = useState('');
   useEffect(() => {
     try {
@@ -19,6 +23,7 @@ export function SettingsGeneral() {
   }, []);
 
   const languages = [
+    { code: 'it', nativeName: 'Italiano' },
     { code: 'en', nativeName: 'English' },
     { code: 'zh', nativeName: '中文' },
   ];
@@ -74,7 +79,7 @@ export function SettingsGeneral() {
       {/* About */}
       {appVer && (
         <div className="pt-4 border-t border-border">
-          <p className="text-xs text-text-muted">Open Cowork v{appVer}</p>
+          <p className="text-xs text-text-muted">Aiden v{appVer} - Pura Digital</p>
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import type { AppConfig, ApiTestResult } from '../types';
 import { useApiConfigState } from '../hooks/useApiConfigState';
 import { ApiConfigSetManager } from './ApiConfigSetManager';
+import { ProviderLogoBadge, protocolTabToLogoId, providerTabToLogoId } from './ProviderLogoBadge';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from './ProviderGuidance';
 
 interface ConfigModalProps {
@@ -202,21 +203,26 @@ export function ConfigModal({
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'custom'] as const).map(
-                (p) => (
-                  <button
-                    key={p}
-                    onClick={() => changeProvider(p)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      provider === p
-                        ? 'bg-accent text-white'
-                        : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-                    }`}
-                  >
-                    {presets?.[p]?.name ||
-                      (p === 'custom' ? t('api.custom') : PROVIDER_LABELS[p]) ||
-                      p}
-                  </button>
-                )
+                (p) => {
+                  const label =
+                    presets?.[p]?.name ||
+                    (p === 'custom' ? t('api.custom') : PROVIDER_LABELS[p]) ||
+                    p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => changeProvider(p)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                        provider === p
+                          ? 'bg-accent text-white'
+                          : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
+                      }`}
+                    >
+                      <ProviderLogoBadge id={providerTabToLogoId(p)} />
+                      <span className="min-w-0 truncate">{label}</span>
+                    </button>
+                  );
+                }
               )}
             </div>
           </div>
@@ -257,13 +263,14 @@ export function ConfigModal({
                   <button
                     key={mode.id}
                     onClick={() => changeProtocol(mode.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       customProtocol === mode.id
                         ? 'bg-accent text-white'
                         : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
                     }`}
                   >
-                    {mode.label}
+                    <ProviderLogoBadge id={protocolTabToLogoId(mode.id)} />
+                    <span className="min-w-0 truncate">{mode.label}</span>
                   </button>
                 ))}
               </div>
@@ -360,8 +367,12 @@ export function ConfigModal({
                   >
                     <Edit3 className="w-3 h-3" />
                     {isOllamaMode
-                      ? (useCustomModel ? t('api.useDetectedModels') : t('api.manualModel'))
-                      : (useCustomModel ? t('api.usePreset') : t('api.custom'))}
+                      ? useCustomModel
+                        ? t('api.useDetectedModels')
+                        : t('api.manualModel')
+                      : useCustomModel
+                        ? t('api.usePreset')
+                        : t('api.custom')}
                   </button>
                 )}
               </div>

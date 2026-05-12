@@ -34,6 +34,7 @@ import {
 } from './config/config-store';
 import { runConfigApiTest } from './config/config-test-routing';
 import { listOllamaModels } from './config/ollama-api';
+import { listOpenAICompatibleModels } from './config/openai-compat-models';
 import { mcpConfigStore } from './mcp/mcp-config-store';
 import { getSandboxAdapter, shutdownSandbox } from './sandbox/sandbox-adapter';
 import { SandboxSync } from './sandbox/sandbox-sync';
@@ -51,7 +52,7 @@ import type {
 } from '../renderer/types';
 import { remoteManager, type AgentExecutor } from './remote/remote-manager';
 import { remoteConfigStore } from './remote/remote-config-store';
-import type { GatewayConfig, FeishuChannelConfig, ChannelType } from './remote/types';
+import type { GatewayConfig, TelegramChannelConfig, ChannelType } from './remote/types';
 import { startNavServer, stopNavServer } from './nav-server';
 import {
   ScheduledTaskManager,
@@ -85,6 +86,12 @@ import {
 } from './utils/logger';
 import { listRecentWorkspaceFiles } from './utils/recent-workspace-files';
 import { buildDiagnosticsSummary } from './utils/diagnostics-summary';
+import {
+  PURA_DIGITAL_REALTIME_MODEL,
+  isPuraDigitalFromAppConfig,
+  openAiCompatibleRealtimeWsUrl,
+  type PuraRealtimeSessionResult,
+} from '../shared/pura-digital';
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -308,7 +315,7 @@ function setupTray() {
   }
 
   tray = new Tray(resolvedIconPath);
-  tray.setToolTip('Open Cowork');
+  tray.setToolTip('Aiden');
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -807,7 +814,7 @@ app
     setDevLogsEnabled(enableDevLogs);
 
     // Log environment variables for debugging
-    log('=== Open Cowork Starting ===');
+    log('=== Aiden Starting ===');
     log('Config file:', configStore.getPath());
     log('Is configured:', configStore.isConfigured());
     log('[Runtime] Using pi-coding-agent SDK for all providers');
@@ -834,9 +841,7 @@ app
 
     pluginRuntimeService = new PluginRuntimeService(new PluginCatalogService());
     memoryService = new MemoryService(db);
-    const extensionManager = new AgentRuntimeExtensionManager([
-      new MemoryExtension(memoryService),
-    ]);
+    const extensionManager = new AgentRuntimeExtensionManager([new MemoryExtension(memoryService)]);
 
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
@@ -1007,7 +1012,7 @@ app
   .catch((error) => {
     logError('[App] Startup failed:', error);
     const message = error instanceof Error ? error.message : 'Unknown startup error';
-    dialog.showErrorBox('Open Cowork 启动失败', `${message}\n\n请查看日志获取更多信息。`);
+    dialog.showErrorBox('Aiden 启动失败', `${message}\n\n请查看日志获取更多信息。`);
     app.quit();
   });
 
@@ -1470,7 +1475,10 @@ ipcMain.handle('config.save', async (_event, newConfig: Partial<AppConfig>) => {
       ? {
           ...newConfig.memoryRuntime,
           llm: newConfig.memoryRuntime.llm
-            ? { ...newConfig.memoryRuntime.llm, apiKey: newConfig.memoryRuntime.llm.apiKey ? '***' : '' }
+            ? {
+                ...newConfig.memoryRuntime.llm,
+                apiKey: newConfig.memoryRuntime.llm.apiKey ? '***' : '',
+              }
             : undefined,
           embedding: newConfig.memoryRuntime.embedding
             ? {
@@ -1531,6 +1539,71 @@ ipcMain.handle('config.isConfigured', () => {
   }
 });
 
+ipcMain.handle('puraDigital.realtimeSession', async (): Promise<PuraRealtimeSessionResult> => {
+  try {
+    const cfg = configStore.getAll();
+    if (!isPuraDigitalFromAppConfig(cfg)) {
+      return { ok: false, error: 'not_pura' };
+    }
+    const activeKey = cfg.activeProfileKey;
+    const profile = cfg.profiles?.[activeKey];
+    const baseUrl = (profile?.baseUrl ?? cfg.baseUrl ?? '').trim();
+    const apiKey = (profile?.apiKey ?? cfg.apiKey ?? '').trim();
+    if (!apiKey) {
+      return { ok: false, error: 'missing_key' };
+    }
+    const normalizedBase = baseUrl.replace(/\/+$/, '');
+    const sessionUrl = `${normalizedBase}/realtime/sessions`;
+    const model = PURA_DIGITAL_REALTIME_MODEL;
+    const res = await fetch(sessionUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        modalities: ['text', 'audio'],
+        voice: 'alloy',
+      }),
+    });
+    const text = await res.text();
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return { ok: false, error: 'bad_response', message: text.slice(0, 240) };
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: 'http',
+        message: `${res.status} ${text.slice(0, 320)}`,
+      };
+    }
+    const obj = json as Record<string, unknown>;
+    const cs = obj.client_secret as Record<string, unknown> | undefined;
+    const secret =
+      typeof cs?.value === 'string'
+        ? cs.value
+        : typeof obj.client_secret === 'string'
+          ? obj.client_secret
+          : null;
+    if (!secret) {
+      return { ok: false, error: 'bad_response', message: text.slice(0, 400) };
+    }
+    const websocketUrl = openAiCompatibleRealtimeWsUrl(baseUrl, model);
+    return { ok: true, clientSecret: secret, websocketUrl, model };
+  } catch (error) {
+    logError('[puraDigital.realtimeSession]', error);
+    return {
+      ok: false,
+      error: 'network',
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
 ipcMain.handle('config.test', async (_event, payload: ApiTestInput): Promise<ApiTestResult> => {
   try {
     return await runConfigApiTest(payload, configStore.getAll());
@@ -1554,6 +1627,13 @@ ipcMain.handle(
       return [];
     }
     return listOllamaModels(payload);
+  }
+);
+
+ipcMain.handle(
+  'config.listOpenAICompatibleModels',
+  async (_event, payload: { baseUrl: string; apiKey?: string }): Promise<ProviderModelInfo[]> => {
+    return listOpenAICompatibleModels(payload);
   }
 );
 
@@ -2177,7 +2257,7 @@ ipcMain.handle('logs.export', async () => {
       });
       archive.append(
         [
-          'Open Cowork diagnostic bundle',
+          'Aiden diagnostic bundle',
           `Exported at: ${diagnosticsSummary.exportedAt}`,
           '',
           'Included files:',
@@ -2307,12 +2387,12 @@ ipcMain.handle('remote.updateGatewayConfig', async (_event, config: Partial<Gate
   }
 });
 
-ipcMain.handle('remote.updateFeishuConfig', async (_event, config: FeishuChannelConfig) => {
+ipcMain.handle('remote.updateTelegramConfig', async (_event, config: TelegramChannelConfig) => {
   try {
-    await remoteManager.updateFeishuConfig(config);
+    await remoteManager.updateTelegramConfig(config);
     return { success: true };
   } catch (error) {
-    logError('[Remote] Error updating Feishu config:', error);
+    logError('[Remote] Error updating Telegram config:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 });
@@ -2395,7 +2475,7 @@ ipcMain.handle('remote.getTunnelStatus', () => {
 
 ipcMain.handle('remote.getWebhookUrl', () => {
   try {
-    return remoteManager.getFeishuWebhookUrl();
+    return remoteManager.getTelegramWebhookUrl();
   } catch (error) {
     logError('[Remote] Error getting webhook URL:', error);
     return null;

@@ -218,7 +218,7 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
 
 const defaultConfigSet: ApiConfigSet = {
   id: DEFAULT_CONFIG_SET_ID,
-  name: '默认方案',
+  name: 'Default',
   isSystem: true,
   provider: 'openrouter',
   customProtocol: 'anthropic',
@@ -391,7 +391,8 @@ function normalizeMemoryModelRuntimeConfig(
 }
 
 function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
-  const value = typeof raw === 'object' && raw !== null ? (raw as Partial<MemoryRuntimeConfig>) : {};
+  const value =
+    typeof raw === 'object' && raw !== null ? (raw as Partial<MemoryRuntimeConfig>) : {};
   return {
     llm: normalizeMemoryModelRuntimeConfig(value.llm, defaultConfig.memoryRuntime.llm),
     embedding: normalizeMemoryModelRuntimeConfig(
@@ -424,7 +425,8 @@ function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
         ? value.evalArtifactsRoot
         : defaultConfig.memoryRuntime.evalArtifactsRoot,
     promptIterationRounds:
-      typeof value.promptIterationRounds === 'number' && Number.isFinite(value.promptIterationRounds)
+      typeof value.promptIterationRounds === 'number' &&
+      Number.isFinite(value.promptIterationRounds)
         ? Math.max(0, Math.min(10, Math.round(value.promptIterationRounds)))
         : defaultConfig.memoryRuntime.promptIterationRounds,
   };
@@ -513,7 +515,7 @@ export class ConfigStore {
   constructor() {
     const storeOptions: StoreOptions<AppConfig> & { projectName?: string } = {
       name: 'config',
-      projectName: 'open-cowork',
+      projectName: 'aiden',
       defaults: defaultConfig,
     };
 
@@ -521,9 +523,17 @@ export class ConfigStore {
     // AppConfig is a structurally compatible object type at runtime.
     type AppConfigRecord = AppConfig & Record<string, unknown>;
     this.store = createEncryptedStoreWithKeyRotation<AppConfigRecord>({
-      stableKey: 'open-cowork-config-stable-v1',
+      stableKey: 'aiden-config-stable-v1',
       legacyKeys: [
+        'aiden-config-v1',
+        'open-cowork-config-stable-v1',
         'open-cowork-config-v1',
+        ...getLegacyDerivedKeyHexes({
+          moduleDirname: __dirname,
+          stableSeed: 'aiden-config-stable-v1',
+          legacySeed: 'aiden-config-v1',
+          salt: 'aiden-config-salt',
+        }),
         ...getLegacyDerivedKeyHexes({
           moduleDirname: __dirname,
           stableSeed: 'open-cowork-config-stable-v1',

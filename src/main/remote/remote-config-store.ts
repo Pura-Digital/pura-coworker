@@ -32,9 +32,17 @@ class RemoteConfigStore {
         unknown
       >;
     this.store = createEncryptedStoreWithKeyRotation<RemoteConfigRecord>({
-      stableKey: 'open-cowork-remote-stable-v1',
+      stableKey: 'aiden-remote-stable-v1',
       legacyKeys: [
+        'aiden-remote-v1',
+        'open-cowork-remote-stable-v1',
         'open-cowork-remote-v1',
+        ...getLegacyDerivedKeyHexes({
+          moduleDirname: __dirname,
+          stableSeed: 'aiden-remote-stable-v1',
+          legacySeed: 'aiden-remote-v1',
+          salt: 'aiden-remote-salt',
+        }),
         ...getLegacyDerivedKeyHexes({
           moduleDirname: __dirname,
           stableSeed: 'open-cowork-remote-stable-v1',
@@ -44,7 +52,7 @@ class RemoteConfigStore {
       ],
       storeOptions: {
         name: 'remote-config',
-        projectName: 'open-cowork',
+        projectName: 'aiden',
         defaults: {
           ...DEFAULT_REMOTE_CONFIG,
           pairedUsers: [],

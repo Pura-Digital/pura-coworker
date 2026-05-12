@@ -172,7 +172,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               {t('settings.title')}
             </p>
             <h2 className="mt-1 text-[1.24rem] font-semibold tracking-[-0.03em] text-text-primary">
-              Open Cowork
+              Aiden
             </h2>
             <p className="mt-1 text-[11px] leading-4 text-text-muted">{t('settings.panelDesc')}</p>
           </div>
@@ -185,7 +185,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               title={compactSidebar ? tab.label : undefined}
               className={`w-full flex items-center ${compactSidebar ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-3'} rounded-lg text-left transition-colors active:scale-[0.98] ${
                 activeTab === tab.id
-                  ? 'bg-accent/10 text-text-primary font-medium border-l-2 border-accent'
+                  ? 'bg-accent/10 text-text-primary font-medium border-l-4 border-accent rounded-none'
                   : 'hover:bg-surface-hover text-text-secondary hover:text-text-primary'
               }`}
             >

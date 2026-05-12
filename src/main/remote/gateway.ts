@@ -269,7 +269,7 @@ export class RemoteGateway extends EventEmitter {
           channelId: message.channelId,
           content: {
             type: 'text',
-            text: '⚠️ 您没有权限使用此机器人。请联系管理员获取访问权限。',
+            text: '⚠️ You are not authorized to use this bot. Contact an administrator for access.',
           },
           replyTo: message.id,
         });
@@ -410,7 +410,7 @@ export class RemoteGateway extends EventEmitter {
           channelId: message.channelId,
           content: {
             type: 'text',
-            text: '✅ 配对成功！您现在可以开始使用机器人了。',
+            text: '✅ Pairing successful! You can now start using the bot.',
           },
           replyTo: message.id,
         });
@@ -429,7 +429,7 @@ export class RemoteGateway extends EventEmitter {
           channelId: message.channelId,
           content: {
             type: 'text',
-            text: `请输入配对码进行验证。\n\n您的配对码是: **${existing.code}**\n\n请将此配对码发送给管理员进行确认，或直接回复配对码完成配对。`,
+            text: `Please enter your pairing code to verify.\n\nYour pairing code is: **${existing.code}**\n\nSend this code to an administrator for approval, or reply with the code directly to complete pairing.`,
           },
           replyTo: message.id,
         });
@@ -455,7 +455,7 @@ export class RemoteGateway extends EventEmitter {
       channelId: message.channelId,
       content: {
         type: 'text',
-        text: `👋 您好！首次使用需要进行配对验证。\n\n您的配对码是: **${code}**\n\n请将此配对码发送给管理员进行确认。配对码有效期10分钟。`,
+        text: `👋 Welcome! First-time use requires pairing verification.\n\nYour pairing code is: **${code}**\n\nSend this code to an administrator for approval. The code is valid for 10 minutes.`,
       },
       replyTo: message.id,
     });
@@ -605,7 +605,7 @@ export class RemoteGateway extends EventEmitter {
   }
 
   private handleWebhook(req: IncomingMessage, res: ServerResponse, url: string): void {
-    // Extract channel type from URL: /webhook/feishu, /webhook/telegram, etc.
+    // Extract channel type from URL, e.g. /webhook/telegram.
     const channelType = url.split('/')[2] as ChannelType;
 
     log(`[Gateway] Received webhook for channel: ${channelType}, URL: ${url}`);

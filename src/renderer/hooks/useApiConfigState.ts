@@ -14,11 +14,14 @@ import type {
   ProviderType,
 } from '../types';
 import { isLoopbackBaseUrl } from '../../shared/network/loopback';
-import {
-  DEFAULT_OLLAMA_BASE_URL,
-  normalizeOllamaBaseUrl,
-} from '../../shared/ollama-base-url';
+import { DEFAULT_OLLAMA_BASE_URL, normalizeOllamaBaseUrl } from '../../shared/ollama-base-url';
 import { API_PROVIDER_PRESETS, getModelInputGuidance } from '../../shared/api-model-presets';
+import {
+  PURA_DIGITAL_BASE_URL,
+  isPuraDigitalActive,
+  isPuraDigitalBaseUrl,
+} from '../../shared/pura-digital';
+import { profileKeyToProvider } from '../../shared/provider-profile';
 import {
   COMMON_PROVIDER_SETUPS,
   detectCommonProviderSetup,
@@ -65,7 +68,7 @@ type PendingConfigSetAction = { type: 'switch'; targetSetId: string };
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
 const CONFIG_SET_LIMIT = 20;
 const DEFAULT_CONFIG_SET_ID = 'default';
-const DEFAULT_CONFIG_SET_NAME_ZH = '默认方案';
+const DEFAULT_CONFIG_SET_NAME_ZH = 'Default';
 export const FALLBACK_PROVIDER_PRESETS: ProviderPresets = API_PROVIDER_PRESETS;
 
 const PROFILE_KEYS: ProviderProfileKey[] = [
@@ -114,30 +117,7 @@ export function profileKeyFromProvider(
   return 'custom:anthropic';
 }
 
-export function profileKeyToProvider(profileKey: ProviderProfileKey): {
-  provider: ProviderType;
-  customProtocol: CustomProtocolType;
-} {
-  if (profileKey === 'ollama') {
-    return { provider: 'ollama', customProtocol: 'openai' };
-  }
-  if (profileKey === 'custom:openai') {
-    return { provider: 'custom', customProtocol: 'openai' };
-  }
-  if (profileKey === 'custom:gemini') {
-    return { provider: 'custom', customProtocol: 'gemini' };
-  }
-  if (profileKey === 'custom:anthropic') {
-    return { provider: 'custom', customProtocol: 'anthropic' };
-  }
-  if (profileKey === 'openai') {
-    return { provider: 'openai', customProtocol: 'openai' };
-  }
-  if (profileKey === 'gemini') {
-    return { provider: 'gemini', customProtocol: 'gemini' };
-  }
-  return { provider: profileKey, customProtocol: 'anthropic' };
-}
+export { profileKeyToProvider } from '../../shared/provider-profile';
 
 export function isCustomAnthropicLoopbackGateway(baseUrl: string): boolean {
   return isLoopbackBaseUrl(baseUrl);
@@ -150,6 +130,8 @@ export function isCustomGeminiLoopbackGateway(baseUrl: string): boolean {
 export function isCustomOpenAiLoopbackGateway(baseUrl: string): boolean {
   return isLoopbackBaseUrl(baseUrl);
 }
+
+export { isPuraDigitalActive } from '../../shared/pura-digital';
 
 function isLegacyOllamaConfig(
   config: Pick<AppConfig, 'provider' | 'customProtocol' | 'baseUrl'> | null | undefined
@@ -196,7 +178,7 @@ function defaultProfileForKey(
   return {
     apiKey: '',
     baseUrl: preset.baseUrl,
-    model: profileKey === 'ollama' ? '' : (preset.models[0]?.id || ''),
+    model: profileKey === 'ollama' ? '' : preset.models[0]?.id || '',
     customModel: '',
     useCustomModel: prefersCustomInput,
     contextWindow: '',
@@ -265,9 +247,8 @@ function normalizeProfile(
   );
   return {
     apiKey: profile?.apiKey || '',
-    baseUrl: profileKey === 'ollama'
-      ? (normalizeOllamaBaseUrl(rawBaseUrl) || fallback.baseUrl)
-      : rawBaseUrl,
+    baseUrl:
+      profileKey === 'ollama' ? normalizeOllamaBaseUrl(rawBaseUrl) || fallback.baseUrl : rawBaseUrl,
     model: hasPresetModel ? modelValue : fallback.model,
     customModel: hasPresetModel ? '' : modelValue,
     useCustomModel: !hasPresetModel,
@@ -582,6 +563,7 @@ interface ApiConfigState {
   isTesting: boolean;
   isRefreshingModels: boolean;
   isDiscoveringLocalOllama: boolean;
+  isDiscoveringPuraModels: boolean;
   isMutatingConfigSet: boolean;
   isDiagnosing: boolean;
   // Error message — either a raw string or a i18n key + optional values
@@ -647,6 +629,7 @@ type ApiConfigAction =
   | { type: 'SET_IS_TESTING'; payload: boolean }
   | { type: 'SET_IS_REFRESHING_MODELS'; payload: boolean }
   | { type: 'SET_IS_DISCOVERING_LOCAL_OLLAMA'; payload: boolean }
+  | { type: 'SET_IS_DISCOVERING_PURA_MODELS'; payload: boolean }
   | { type: 'SET_IS_MUTATING_CONFIG_SET'; payload: boolean }
   | { type: 'SET_IS_DIAGNOSING'; payload: boolean }
   // Error message helpers
@@ -726,7 +709,10 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
     case 'CLEAR_DISCOVERED_MODELS':
       return {
         ...state,
-        discoveredModels: clearDiscoveredModelsForProfile(state.discoveredModels, action.profileKey),
+        discoveredModels: clearDiscoveredModelsForProfile(
+          state.discoveredModels,
+          action.profileKey
+        ),
       };
 
     case 'DELETE_DISCOVERED_MODELS': {
@@ -758,6 +744,9 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
 
     case 'SET_IS_DISCOVERING_LOCAL_OLLAMA':
       return { ...state, isDiscoveringLocalOllama: action.payload };
+
+    case 'SET_IS_DISCOVERING_PURA_MODELS':
+      return { ...state, isDiscoveringPuraModels: action.payload };
 
     case 'SET_IS_MUTATING_CONFIG_SET':
       return { ...state, isMutatingConfigSet: action.payload };
@@ -824,34 +813,39 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         ? 'gemini'
         : 'anthropic';
 
-  const [state, dispatch] = useReducer(apiConfigReducer, undefined, (): ApiConfigState => ({
-    presets: FALLBACK_PROVIDER_PRESETS,
-    profiles: initialBootstrap.snapshot.profiles,
-    activeProfileKey: initialBootstrap.snapshot.activeProfileKey,
-    configSets: initialBootstrap.configSets,
-    activeConfigSetId: initialBootstrap.activeConfigSetId,
-    pendingConfigSetAction: null,
-    isMutatingConfigSet: false,
-    lastCustomProtocol: initialLastCustomProtocol,
-    enableThinking: Boolean(initialConfig?.enableThinking),
-    discoveredModels: {},
-    isLoadingConfig: true,
-    savedDraftSignature: '',
-    isSaving: false,
-    isTesting: false,
-    isRefreshingModels: false,
-    isDiscoveringLocalOllama: false,
-    errorText: '',
-    errorKey: null,
-    errorValues: undefined,
-    successText: '',
-    successKey: null,
-    successValues: undefined,
-    lastSaveCompletedAt: 0,
-    testResult: null,
-    diagnosticResult: null,
-    isDiagnosing: false,
-  }));
+  const [state, dispatch] = useReducer(
+    apiConfigReducer,
+    undefined,
+    (): ApiConfigState => ({
+      presets: FALLBACK_PROVIDER_PRESETS,
+      profiles: initialBootstrap.snapshot.profiles,
+      activeProfileKey: initialBootstrap.snapshot.activeProfileKey,
+      configSets: initialBootstrap.configSets,
+      activeConfigSetId: initialBootstrap.activeConfigSetId,
+      pendingConfigSetAction: null,
+      isMutatingConfigSet: false,
+      lastCustomProtocol: initialLastCustomProtocol,
+      enableThinking: Boolean(initialConfig?.enableThinking),
+      discoveredModels: {},
+      isLoadingConfig: true,
+      savedDraftSignature: '',
+      isSaving: false,
+      isTesting: false,
+      isRefreshingModels: false,
+      isDiscoveringLocalOllama: false,
+      isDiscoveringPuraModels: false,
+      errorText: '',
+      errorKey: null,
+      errorValues: undefined,
+      successText: '',
+      successKey: null,
+      successValues: undefined,
+      lastSaveCompletedAt: 0,
+      testResult: null,
+      diagnosticResult: null,
+      isDiagnosing: false,
+    })
+  );
 
   // Destructure state for convenience — avoids `state.X` in every expression
   const {
@@ -871,6 +865,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isTesting,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringPuraModels,
     errorText,
     errorKey,
     errorValues,
@@ -894,6 +889,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     provider: 'openrouter',
   });
   const ollamaDiscoverRequestIdRef = useRef(0);
+  const puraDiscoverRequestIdRef = useRef(0);
 
   const clearError = useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' });
@@ -930,12 +926,17 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const modelPreset = modelPresetForProfile(activeProfileKey, presets);
   const currentPreset = modelPreset;
   const hasDiscoveredOllamaModels =
-    provider === 'ollama' && Object.prototype.hasOwnProperty.call(discoveredModels, activeProfileKey);
-  const modelOptions = provider === 'ollama'
-    ? (discoveredModels[activeProfileKey] || [])
-    : hasDiscoveredOllamaModels
-      ? (discoveredModels[activeProfileKey] || [])
-      : modelPreset.models;
+    provider === 'ollama' &&
+    Object.prototype.hasOwnProperty.call(discoveredModels, activeProfileKey);
+  const isPuraMode = isPuraDigitalActive(provider, customProtocol, currentProfile.baseUrl);
+  const modelOptions =
+    provider === 'ollama'
+      ? discoveredModels[activeProfileKey] || []
+      : isPuraMode
+        ? discoveredModels[activeProfileKey] || []
+        : hasDiscoveredOllamaModels
+          ? discoveredModels[activeProfileKey] || []
+          : modelPreset.models;
   const modelInputGuidance = getModelInputGuidance(provider, customProtocol);
 
   const currentConfigSet = useMemo(
@@ -956,10 +957,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const customModel = currentProfile.customModel;
   const useCustomModel = currentProfile.useCustomModel;
   const shouldShowOllamaManualModelToggle =
-    provider !== 'ollama'
-      || useCustomModel
-      || Boolean(error)
-      || modelOptions.length === 0;
+    (provider !== 'ollama' && !isPuraMode) ||
+    useCustomModel ||
+    Boolean(error) ||
+    modelOptions.length === 0;
   const contextWindow = currentProfile.contextWindow;
   const maxTokens = currentProfile.maxTokens;
   const detectedProviderSetup = useMemo(
@@ -1181,7 +1182,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
 
   const changeProtocol = useCallback((newProtocol: CustomProtocolType) => {
     dispatch({ type: 'SET_LAST_CUSTOM_PROTOCOL', payload: newProtocol });
-    dispatch({ type: 'SET_ACTIVE_PROFILE_KEY', payload: profileKeyFromProvider('custom', newProtocol) });
+    dispatch({
+      type: 'SET_ACTIVE_PROFILE_KEY',
+      payload: profileKeyFromProvider('custom', newProtocol),
+    });
   }, []);
 
   const setApiKey = useCallback(
@@ -1354,7 +1358,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
           if (!inPreset) {
             return {
               ...current,
-              model: provider === 'ollama' ? '' : (preset.models[0]?.id || ''),
+              model: provider === 'ollama' ? '' : preset.models[0]?.id || '',
             };
           }
         }
@@ -1362,6 +1366,22 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       },
     });
   }, [activeProfileKey, baseUrl, provider, presets]);
+
+  // Drop discovered Pura models if the user navigates away from the Pura host.
+  // The discovered list belongs to the LiteLLM gateway and is not portable to
+  // arbitrary OpenAI-compatible endpoints.
+  useEffect(() => {
+    if (activeProfileKey !== 'custom:openai') {
+      return;
+    }
+    if (isPuraDigitalBaseUrl(baseUrl)) {
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(discoveredModels, 'custom:openai')) {
+      return;
+    }
+    dispatch({ type: 'DELETE_DISCOVERED_MODELS', profileKey: 'custom:openai' });
+  }, [activeProfileKey, baseUrl, discoveredModels]);
 
   const handleTest = useCallback(async () => {
     if (requiresApiKey && !apiKey.trim()) {
@@ -1430,52 +1450,55 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     showSuccessKey,
   ]);
 
-  const handleDiagnose = useCallback(async (verificationLevel: 'fast' | 'deep' = 'fast') => {
-    if (requiresApiKey && !apiKey.trim()) {
-      showErrorKey('api.testError.missing_key');
-      return;
-    }
+  const handleDiagnose = useCallback(
+    async (verificationLevel: 'fast' | 'deep' = 'fast') => {
+      if (requiresApiKey && !apiKey.trim()) {
+        showErrorKey('api.testError.missing_key');
+        return;
+      }
 
-    clearError();
-    dispatch({ type: 'SET_IS_DIAGNOSING', payload: true });
-    dispatch({ type: 'SET_DIAGNOSTIC_RESULT', payload: null });
-    dispatch({ type: 'SET_TEST_RESULT', payload: null });
-    try {
-      const resolvedBaseUrl =
-        provider === 'custom' || provider === 'ollama'
-          ? baseUrl.trim()
-          : (baseUrl.trim() || currentPreset.baseUrl || '').trim();
+      clearError();
+      dispatch({ type: 'SET_IS_DIAGNOSING', payload: true });
+      dispatch({ type: 'SET_DIAGNOSTIC_RESULT', payload: null });
+      dispatch({ type: 'SET_TEST_RESULT', payload: null });
+      try {
+        const resolvedBaseUrl =
+          provider === 'custom' || provider === 'ollama'
+            ? baseUrl.trim()
+            : (baseUrl.trim() || currentPreset.baseUrl || '').trim();
 
-      const finalModel = useCustomModel ? customModel.trim() : model;
+        const finalModel = useCustomModel ? customModel.trim() : model;
 
-      const result = await window.electronAPI.config.diagnose({
-        provider,
-        apiKey: apiKey.trim(),
-        baseUrl: resolvedBaseUrl || undefined,
-        customProtocol,
-        model: finalModel || undefined,
-        verificationLevel,
-      });
-      dispatch({ type: 'SET_DIAGNOSTIC_RESULT', payload: result });
-    } catch (err) {
-      showErrorText((err as Error).message || 'Diagnosis failed');
-    } finally {
-      dispatch({ type: 'SET_IS_DIAGNOSING', payload: false });
-    }
-  }, [
-    requiresApiKey,
-    apiKey,
-    baseUrl,
-    provider,
-    customProtocol,
-    model,
-    customModel,
-    useCustomModel,
-    currentPreset.baseUrl,
-    clearError,
-    showErrorKey,
-    showErrorText,
-  ]);
+        const result = await window.electronAPI.config.diagnose({
+          provider,
+          apiKey: apiKey.trim(),
+          baseUrl: resolvedBaseUrl || undefined,
+          customProtocol,
+          model: finalModel || undefined,
+          verificationLevel,
+        });
+        dispatch({ type: 'SET_DIAGNOSTIC_RESULT', payload: result });
+      } catch (err) {
+        showErrorText((err as Error).message || 'Diagnosis failed');
+      } finally {
+        dispatch({ type: 'SET_IS_DIAGNOSING', payload: false });
+      }
+    },
+    [
+      requiresApiKey,
+      apiKey,
+      baseUrl,
+      provider,
+      customProtocol,
+      model,
+      customModel,
+      useCustomModel,
+      currentPreset.baseUrl,
+      clearError,
+      showErrorKey,
+      showErrorText,
+    ]
+  );
 
   const handleDeepDiagnose = useCallback(async () => {
     await handleDiagnose('deep');
@@ -1501,10 +1524,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
 
       const latestTarget = latestOllamaTargetRef.current;
       if (
-        requestId !== ollamaRefreshRequestIdRef.current
-        || latestTarget.provider !== 'ollama'
-        || latestTarget.activeProfileKey !== requestedProfileKey
-        || latestTarget.baseUrl !== requestedBaseUrl
+        requestId !== ollamaRefreshRequestIdRef.current ||
+        latestTarget.provider !== 'ollama' ||
+        latestTarget.activeProfileKey !== requestedProfileKey ||
+        latestTarget.baseUrl !== requestedBaseUrl
       ) {
         return models;
       }
@@ -1534,10 +1557,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     } catch (refreshError) {
       const latestTarget = latestOllamaTargetRef.current;
       if (
-        requestId !== ollamaRefreshRequestIdRef.current
-        || latestTarget.provider !== 'ollama'
-        || latestTarget.activeProfileKey !== requestedProfileKey
-        || latestTarget.baseUrl !== requestedBaseUrl
+        requestId !== ollamaRefreshRequestIdRef.current ||
+        latestTarget.provider !== 'ollama' ||
+        latestTarget.activeProfileKey !== requestedProfileKey ||
+        latestTarget.baseUrl !== requestedBaseUrl
       ) {
         return [];
       }
@@ -1562,6 +1585,112 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     clearError,
     showErrorKey,
     showErrorText,
+  ]);
+
+  const applyPuraDigitalSetup = useCallback(() => {
+    const targetProfileKey: ProviderProfileKey = 'custom:openai';
+    dispatch({ type: 'SET_LAST_CUSTOM_PROTOCOL', payload: 'openai' });
+    dispatch({
+      type: 'UPDATE_PROFILE_FN',
+      profileKey: targetProfileKey,
+      updater: (current) => ({
+        ...current,
+        baseUrl: PURA_DIGITAL_BASE_URL,
+        // Force the user to (re)discover Pura models or type one manually,
+        // since the previous custom:openai model rarely matches the gateway.
+        model: '',
+        customModel: '',
+        useCustomModel: false,
+      }),
+    });
+    dispatch({ type: 'DELETE_DISCOVERED_MODELS', profileKey: targetProfileKey });
+    dispatch({ type: 'SET_ACTIVE_PROFILE_KEY', payload: targetProfileKey });
+  }, []);
+
+  const discoverPuraDigitalModels = useCallback(async () => {
+    if (!isElectron || !isPuraMode) {
+      return [];
+    }
+
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      showErrorKey('api.testError.missing_key');
+      return [];
+    }
+
+    const requestedProfileKey = activeProfileKey;
+    const requestedBaseUrl = baseUrl.trim() || PURA_DIGITAL_BASE_URL;
+    const requestId = ++puraDiscoverRequestIdRef.current;
+
+    dispatch({ type: 'SET_IS_DISCOVERING_PURA_MODELS', payload: true });
+    clearError();
+
+    try {
+      const models = await window.electronAPI.config.listOpenAICompatibleModels({
+        baseUrl: requestedBaseUrl,
+        apiKey: trimmedKey,
+      });
+
+      if (requestId !== puraDiscoverRequestIdRef.current) {
+        return models;
+      }
+
+      dispatch({
+        type: 'SET_DISCOVERED_MODELS',
+        profileKey: requestedProfileKey,
+        models,
+      });
+      dispatch({
+        type: 'UPDATE_PROFILE_FN',
+        profileKey: requestedProfileKey,
+        updater: (current) => {
+          const explicitManualModel = current.useCustomModel ? current.customModel.trim() : '';
+          const currentModel = explicitManualModel || current.model.trim();
+          const hasMatch = models.some((item) => item.id === currentModel);
+          const shouldAutoSelect =
+            Boolean(models[0]?.id) && !explicitManualModel && (!currentModel || !hasMatch);
+          return {
+            ...current,
+            model: shouldAutoSelect ? models[0]!.id : current.model,
+            useCustomModel: shouldAutoSelect ? false : current.useCustomModel,
+          };
+        },
+      });
+
+      if (models.length === 0) {
+        showErrorKey('api.puraNoModels');
+      } else {
+        showSuccessKey('api.puraModelsDiscovered', { count: models.length });
+        setTimeout(() => clearSuccessMessage(), 2500);
+      }
+
+      return models;
+    } catch (discoveryError) {
+      if (requestId !== puraDiscoverRequestIdRef.current) {
+        return [];
+      }
+      dispatch({ type: 'CLEAR_DISCOVERED_MODELS', profileKey: requestedProfileKey });
+      if (discoveryError instanceof Error && discoveryError.message.trim()) {
+        showErrorText(discoveryError.message);
+      } else {
+        showErrorKey('api.puraDiscoveryFailed');
+      }
+      return [];
+    } finally {
+      if (requestId === puraDiscoverRequestIdRef.current) {
+        dispatch({ type: 'SET_IS_DISCOVERING_PURA_MODELS', payload: false });
+      }
+    }
+  }, [
+    activeProfileKey,
+    apiKey,
+    baseUrl,
+    clearError,
+    clearSuccessMessage,
+    isPuraMode,
+    showErrorKey,
+    showErrorText,
+    showSuccessKey,
   ]);
 
   const applyDiscoveredOllamaState = useCallback(
@@ -1622,10 +1751,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         });
         const latestTarget = latestOllamaTargetRef.current;
         if (
-          requestId !== ollamaDiscoverRequestIdRef.current
-          || latestTarget.provider !== 'ollama'
-          || latestTarget.activeProfileKey !== requestedProfileKey
-          || latestTarget.baseUrl !== requestedBaseUrl
+          requestId !== ollamaDiscoverRequestIdRef.current ||
+          latestTarget.provider !== 'ollama' ||
+          latestTarget.activeProfileKey !== requestedProfileKey ||
+          latestTarget.baseUrl !== requestedBaseUrl
         ) {
           return result;
         }
@@ -1656,10 +1785,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       } catch (discoveryError) {
         const latestTarget = latestOllamaTargetRef.current;
         if (
-          requestId !== ollamaDiscoverRequestIdRef.current
-          || latestTarget.provider !== 'ollama'
-          || latestTarget.activeProfileKey !== requestedProfileKey
-          || latestTarget.baseUrl !== requestedBaseUrl
+          requestId !== ollamaDiscoverRequestIdRef.current ||
+          latestTarget.provider !== 'ollama' ||
+          latestTarget.activeProfileKey !== requestedProfileKey ||
+          latestTarget.baseUrl !== requestedBaseUrl
         ) {
           return null;
         }
@@ -2072,6 +2201,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     handleDiagnose,
     handleDeepDiagnose,
     isOllamaMode: provider === 'ollama',
+    isPuraMode,
+    isDiscoveringPuraModels,
     shouldShowOllamaManualModelToggle,
     requiresApiKey,
     detectedProviderSetup,
@@ -2111,6 +2242,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     handleTest,
     refreshModelOptions,
     discoverLocalOllama,
+    applyPuraDigitalSetup,
+    discoverPuraDigitalModels,
     setError: showErrorText,
     setSuccessMessage: showSuccessText,
   };

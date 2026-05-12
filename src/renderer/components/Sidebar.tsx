@@ -16,8 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import type { Session } from '../types';
-
-import sidebarLogoSrc from '../assets/logo.png';
+import appLogo from '../assets/logo.png';
 
 type SessionGroup = {
   key: string;
@@ -274,13 +273,13 @@ export function Sidebar() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
             <img
-              src={sidebarLogoSrc}
+              src={appLogo}
               alt={t('common.appLogoAlt')}
               className="w-10 h-10 rounded-2xl object-cover border border-border-subtle bg-background/60 flex-shrink-0"
             />
             <div className="min-w-0">
               <h1 className="text-[1.34rem] leading-none font-semibold tracking-[-0.035em] text-text-primary">
-                Open Cowork
+                Aiden
               </h1>
             </div>
           </div>

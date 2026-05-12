@@ -1,6 +1,6 @@
-appId: com.opencowork.app
-productName: Open Cowork
-copyright: Copyright © 2026 Open Cowork Team
+appId: com.aiden.app
+productName: Aiden
+copyright: Copyright © 2026 Pura Digital Team
 
 directories:
   output: release
@@ -17,7 +17,8 @@ files:
   - node_modules/@img/**/*
   - node_modules/better-sqlite3/**/*
   - node_modules/@anthropic-ai/sdk/**/*
-  - node_modules/@larksuiteoapi/**/*
+  - node_modules/@grammyjs/**/*
+  - node_modules/grammy/**/*
   - node_modules/openai/**/*
   - node_modules/@modelcontextprotocol/**/*
   - node_modules/electron-updater/**/*
@@ -92,8 +93,8 @@ mac:
   entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
     LSApplicationCategoryType: public.app-category.developer-tools
-    NSScreenCaptureUsageDescription: 'Open Cowork needs screen recording access for GUI automation.'
-    NSAccessibilityUsageDescription: 'Open Cowork needs accessibility access for GUI automation.'
+    NSScreenCaptureUsageDescription: 'Aiden needs screen recording access for GUI automation.'
+    NSAccessibilityUsageDescription: 'Aiden needs accessibility access for GUI automation.'
   extraResources:
     - from: .bundle-resources/mcp
       to: mcp
@@ -147,7 +148,7 @@ dmg:
   contents:
     - x: 150
       y: 220
-      name: 'Open Cowork.app'
+      name: 'Aiden.app'
     - x: 450
       y: 220
       type: link
@@ -160,4 +161,4 @@ extraMetadata:
 publish:
   provider: github
   owner: OpenCoworkAI
-  repo: open-cowork
+  repo: aiden

@@ -7,26 +7,26 @@
 @layer base {
   /* Define CSS variables for theming */
   :root {
-    /* Dark theme (default) — Claude warm palette */
-    --color-background: #171614;
-    --color-background-secondary: #1d1b18;
-    --color-surface: #22201d;
-    --color-surface-hover: #2a2723;
-    --color-surface-active: #33302b;
-    --color-surface-muted: #1b1916;
-    --color-border: #34302a;
-    --color-border-muted: #2a2722;
-    --color-border-subtle: rgba(255, 245, 232, 0.07);
-    --color-mcp: #9d8abc;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.24);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 245, 232, 0.03);
-    --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(255, 245, 232, 0.04);
-    --color-accent: #d67a52;
-    --color-accent-hover: #c56c46;
-    --color-accent-muted: rgba(214, 122, 82, 0.14);
-    --color-text-primary: #f1ece4;
-    --color-text-secondary: #b6ada2;
-    --color-text-muted: #8c8378;
+    /* Dark theme (default) — Aiden deep-blue palette */
+    --color-background: #071427;
+    --color-background-secondary: #0b1c33;
+    --color-surface: #122742;
+    --color-surface-hover: #173252;
+    --color-surface-active: #1d3d63;
+    --color-surface-muted: #0d2039;
+    --color-border: #29426130;
+    --color-border-muted: #1f365430;
+    --color-border-subtle: rgba(158, 189, 255, 0.18);
+    --color-mcp: #8ea6ff;
+    --shadow-soft: 0 1px 4px rgba(1, 10, 20, 0.35);
+    --shadow-card: 0 1px 2px rgba(1, 10, 20, 0.34), 0 0 0 1px rgba(158, 189, 255, 0.08);
+    --shadow-elevated: 0 8px 24px rgba(1, 10, 20, 0.45), 0 0 0 1px rgba(158, 189, 255, 0.1);
+    --color-accent: #7f93ee;
+    --color-accent-hover: #96adff;
+    --color-accent-muted: rgba(127, 147, 238, 0.2);
+    --color-text-primary: #eaf2ff;
+    --color-text-secondary: #b8cae9;
+    --color-text-muted: #8ea3c8;
     --color-success: #22c55e;
     --color-warning: #eab308;
     --color-error: #ef4444;
@@ -34,25 +34,25 @@
 
   /* Light theme override — Claude warm cream */
   .light {
-    --color-background: #f5f3ed;
-    --color-background-secondary: #f0eee8;
-    --color-surface: #faf9f4;
-    --color-surface-hover: #f5f3ed;
-    --color-surface-active: #eceae4;
-    --color-surface-muted: #f2f0eb;
-    --color-border: #e2dfd9;
-    --color-border-muted: #e8e6e0;
-    --color-border-subtle: rgba(0, 0, 0, 0.05);
-    --color-mcp: #8570a6;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.04);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.1);
-    --color-accent: #d97757;
-    --color-accent-hover: #c46849;
-    --color-accent-muted: #fef3ee;
-    --color-text-primary: #1a1a1a;
-    --color-text-secondary: #5c5c5c;
-    --color-text-muted: #8c8c8c;
+    --color-background: #ffffff;
+    --color-background-secondary: #f5f9ff;
+    --color-surface: #ffffff;
+    --color-surface-hover: #eff5ff;
+    --color-surface-active: #e4eeff;
+    --color-surface-muted: #f7faff;
+    --color-border: #d5e2fb50;
+    --color-border-muted: #e5edfb50;
+    --color-border-subtle: rgba(30, 73, 138, 0.08);
+    --color-mcp: #5d78d5;
+    --shadow-soft: 0 1px 4px rgba(9, 33, 71, 0.08);
+    --shadow-card: 0 1px 3px rgba(9, 33, 71, 0.09), 0 1px 2px rgba(9, 33, 71, 0.06);
+    --shadow-elevated: 0 4px 12px rgba(9, 33, 71, 0.14);
+    --color-accent: #5c79df;
+    --color-accent-hover: #4968d1;
+    --color-accent-muted: rgba(92, 121, 223, 0.12);
+    --color-text-primary: #102a4d;
+    --color-text-secondary: #3f5f8c;
+    --color-text-muted: #6b84ab;
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
@@ -197,7 +197,8 @@
     font-style: italic;
   }
 
-  .prose-chat ul, .prose-chat ol {
+  .prose-chat ul,
+  .prose-chat ol {
     margin: 0.75rem 0;
     padding-left: 1.5rem;
   }
@@ -241,7 +242,10 @@
     margin-bottom: 0.35rem;
   }
 
-  .prose-chat h1, .prose-chat h2, .prose-chat h3, .prose-chat h4 {
+  .prose-chat h1,
+  .prose-chat h2,
+  .prose-chat h3,
+  .prose-chat h4 {
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     font-weight: 600;
     margin-top: 1.25rem;
@@ -252,10 +256,18 @@
     margin-top: 0;
   }
 
-  .prose-chat h1 { font-size: 1.5rem; }
-  .prose-chat h2 { font-size: 1.25rem; }
-  .prose-chat h3 { font-size: 1.125rem; }
-  .prose-chat h4 { font-size: 1rem; }
+  .prose-chat h1 {
+    font-size: 1.5rem;
+  }
+  .prose-chat h2 {
+    font-size: 1.25rem;
+  }
+  .prose-chat h3 {
+    font-size: 1.125rem;
+  }
+  .prose-chat h4 {
+    font-size: 1rem;
+  }
 
   .prose-chat .katex-display {
     margin: 1rem 0;
@@ -327,9 +339,42 @@
   }
 }
 
+/* Pura voice FAB — liquid-style ambient glow (blur + organic border-radius) */
+.pura-voice-fab__blob::before {
+  content: '';
+  position: absolute;
+  inset: -38%;
+  border-radius: 60% 40% 55% 45% / 55% 45% 55% 45%;
+  background:
+    radial-gradient(circle at 28% 32%, rgba(127, 147, 238, 0.55), transparent 58%),
+    radial-gradient(circle at 72% 58%, rgba(56, 189, 248, 0.38), transparent 52%),
+    radial-gradient(circle at 50% 82%, rgba(167, 139, 250, 0.22), transparent 46%);
+  filter: blur(26px);
+  animation: pura-voice-liquid 11s ease-in-out infinite;
+  opacity: 0.92;
+}
+
+@keyframes pura-voice-liquid {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 60% 40% 55% 45% / 55% 45% 55% 45%;
+  }
+  33% {
+    transform: translate3d(4%, -3%, 0) scale(1.07) rotate(7deg);
+    border-radius: 48% 52% 42% 58% / 52% 48% 52% 48%;
+  }
+  66% {
+    transform: translate3d(-3%, 4%, 0) scale(0.97) rotate(-5deg);
+    border-radius: 54% 46% 58% 42% / 46% 54% 46% 54%;
+  }
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
