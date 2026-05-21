@@ -16,7 +16,6 @@ import {
   Check,
 } from 'lucide-react';
 import type { Session } from '../types';
-import appLogo from '../assets/logo.png';
 
 type SessionGroup = {
   key: string;
@@ -270,19 +269,14 @@ export function Sidebar() {
   return (
     <aside className="w-[17.5rem] bg-surface/96 border-r border-border-muted flex flex-col overflow-hidden">
       <div className="px-4 pt-5 pb-4 border-b border-border-muted">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-3">
-            <img
-              src={appLogo}
-              alt={t('common.appLogoAlt')}
-              className="w-10 h-10 rounded-2xl object-cover border border-border-subtle bg-background/60 flex-shrink-0"
-            />
-            <div className="min-w-0">
-              <h1 className="text-[1.34rem] leading-none font-semibold tracking-[-0.035em] text-text-primary">
-                Aiden
-              </h1>
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleNewSession}
+            className="min-w-0 flex-1 flex items-center gap-2 rounded-xl bg-background/60 px-3 py-2 text-left text-text-primary hover:bg-surface-hover transition-colors"
+          >
+            <Plus className="w-4 h-4 text-text-secondary flex-shrink-0" />
+            <span className="text-[13px] font-medium truncate">{t('sidebar.newTask')}</span>
+          </button>
           <button
             onClick={toggleSidebar}
             className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-surface-hover transition-colors text-text-secondary flex-shrink-0"
@@ -291,14 +285,6 @@ export function Sidebar() {
             <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
-
-        <button
-          onClick={handleNewSession}
-          className="mt-3 w-full flex items-center gap-2 rounded-xl bg-background/60 px-3 py-2 text-left text-text-primary hover:bg-surface-hover transition-colors"
-        >
-          <Plus className="w-4 h-4 text-text-secondary flex-shrink-0" />
-          <span className="text-[13px] font-medium">{t('sidebar.newTask')}</span>
-        </button>
 
         {sessions.length > 0 && (
           <div className="mt-2 flex items-center gap-2">

@@ -106,6 +106,10 @@ export interface AppConfig {
   // Optional: Global skills storage directory
   globalSkillsPath?: string;
 
+  // Optional: BFF external web-tools (web-search-bff skill)
+  bffBaseUrl?: string;
+  webServicesKey?: string;
+
   // Developer logs
   enableDevLogs: boolean;
 
@@ -241,6 +245,8 @@ const defaultConfig: AppConfig = {
   claudeCodePath: '',
   defaultWorkdir: '',
   globalSkillsPath: '',
+  bffBaseUrl: '',
+  webServicesKey: '',
   enableDevLogs: false,
   theme: 'light',
   sandboxEnabled: false,
@@ -866,7 +872,7 @@ export class ConfigStore {
 
       const normalizedSet = this.normalizeConfigSet(rawSet, {
         id: nextId,
-        name: toNonEmptyString(rawSet.name) || `方案 ${index + 1}`,
+        name: toNonEmptyString(rawSet.name) || `Config set ${index + 1}`,
         provider: legacy.provider,
         customProtocol: legacy.customProtocol,
         activeProfileKey: legacy.activeProfileKey,
@@ -980,6 +986,12 @@ export class ConfigStore {
         typeof raw.globalSkillsPath === 'string'
           ? raw.globalSkillsPath
           : defaultConfig.globalSkillsPath,
+      bffBaseUrl:
+        typeof raw.bffBaseUrl === 'string' ? raw.bffBaseUrl : defaultConfig.bffBaseUrl,
+      webServicesKey:
+        typeof raw.webServicesKey === 'string'
+          ? raw.webServicesKey
+          : defaultConfig.webServicesKey,
       enableDevLogs: toBoolean(raw.enableDevLogs, defaultConfig.enableDevLogs),
       theme: isAppTheme(raw.theme) ? raw.theme : defaultConfig.theme,
       sandboxEnabled: toBoolean(raw.sandboxEnabled, defaultConfig.sandboxEnabled),
@@ -1514,9 +1526,9 @@ export class ConfigStore {
    * Apply config to environment variables
    * This should be called before creating sessions
    *
-   * 环境变量映射：
-   * - OpenAI 直连: OPENAI_API_KEY = apiKey, OPENAI_BASE_URL 可选
-   * - Anthropic 直连: ANTHROPIC_API_KEY = apiKey
+   * Environment variable mapping:
+   * - OpenAI direct: OPENAI_API_KEY = apiKey, OPENAI_BASE_URL optional
+   * - Anthropic direct: ANTHROPIC_API_KEY = apiKey
    * - Custom Anthropic: ANTHROPIC_API_KEY = apiKey
    * - OpenRouter: ANTHROPIC_AUTH_TOKEN = apiKey, ANTHROPIC_API_KEY = '' (proxy mode)
    */
@@ -1641,6 +1653,15 @@ export class ConfigStore {
       process.env.COWORK_WORKDIR = projectedConfig.defaultWorkdir;
     }
 
+    const bffBaseUrl = projectedConfig.bffBaseUrl?.trim();
+    if (bffBaseUrl) {
+      process.env.BFF_BASE_URL = bffBaseUrl.replace(/\/+$/, '');
+    }
+    const webServicesKey = projectedConfig.webServicesKey?.trim();
+    if (webServicesKey) {
+      process.env.WEB_SERVICES_KEY = webServicesKey;
+    }
+
     log('[Config] Applied env vars for provider:', projectedConfig.provider, {
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? '✓ Set' : '(empty/unset)',
       ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN ? '✓ Set' : '(empty/unset)',
@@ -1652,6 +1673,8 @@ export class ConfigStore {
       OPENAI_ACCOUNT_ID: process.env.OPENAI_ACCOUNT_ID || '(not set)',
       GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '✓ Set' : '(empty/unset)',
       GEMINI_BASE_URL: process.env.GEMINI_BASE_URL || '(default)',
+      BFF_BASE_URL: process.env.BFF_BASE_URL ? '✓ Set' : '(not set)',
+      WEB_SERVICES_KEY: process.env.WEB_SERVICES_KEY ? '✓ Set' : '(not set)',
     });
   }
 

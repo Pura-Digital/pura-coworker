@@ -415,7 +415,7 @@ export function buildApiConfigSets(
       return {
         ...set,
         id: typeof set.id === 'string' && set.id.trim() ? set.id : `set-${index + 1}`,
-        name: typeof set.name === 'string' && set.name.trim() ? set.name : `配置方案 ${index + 1}`,
+        name: typeof set.name === 'string' && set.name.trim() ? set.name : `Config set ${index + 1}`,
         provider,
         customProtocol,
         activeProfileKey,

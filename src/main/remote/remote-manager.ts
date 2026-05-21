@@ -1,6 +1,6 @@
 /**
  * Remote Manager
- * 远程控制系统管理器，整合 Gateway、Channels 和 MessageRouter
+ * Remote control manager integrating Gateway, Channels, and MessageRouter
  */
 
 import { EventEmitter } from 'events';
@@ -99,7 +99,7 @@ export class RemoteManager extends EventEmitter {
   // Promise-chain mutex for synchronizing pendingInteractions access
   private lockChain: Promise<void> = Promise.resolve();
 
-  // 远程默认工作目录（用于未指定 cwd 的会话）
+  // Default working directory for remote sessions without an explicit cwd
   private defaultWorkingDirectory?: string;
 
   constructor() {
@@ -148,7 +148,7 @@ export class RemoteManager extends EventEmitter {
   }
 
   /**
-   * 设置远程会话的默认工作目录
+   * Set the default working directory for remote sessions
    */
   setDefaultWorkingDirectory(dir?: string): void {
     this.defaultWorkingDirectory = dir;
@@ -180,7 +180,7 @@ export class RemoteManager extends EventEmitter {
       // Create gateway
       this.gateway = new RemoteGateway(config.gateway, this.messageRouter);
 
-      // 设置远程默认工作目录（优先使用配置，其次使用全局默认）
+      // Set remote default cwd (config first, then global default)
       const configuredDefaultWorkingDir =
         config.gateway.defaultWorkingDirectory || this.defaultWorkingDirectory;
       if (configuredDefaultWorkingDir) {
@@ -617,6 +617,8 @@ export class RemoteManager extends EventEmitter {
         'LS',
         'WebFetch',
         'WebSearch',
+        'BffWebSearch',
+        'BffWebCrawl',
         // MCP Chrome tools (for browsing)
         'mcp__Chrome__navigate_page',
         'mcp__Chrome__take_screenshot',
@@ -983,7 +985,7 @@ export class RemoteManager extends EventEmitter {
     if (!channelInfo || !this.gateway) return;
 
     // Only send notifications for interesting tools
-    const notifyTools = ['Bash', 'Write', 'Edit', 'WebSearch', 'WebFetch', 'mcp__Chrome__'];
+    const notifyTools = ['Bash', 'Write', 'Edit', 'WebSearch', 'WebFetch', 'BffWebSearch', 'BffWebCrawl', 'mcp__Chrome__'];
     const shouldNotify = notifyTools.some((t) => toolName.includes(t));
 
     if (!shouldNotify) return;
@@ -1263,7 +1265,7 @@ export class RemoteManager extends EventEmitter {
   }
 
   /**
-   * 发送远程用户消息到本地 UI（仅远程会话使用）
+   * Send a remote user message to the local UI (remote sessions only)
    */
   private emitRemoteUserMessage(
     actualSessionId: string,

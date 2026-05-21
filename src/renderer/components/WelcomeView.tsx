@@ -15,7 +15,7 @@ import {
   BookOpen,
   FileSearch,
 } from 'lucide-react';
-import appLogo from '../assets/logo.png';
+import { AidenLogoLoader } from './AidenLogoLoader';
 
 type AttachedFile = {
   name: string;
@@ -442,10 +442,10 @@ export function WelcomeView() {
       <div className="max-w-[840px] w-full space-y-7 animate-fade-in">
         <div className="space-y-4 text-center">
           <div className="flex items-center justify-center gap-4">
-            <img
-              src={appLogo}
-              alt={t('welcome.logoAlt')}
-              className="w-16 h-16 md:w-20 md:h-20 rounded-[1.4rem] object-cover border border-border-subtle bg-background/60 shadow-soft"
+            <AidenLogoLoader
+              aria-label={t('welcome.logoAlt')}
+              playOnceThenEveryMs={5 * 60 * 1000}
+              className="w-16 h-16 shrink-0 overflow-visible md:h-20 md:w-20 rounded-[1.4rem] border border-border-subtle bg-background/60 p-2.5 shadow-soft"
             />
             <div className="text-left">
               <h1 className="text-[2.35rem] md:text-[3.1rem] leading-none font-semibold tracking-[-0.05em] text-text-primary">

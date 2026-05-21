@@ -48,11 +48,12 @@ describe('session title utils', () => {
     ).toBe(false);
   });
 
-  it('builds a bilingual prompt requiring <=15 chars and same language', () => {
-    const prompt = buildTitlePrompt('帮我做一个PPT');
+  it('builds an English prompt requiring <=15 chars and same language', () => {
+    const prompt = buildTitlePrompt('Help me make a slide deck');
     expect(prompt).toContain('15');
-    expect(prompt).toContain('同语言');
     expect(prompt).toContain('same language');
+    expect(prompt).toContain('User request: Help me make a slide deck');
+    expect(prompt).not.toContain('同语言');
   });
 
   it('normalizes generated title by taking first line and stripping quotes', () => {

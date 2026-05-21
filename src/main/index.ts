@@ -16,7 +16,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeTheme, Tray } f
 import { join, resolve, dirname, isAbsolute, basename } from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
-import { config } from 'dotenv';
+import { loadAppEnvironmentFiles } from './utils/env-loader';
 import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager } from './session/session-manager';
 import { SkillsManager } from './skills/skills-manager';
@@ -96,20 +96,24 @@ import {
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
 
-// Load .env file from project root (for development)
-const envPath = resolve(__dirname, '../../.env');
-log('[dotenv] Loading from:', envPath);
-const dotenvResult = config({ path: envPath });
-if (dotenvResult.error) {
-  logWarn('[dotenv] Failed to load .env:', dotenvResult.error.message);
-} else {
-  log('[dotenv] Loaded successfully');
-}
+// Load .env from project root (dev) and userData (packaged app)
+loadAppEnvironmentFiles(__dirname);
 
 // Apply saved config (this overrides .env if config exists)
 if (configStore.isConfigured()) {
   log('[Config] Applying saved configuration...');
   configStore.applyToEnv();
+}
+
+// Persist BFF credentials from .env into config when not yet saved (packaged app bootstrap)
+const envBffBase = process.env.BFF_BASE_URL?.trim();
+const envWebKey = process.env.WEB_SERVICES_KEY?.trim();
+if (envBffBase && envWebKey && !configStore.get('bffBaseUrl')?.trim()) {
+  configStore.update({
+    bffBaseUrl: envBffBase.replace(/\/+$/, ''),
+    webServicesKey: envWebKey,
+  });
+  log('[Config] Saved BFF web-tools credentials from environment to config store');
 }
 
 // Disable hardware acceleration for better compatibility
@@ -446,7 +450,7 @@ function createWindow() {
     try {
       allowedOrigins.add(new URL(process.env.VITE_DEV_SERVER_URL).origin);
     } catch {
-      // 忽略无效的开发服务地址
+      // Ignore invalid dev server URL
     }
   }
   const allowedProtocols = new Set<string>(['file:', 'devtools:']);
@@ -537,6 +541,16 @@ function createWindow() {
     mainWindow = null;
   });
 
+  const pushWindowChromeState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send('window-chrome-state', {
+      isFullscreen: mainWindow.isFullScreen(),
+    });
+  };
+
+  mainWindow.on('enter-full-screen', pushWindowChromeState);
+  mainWindow.on('leave-full-screen', pushWindowChromeState);
+
   // Notify renderer about config status after window is ready
   mainWindow.webContents.on('did-finish-load', () => {
     const isConfigured = configStore.isConfigured();
@@ -557,6 +571,8 @@ function createWindow() {
 
     // Start sandbox bootstrap after window is loaded
     startSandboxBootstrap();
+
+    pushWindowChromeState();
   });
 }
 
@@ -682,7 +698,7 @@ async function startSandboxBootstrap(): Promise<void> {
   }
 }
 
-// 发送事件到渲染进程（含远程会话拦截）
+// Send events to the renderer (with remote-session interception)
 function sendToRenderer(event: ServerEvent) {
   const payload =
     'payload' in event
@@ -690,25 +706,24 @@ function sendToRenderer(event: ServerEvent) {
       : undefined;
   const sessionId = payload?.sessionId;
 
-  // 判断是否远程会话
+  // Remote session: intercept selected events before local UI delivery
   if (sessionId && remoteManager.isRemoteSession(sessionId)) {
-    // 处理远程会话事件
 
-    // 拦截 stream.message，用于回传到远程通道
+    // Intercept stream.message for channel relay
     if (event.type === 'stream.message') {
       const message = payload.message as {
         role?: string;
         content?: Array<{ type: string; text?: string }>;
       };
       if (message?.role === 'assistant' && message?.content) {
-        // 提取助手文本内容
+        // Extract assistant text content
         const textContent = message.content
           .filter((c) => c.type === 'text' && c.text)
           .map((c) => c.text)
           .join('\n');
 
         if (textContent) {
-          // 发送到远程通道（带缓冲）
+          // Send to remote channel (buffered)
           remoteManager.sendResponseToChannel(sessionId, textContent).catch((err: Error) => {
             logError('[Remote] Failed to send response to channel:', err);
           });
@@ -716,7 +731,7 @@ function sendToRenderer(event: ServerEvent) {
       }
     }
 
-    // 拦截 trace.step 作为工具进度
+    // Intercept trace.step as tool progress
     if (event.type === 'trace.step') {
       const step = payload.step as {
         type?: string;
@@ -741,20 +756,20 @@ function sendToRenderer(event: ServerEvent) {
       }
     }
 
-    // trace.update 预留；当前主要用 trace.step
+    // trace.update reserved; trace.step is the primary path today
 
-    // 拦截 session.status 用于清理
+    // Intercept session.status for cleanup
     if (event.type === 'session.status') {
       const status = payload.status as string;
       if (status === 'idle' || status === 'error') {
-        // 会话结束，清空缓冲
+        // Session ended; clear buffer
         remoteManager.clearSessionBuffer(sessionId).catch((err: Error) => {
           logError('[Remote] Failed to clear session buffer:', err);
         });
       }
     }
 
-    // 拦截 permission.request
+    // Intercept permission.request
     if (event.type === 'permission.request' && payload.toolUseId && payload.toolName) {
       log('[Remote] Intercepting permission for remote session:', sessionId);
       remoteManager
@@ -778,11 +793,11 @@ function sendToRenderer(event: ServerEvent) {
         .catch((err) => {
           logError('[Remote] Failed to handle permission request:', err);
         });
-      return; // 不发送到本地 UI
+      return; // Do not forward to local UI
     }
   }
 
-  // 发送到本地 UI
+  // Deliver to local UI
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('server-event', event);
   }
@@ -828,12 +843,14 @@ app
     log('  OPENAI_BASE_URL:', process.env.OPENAI_BASE_URL || '(not set)');
     log('  OPENAI_MODEL:', process.env.OPENAI_MODEL || '(not set)');
     log('  OPENAI_API_MODE:', process.env.OPENAI_API_MODE || '(default)');
+    log('  BFF_BASE_URL:', process.env.BFF_BASE_URL ? '✓ Set' : '✗ Not set');
+    log('  WEB_SERVICES_KEY:', process.env.WEB_SERVICES_KEY ? '✓ Set' : '✗ Not set');
     log('===========================');
 
     // Initialize default working directory
     initializeDefaultWorkingDir();
     log('Working directory:', currentWorkingDir);
-    // 远程会话默认使用全局工作目录
+    // Remote sessions default to the global working directory
     remoteManager.setDefaultWorkingDirectory(currentWorkingDir || undefined);
 
     // Initialize database
@@ -940,7 +957,7 @@ app
           scheduledTaskStore.update(task.id, { title });
         }
         const started = await sessionManager.startSession(title, task.prompt, task.cwd);
-        // 定时任务创建的新会话需要主动同步到前端会话列表
+        // Scheduled tasks create sessions that must be synced to the renderer list
         sendToRenderer({
           type: 'session.update',
           payload: { sessionId: started.id, updates: started },
@@ -957,7 +974,7 @@ app
     });
     scheduledTaskManager.start();
 
-    // 初始化远程管理器
+    // Initialize remote manager
     remoteManager.setRendererCallback(sendToRenderer);
     const agentExecutor: AgentExecutor = {
       startSession: async (title, prompt, cwd) => {
@@ -995,7 +1012,7 @@ app
     };
     remoteManager.setAgentExecutor(agentExecutor);
 
-    // 远程控制启用时启动
+    // Start remote control when enabled
     if (remoteConfigStore.isEnabled()) {
       remoteManager.start().catch((error) => {
         logError('[App] Failed to start remote control:', error);
@@ -1012,7 +1029,7 @@ app
   .catch((error) => {
     logError('[App] Startup failed:', error);
     const message = error instanceof Error ? error.message : 'Unknown startup error';
-    dialog.showErrorBox('Aiden 启动失败', `${message}\n\n请查看日志获取更多信息。`);
+    dialog.showErrorBox('Aiden failed to start', `${message}\n\nSee the logs for more details.`);
     app.quit();
   });
 
@@ -1052,7 +1069,7 @@ async function cleanupSandboxResources(): Promise<void> {
   tray?.destroy();
   tray = null;
 
-  // 停止远程控制
+  // Stop remote control
   try {
     log('[App] Stopping remote control...');
     await withTimeout(remoteManager.stop(), 5000, 'Remote control shutdown');
@@ -1976,6 +1993,10 @@ ipcMain.on('window.close', () => {
   }
 });
 
+ipcMain.handle('window.getChromeState', () => ({
+  isFullscreen: mainWindow ? mainWindow.isFullScreen() : false,
+}));
+
 // Sandbox IPC handlers
 ipcMain.handle('sandbox.getStatus', async () => {
   try {
@@ -2339,7 +2360,7 @@ ipcMain.handle('logs.isEnabled', () => {
 });
 
 // ============================================================================
-// 远程控制 IPC 处理
+// Remote control IPC handlers
 // ============================================================================
 
 ipcMain.handle('remote.getConfig', () => {
@@ -2742,7 +2763,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
     sendToRenderer({
       type: 'error',
       payload: {
-        message: '当前方案未配置可用凭证，请先在 API 设置中完成配置',
+        message: 'The current config set does not have usable credentials. Finish setup in API Settings first.',
         code: 'CONFIG_REQUIRED_ACTIVE_SET',
         action: 'open_api_settings',
       },

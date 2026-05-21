@@ -1,0 +1,117 @@
+/**
+ * Aiden mark loader — SVG `<g>` transforms. Wrapped in `prefers-reduced-motion: no-preference`
+ * so OS “reduce motion” does not leave half-applied rules; finite mode uses full `animation`
+ * shorthand (WebKit is picky about overriding `animation: … infinite` with only iteration-count).
+ */
+
+.aiden-logo-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.aiden-logo-loader > svg {
+  display: block;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .aiden-logo-loader__rotor {
+    transform-origin: 50% 50%;
+    transform-box: view-box;
+    will-change: transform;
+    animation: aiden-loader-rotor 3s linear infinite;
+  }
+
+  .aiden-logo-loader__shift {
+    transform-origin: 50% 50%;
+    transform-box: view-box;
+    will-change: transform;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .aiden-logo-loader__shift--blue {
+    animation-name: aiden-loader-shift-blue;
+  }
+
+  .aiden-logo-loader__shift--cyan {
+    animation-name: aiden-loader-shift-cyan;
+  }
+
+  /* Welcome: one play + hold end state; replay via React `key` on `<svg>`. */
+  .aiden-logo-loader--finite .aiden-logo-loader__rotor {
+    animation: aiden-loader-rotor 3s linear 1 forwards;
+  }
+
+  .aiden-logo-loader--finite .aiden-logo-loader__shift--blue {
+    animation: aiden-loader-shift-blue 3s linear 1 forwards;
+  }
+
+  .aiden-logo-loader--finite .aiden-logo-loader__shift--cyan {
+    animation: aiden-loader-shift-cyan 3s linear 1 forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiden-logo-loader__rotor,
+  .aiden-logo-loader__shift {
+    animation: none !important;
+    transform: none;
+  }
+}
+
+@keyframes aiden-loader-rotor {
+  0%,
+  10% {
+    transform: rotate(0deg);
+  }
+  12% {
+    transform: rotate(0deg);
+  }
+  88% {
+    transform: rotate(720deg);
+  }
+  100% {
+    transform: rotate(720deg);
+  }
+}
+
+@keyframes aiden-loader-shift-blue {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  10% {
+    transform: translate3d(0, 95px, 0);
+  }
+  12% {
+    transform: translate3d(0, 95px, 0);
+  }
+  88% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes aiden-loader-shift-cyan {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  10% {
+    transform: translate3d(0, -95px, 0);
+  }
+  12% {
+    transform: translate3d(0, -95px, 0);
+  }
+  88% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}

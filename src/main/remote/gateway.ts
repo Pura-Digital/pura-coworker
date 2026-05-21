@@ -1,6 +1,6 @@
 /**
  * Remote Gateway
- * WebSocket 控制平面，管理远程连接和消息路由
+ * WebSocket control plane for remote connections and message routing
  */
 
 import * as crypto from 'crypto';

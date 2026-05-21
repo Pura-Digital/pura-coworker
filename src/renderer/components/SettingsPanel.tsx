@@ -139,9 +139,9 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
     },
     {
       id: 'remote' as TabId,
-      label: t('settings.remote', '远程控制'),
+      label: t('settings.remote'),
       icon: Wifi,
-      description: t('settings.remoteDesc', '通过飞书等平台远程使用'),
+      description: t('settings.remoteDesc'),
     },
     {
       id: 'logs' as TabId,
@@ -165,29 +165,28 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
         className={`${compactSidebar ? 'w-14' : 'w-52 lg:w-60'} bg-background-secondary/88 border-r border-border-muted flex flex-col flex-shrink-0`}
       >
         {!compactSidebar && (
-          <div className="px-4 pt-5 pb-4 border-b border-border-muted">
+          <div className="px-4 pt-4 pb-3 border-b border-border-muted">
             <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
               {t('settings.title')}
             </p>
-            <h2 className="mt-1 text-[1.24rem] font-semibold tracking-[-0.03em] text-text-primary">
-              Aiden
-            </h2>
-            <p className="mt-1 text-[11px] leading-4 text-text-muted">{t('settings.panelDesc')}</p>
+            <p className="mt-1.5 text-[11px] leading-4 text-text-muted">{t('settings.panelDesc')}</p>
           </div>
         )}
-        <div className={`flex-1 ${compactSidebar ? 'p-1.5 space-y-1' : 'p-3 space-y-1.5'}`}>
+        <div className={`flex-1 ${compactSidebar ? 'p-1 space-y-0.5' : 'p-2.5 space-y-1'}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               title={compactSidebar ? tab.label : undefined}
-              className={`w-full flex items-center ${compactSidebar ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-3'} rounded-lg text-left transition-colors active:scale-[0.98] ${
+              className={`w-full flex items-center ${compactSidebar ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5'} rounded-lg text-left transition-colors active:scale-[0.98] ${
                 activeTab === tab.id
                   ? 'bg-accent/10 text-text-primary font-medium border-l-4 border-accent rounded-none'
                   : 'hover:bg-surface-hover text-text-secondary hover:text-text-primary'
               }`}
             >
-              <tab.icon className="w-4.5 h-4.5 flex-shrink-0" />
+              <tab.icon
+                className={`flex-shrink-0 ${compactSidebar ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+              />
               {!compactSidebar && (
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{tab.label}</p>
@@ -197,7 +196,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
                 </div>
               )}
               {!compactSidebar && activeTab === tab.id && (
-                <ChevronRight className="w-4 h-4 flex-shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
               )}
             </button>
           ))}

@@ -13,8 +13,11 @@ import {
 import { useAppStore } from '../store';
 import { useIPC } from '../hooks/useIPC';
 import { MessageCard } from './MessageCard';
+import { UserMessageNav, buildUserMessageNavItems, userMessageAnchorId } from './UserMessageNav';
 import type { Message, ContentBlock } from '../types';
-import { Send, Square, Plus, Loader2, Plug, X, Clock } from 'lucide-react';
+import { Send, Square, Plus, Plug, X, Clock } from 'lucide-react';
+import { AidenLogoLoader } from './AidenLogoLoader';
+import { ChatProcessingStatus } from './ChatProcessingStatus';
 
 type AttachedFile = {
   name: string;
@@ -68,6 +71,22 @@ export function ChatView() {
   const isSessionRunning = activeSession?.status === 'running';
   const canStop = isSessionRunning || hasActiveTurn || pendingCount > 0;
 
+  const userMessageNavItems = useMemo(
+    () => buildUserMessageNavItems(messages, t),
+    [messages, t]
+  );
+
+  const userMessageIds = useMemo(
+    () => messages.filter((m) => m.role === 'user').map((m) => m.id),
+    [messages]
+  );
+
+  const [activeUserMessageIdInView, setActiveUserMessageIdInView] = useState<string | null>(null);
+  const userMessageIdsRef = useRef(userMessageIds);
+  userMessageIdsRef.current = userMessageIds;
+
+  const userMessageIdsKey = userMessageIds.join('|');
+
   const displayedMessages = useMemo(() => {
     if (!activeSessionId) return messages;
     // Show streaming message if we have partial text OR partial thinking
@@ -100,6 +119,55 @@ export function ChatView() {
 
     return [...messages.slice(0, insertIndex), streamingMessage, ...messages.slice(insertIndex)];
   }, [activeSessionId, activeTurn?.userMessageId, messages, partialMessage, partialThinking]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const inner = messagesContainerRef.current;
+    if (!container) return;
+
+    const update = () => {
+      const ids = userMessageIdsRef.current;
+      if (ids.length === 0) {
+        setActiveUserMessageIdInView(null);
+        return;
+      }
+      const cr = container.getBoundingClientRect();
+      const centerY = cr.top + cr.height / 2;
+      // Active = last user message (chronological / DOM order) whose top is at or above the
+      // viewport center — i.e. the first block hit when moving from center upward ("salendo").
+      let activeId: string | null = null;
+      for (const id of ids) {
+        const el = document.getElementById(userMessageAnchorId(id));
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (r.top <= centerY) {
+          activeId = id;
+        }
+      }
+      if (activeId === null) {
+        activeId = ids[0] ?? null;
+      }
+      setActiveUserMessageIdInView((prev) => (prev === activeId ? prev : activeId));
+    };
+
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+
+    schedule();
+    container.addEventListener('scroll', schedule, { passive: true });
+    const ro = new ResizeObserver(schedule);
+    ro.observe(container);
+    if (inner) ro.observe(inner);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      container.removeEventListener('scroll', schedule);
+      ro.disconnect();
+    };
+  }, [activeSessionId, userMessageIdsKey]);
 
   // Format execution time for display
   const formatExecutionTime = useCallback((ms: number): string => {
@@ -179,7 +247,7 @@ export function ChatView() {
       isUserAtBottomRef.current = distanceToBottom <= 80;
     };
     updateScrollState();
-    // 用户阅读旧消息时，阻止新消息自动滚动打断视线
+    // While the user reads older messages, avoid auto-scroll from new messages
     const onScroll = () => updateScrollState();
     container.addEventListener('scroll', onScroll, { passive: true });
     return () => container.removeEventListener('scroll', onScroll);
@@ -519,6 +587,20 @@ export function ChatView() {
     }
   }, [isElectron]);
 
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const maxHeight = 200;
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${newHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [prompt, adjustTextareaHeight]);
+
   useEffect(() => {
     const titleEl = titleRef.current;
     const headerEl = headerRef.current;
@@ -634,9 +716,7 @@ export function ChatView() {
         ref={headerRef}
         className="relative h-12 border-b border-border-muted grid grid-cols-[1fr_auto_1fr] items-center px-4 lg:px-8 bg-background/88 backdrop-blur-md"
       >
-        <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-text-muted">
-          Aiden
-        </div>
+        <div aria-hidden className="min-w-0" />
         <h2
           ref={titleRef}
           className="text-[15px] font-medium text-text-primary text-center truncate max-w-[40vw] lg:max-w-[32rem]"
@@ -669,12 +749,13 @@ export function ChatView() {
         )}
       </div>
 
-      {/* Messages */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-        <div
-          ref={messagesContainerRef}
-          className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
-        >
+      {/* Messages + floating user-message rail (left of scrollbar) */}
+      <div className="flex-1 min-h-0 relative">
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto">
+          <div
+            ref={messagesContainerRef}
+            className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
+          >
           {displayedMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-28 text-text-muted space-y-3 text-center">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted/80">Aiden</p>
@@ -685,7 +766,7 @@ export function ChatView() {
               const isStreaming =
                 typeof message.id === 'string' && message.id.startsWith('partial-');
               return (
-                <div key={message.id}>
+                <div key={message.id} id={userMessageAnchorId(message.id)} className="scroll-mt-6">
                   <MessageCard message={message} isStreaming={isStreaming} />
                 </div>
               );
@@ -697,8 +778,8 @@ export function ChatView() {
             (!partialMessage || partialMessage.trim() === '') &&
             !partialThinking && (
               <div className="flex items-center gap-3 px-4 py-3 rounded-full bg-background/80 border border-border-subtle max-w-fit">
-                <Loader2 className="w-4 h-4 text-accent animate-spin" />
-                <span className="text-sm text-text-secondary">{t('chat.processing')}</span>
+                <AidenLogoLoader decorative className="h-9 w-9 shrink-0 overflow-visible" />
+                <ChatProcessingStatus />
               </div>
             )}
 
@@ -715,7 +796,20 @@ export function ChatView() {
           )}
 
           <div ref={messagesEndRef} />
+          </div>
         </div>
+
+        {userMessageNavItems.length > 0 && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center pr-1 sm:pr-1.5">
+            <div className="pointer-events-auto">
+              <UserMessageNav
+                items={userMessageNavItems}
+                layout="floating"
+                activeMessageId={activeUserMessageIdInView}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input */}
@@ -811,7 +905,8 @@ export function ChatView() {
                 placeholder={t('chat.typeMessage')}
                 disabled={isSubmitting}
                 rows={1}
-                className="flex-1 resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-[15px] py-2"
+                style={{ minHeight: '44px', maxHeight: '200px' }}
+                className="flex-1 resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-[15px] py-2 leading-snug overflow-hidden"
               />
 
               <div className="flex items-center gap-2">

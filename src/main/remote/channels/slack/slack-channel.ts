@@ -1,6 +1,6 @@
 /**
  * Slack Channel
- * 实现 Slack 机器人的消息接收和发送
+ * Slack bot message receive and send implementation
  */
 
 import * as crypto from 'crypto';

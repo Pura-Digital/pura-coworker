@@ -63,7 +63,7 @@ export interface MemoryEvalReport {
 const DEFAULT_EVAL_CASES: MemoryEvalCase[] = [
   {
     id: 'cross-workspace-code',
-    title: '跨 workspace 代码经验召回',
+    title: 'Cross-workspace code experience recall',
     workspace: '/eval/workspace-a',
     sessionTitle: 'Gateway token rotation',
     messages: [
@@ -96,27 +96,27 @@ const DEFAULT_EVAL_CASES: MemoryEvalCase[] = [
   },
   {
     id: 'cross-workspace-design',
-    title: '另一个 workspace 的设计决策',
+    title: 'Design decision from another workspace',
     workspace: '/eval/workspace-b',
     sessionTitle: 'Order state machine',
     messages: [
       {
         role: 'user',
-        text: '在 workspace B 中，我们决定订单状态机不要把 refunded 和 cancelled 合并。',
+        text: 'In workspace B, we decided not to merge refunded and cancelled in the order state machine.',
         timestamp: 10,
       },
       {
         role: 'assistant',
-        text: '已记录：refunded 和 cancelled 代表不同的财务语义，需要保留独立状态。',
+        text: 'Recorded: refunded and cancelled have different financial semantics and must remain separate states.',
         timestamp: 11,
       },
     ],
     queries: [
       {
         id: 'query-b1',
-        prompt: '为什么 refunded 和 cancelled 不能合并？',
+        prompt: 'Why can refunded and cancelled not be merged?',
         workspace: '/eval/workspace-b',
-        expectedHits: ['refunded', 'cancelled', '财务语义'],
+        expectedHits: ['refunded', 'cancelled', 'financial semantics'],
       },
     ],
   },

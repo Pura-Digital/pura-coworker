@@ -131,13 +131,13 @@ class EvalMockLLM implements MemoryLLMClientLike {
       }
       return {
         text: JSON.stringify({
-          session_summary: '记录订单状态机设计约束',
+          session_summary: 'Order state machine design constraints',
           session_keywords: ['refund', 'cancel'],
           chunks: [
             {
-              summary: 'refunded 和 cancelled 不能合并',
-              details: '两者代表不同财务语义。',
-              keywords: ['refunded', 'cancelled', '财务语义'],
+              summary: 'refunded and cancelled must not be merged',
+              details: 'They represent different financial semantics.',
+              keywords: ['refunded', 'cancelled', 'financial semantics'],
               source_turns: [1, 2],
             },
           ],

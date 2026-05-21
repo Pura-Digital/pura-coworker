@@ -25,8 +25,17 @@ describe('ClaudeAgentRunner pi-coding-agent integration', () => {
 
   it('uses standard markdown link guidance for sources citations', () => {
     expect(agentRunnerContent).toContain(
-      'otherwise use standard Markdown links: [Title](https://claude.ai/chat/URL)'
+      'otherwise use standard Markdown links: [Title](URL)'
     );
+  });
+
+  it('registers native web custom tools and BFF bash spawn hook', () => {
+    expect(agentRunnerContent).toContain("import { buildWebCustomTools } from '../tools/web-custom-tools'");
+    expect(agentRunnerContent).toContain('const webCustomTools = buildWebCustomTools(bffEnv)');
+    expect(agentRunnerContent).toContain('spawnHook: (ctx) => ({');
+    expect(agentRunnerContent).toContain('getBffEnvForSpawn(ctx.env ?? {})');
+    expect(agentRunnerContent).toContain('BffWebSearch');
+    expect(agentRunnerContent).toContain('Do NOT use raw curl against the BFF');
   });
 
   it('avoids duplicating the current user prompt in contextual history assembly', () => {

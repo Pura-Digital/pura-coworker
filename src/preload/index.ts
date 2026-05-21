@@ -204,6 +204,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     minimize: () => ipcRenderer.send('window.minimize'),
     maximize: () => ipcRenderer.send('window.maximize'),
     close: () => ipcRenderer.send('window.close'),
+    getChromeState: (): Promise<{ isFullscreen: boolean }> =>
+      ipcRenderer.invoke('window.getChromeState'),
+    onChromeState: (callback: (state: { isFullscreen: boolean }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, state: { isFullscreen: boolean }) => {
+        callback(state);
+      };
+      ipcRenderer.on('window-chrome-state', handler);
+      return () => {
+        ipcRenderer.removeListener('window-chrome-state', handler);
+      };
+    },
   },
 
   // MCP methods
@@ -505,6 +516,8 @@ declare global {
         minimize: () => void;
         maximize: () => void;
         close: () => void;
+        getChromeState: () => Promise<{ isFullscreen: boolean }>;
+        onChromeState: (callback: (state: { isFullscreen: boolean }) => void) => () => void;
       };
       mcp: {
         getServers: () => Promise<McpServerConfig[]>;

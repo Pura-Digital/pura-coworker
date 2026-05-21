@@ -1,6 +1,6 @@
 /**
  * Remote Control Types
- * 远程控制模块类型定义
+ * Remote control module type definitions
  */
 
 // Types are defined locally in this file

@@ -207,6 +207,7 @@ Aiden ships with built-in skills under `.claude/skills/`, and supports user-adde
 - `docx` for Word document processing
 - `pdf` for PDF handling and forms
 - `xlsx` for Excel spreadsheet support
+- `web-search-bff` for web search & markdown crawl via the BFF external web-tools API (service key)
 - `skill-creator` for creating custom skills
 
 ---
@@ -265,6 +266,7 @@ aiden/
 │       ├── docx/                # Word document processing
 │       ├── pdf/                 # PDF handling & forms
 │       ├── xlsx/                # Excel spreadsheet support
+│       ├── web-search-bff/        # Web search + crawl via BFF external web-tools
 │       └── skill-creator/       # Skill development toolkit
 ├── resources/                   # Static Assets (icons, images)
 ├── electron-builder.yml         # Build configuration
@@ -278,7 +280,7 @@ aiden/
 
 See our full **[ROADMAP.md](ROADMAP.md)** for detailed plans.
 
-**Completed:** Core installers · Filesystem sandboxing · VM isolation (WSL2/Lima) · Skills (PPTX/DOCX/PDF/XLSX) · MCP connectors · Multi-model support · Rich input · i18n
+**Completed:** Core installers · Filesystem sandboxing · VM isolation (WSL2/Lima) · Skills (PPTX/DOCX/PDF/XLSX + web search BFF) · MCP connectors · Multi-model support · Rich input · i18n
 
 **Coming next:** Memory optimization · Linux support · Plugin system · Computer use · Stable release
 
@@ -305,7 +307,7 @@ Currently, Aiden provides pre-built installers for Windows and macOS only. Linux
 Aiden offers multi-level protection: basic path-based restrictions on all platforms, and enhanced VM-level isolation using WSL2 (Windows) or Lima (macOS). When a VM is available, all commands execute inside an isolated Linux environment, protecting your host system.
 
 **What are Skills and how do I create custom ones?**
-Skills are built-in workflows for specific tasks like generating PPTX, DOCX, PDF, or XLSX files. Aiden ships with default skills under `.claude/skills/` and includes a `skill-creator` tool to help you build your own custom skills.
+Skills are built-in workflows for specific tasks like generating PPTX, DOCX, PDF, or XLSX files, or using the **web search** skill (BFF external web-tools) when your backend is configured. Aiden ships with default skills under `.claude/skills/` and includes a `skill-creator` tool to help you build your own custom skills.
 
 **What is MCP and how does it work?**
 MCP (Model Context Protocol) lets AI connect to external tools and services. Aiden supports MCP connectors for browsers, Notion, and other desktop apps — extending the AI's capabilities beyond just file management and code.

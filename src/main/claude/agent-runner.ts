@@ -51,6 +51,9 @@ import { PluginRuntimeService } from '../skills/plugin-runtime-service';
 import type { SkillsAdapter } from '../skills/skills-adapter';
 import { AgentRuntimeExtensionManager } from '../extensions/agent-runtime-extension-manager';
 import { configStore } from '../config/config-store';
+import { applyBffWebEnvToProcess, getBffEnvForSpawn, resolveBffWebEnv } from '../tools/bff-web-env';
+import { formatBffConfiguredHint } from '../tools/web-client';
+import { buildWebCustomTools } from '../tools/web-custom-tools';
 import { normalizeOpenAICompatibleBaseUrl } from '../config/auth-utils';
 import { resolveMessageEndPayload, toUserFacingErrorText } from './agent-runner-message-end';
 import {
@@ -926,10 +929,10 @@ ${hints.join('\n')}
 
     const controller = new AbortController();
     try {
-      // SDK 会在同一 AbortSignal 上挂载较多监听器，放开上限避免无意义告警干扰排错。
+      // SDK attaches many listeners to the same AbortSignal; raise the cap to avoid noisy warnings.
       setMaxListeners(0, controller.signal);
     } catch {
-      // 旧运行时不支持 EventTarget 调整监听上限时忽略即可。
+      // Ignore when the runtime does not support adjusting EventTarget listener limits.
     }
     this.activeControllers.set(session.id, controller);
 
@@ -1707,7 +1710,7 @@ ${hints.join('\n')}
               const serverKey = config.name;
 
               if (config.type === 'stdio') {
-                // 当命令是 npx 或 node 时优先使用内置路径
+                // Prefer bundled paths when the command is npx or node
                 const command =
                   config.command === 'npx' && bundledNpx
                     ? bundledNpx
@@ -1715,7 +1718,7 @@ ${hints.join('\n')}
                       ? bundledNodePaths.node
                       : config.command;
 
-                // 使用内置 npx/node 时，将内置 node bin 注入 PATH
+                // When using bundled npx/node, inject bundled node bin into PATH
                 const serverEnv = { ...config.env };
                 if (bundledNodePaths && (config.command === 'npx' || config.command === 'node')) {
                   const nodeBinDir = path.dirname(bundledNodePaths.node);
@@ -1821,6 +1824,13 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
             ? `<workspace_info>Your current workspace is: ${workingDir}</workspace_info>`
             : '';
 
+      const bffEnv = applyBffWebEnvToProcess(
+        resolveBffWebEnv({
+          bffBaseUrl: configStore.get('bffBaseUrl'),
+          webServicesKey: configStore.get('webServicesKey'),
+        })
+      );
+
       const coworkAppendPrompt = [
         'You are an Aiden assistant. Be concise, accurate, and tool-capable.',
         `CRITICAL BEHAVIORAL RULES:
@@ -1831,12 +1841,14 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
 5. When given a task, START DOING IT. Do not restate the task, do not list what you will do, do not ask for confirmation. Just execute.`,
         workspaceInfoPrompt,
         `<citation_requirements>
-If your answer uses linkable content from MCP tools, include a "Sources:" section and otherwise use standard Markdown links: [Title](https://claude.ai/chat/URL).
+If your answer uses linkable content from MCP tools or web search/crawl tools, include a "Sources:" section and otherwise use standard Markdown links: [Title](URL).
 </citation_requirements>`,
         `<tool_behavior>
 Tool routing:
-- If user explicitly asks to use Chrome/browser/web navigation, prioritize Chrome MCP tools (mcp__Chrome__*) over generic WebSearch/WebFetch.
-- Use WebSearch/WebFetch only when Chrome MCP is unavailable or the user explicitly asks for generic web search.
+- For web research, news, or "search the web" tasks: use native WebSearch for quick orientation, then BffWebSearch (when configured) for a full SERP, then BffWebCrawl on a few chosen HTTPS URLs. Do NOT use raw curl against the BFF — use BffWebSearch/BffWebCrawl tools instead.
+- Optionally read the web-search-bff skill (SKILL.md) for query-improvement guidance before the first BffWebSearch when the query is ambiguous.
+- If user explicitly asks to use Chrome/browser, prioritize Chrome MCP tools (mcp__Chrome__*) over generic web tools.
+- ${formatBffConfiguredHint(bffEnv.configured)}
 </tool_behavior>`,
         this.getBundledPathHints(),
       ]
@@ -1849,8 +1861,15 @@ Tool routing:
       // Bridge MCP tools as customTools for pi-coding-agent.
       // Re-read every query so newly added/removed MCP servers take effect immediately.
       const mcpCustomTools = this.mcpManager ? buildMcpCustomTools(this.mcpManager) : [];
+      const webCustomTools = buildWebCustomTools(bffEnv);
       const extensionCustomTools = extensionResult.customTools || [];
-      const customTools = [...mcpCustomTools, ...extensionCustomTools];
+      const customTools = [...webCustomTools, ...mcpCustomTools, ...extensionCustomTools];
+      if (webCustomTools.length > 0) {
+        log(
+          `[ClaudeAgentRunner] Registered ${webCustomTools.length} web customTools:`,
+          webCustomTools.map((t) => t.name).join(', ')
+        );
+      }
       if (mcpCustomTools.length > 0) {
         log(
           `[ClaudeAgentRunner] Registered ${mcpCustomTools.length} MCP tools as customTools:`,
@@ -1868,7 +1887,14 @@ Tool routing:
       // executed via Pi SDK's Bash tool can find bundled and user-installed executables.
       await enrichProcessPathForBuild();
 
-      const codingTools = createCodingTools(effectiveCwd);
+      const codingTools = createCodingTools(effectiveCwd, {
+        bash: {
+          spawnHook: (ctx) => ({
+            ...ctx,
+            env: getBffEnvForSpawn({ ...(ctx.env ?? {}) }),
+          }),
+        },
+      });
 
       // Inject a default 120s timeout for bash commands when the model omits one
       const withTimeout = ClaudeAgentRunner.wrapBashToolWithDefaultTimeout(
@@ -2273,8 +2299,8 @@ Tool routing:
                         type: 'text',
                         text: `**Error**: ${resolvedPayload.errorText}\n\n${
                           /\b4\d{2}\b/.test(resolvedPayload.errorText)
-                            ? '_请检查配置后重试。_'
-                            : '_Agent 正在自动重试，请稍候..._'
+                            ? '_Please check your configuration and retry._'
+                            : '_Agent is retrying automatically, please wait..._'
                         }`,
                       },
                     ],
@@ -2501,7 +2527,7 @@ Tool routing:
           id: uuidv4(),
           sessionId: session.id,
           role: 'assistant',
-          content: [{ type: 'text', text: '**请求超时**：长时间未收到响应，操作已中止。' }],
+          content: [{ type: 'text', text: '**Request timed out**: No response received for a long time. The operation was aborted.' }],
           timestamp: Date.now(),
         };
         this.sendMessage(session.id, errorMsg);
@@ -2524,7 +2550,7 @@ Tool routing:
             id: uuidv4(),
             sessionId: session.id,
             role: 'assistant',
-            content: [{ type: 'text', text: '**请求超时**：长时间未收到响应，操作已中止。' }],
+            content: [{ type: 'text', text: '**Request timed out**: No response received for a long time. The operation was aborted.' }],
             timestamp: Date.now(),
           };
           this.sendMessage(session.id, errorMsg);
