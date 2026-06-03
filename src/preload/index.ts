@@ -188,6 +188,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       apiKey?: string;
     }): Promise<ProviderModelInfo[]> =>
       ipcRenderer.invoke('config.listOpenAICompatibleModels', payload),
+    listPuraDigitalModels: (): Promise<ProviderModelInfo[]> =>
+      ipcRenderer.invoke('config.listPuraDigitalModels'),
     diagnose: (input: DiagnosticInput): Promise<DiagnosticResult> =>
       ipcRenderer.invoke('config.diagnose', input),
     discoverLocal: (payload?: { baseUrl?: string }): Promise<LocalOllamaDiscoveryResult> =>
@@ -506,6 +508,7 @@ declare global {
           baseUrl: string;
           apiKey?: string;
         }) => Promise<ProviderModelInfo[]>;
+        listPuraDigitalModels: () => Promise<ProviderModelInfo[]>;
         diagnose: (input: DiagnosticInput) => Promise<DiagnosticResult>;
         discoverLocal: (payload?: { baseUrl?: string }) => Promise<LocalOllamaDiscoveryResult>;
       };

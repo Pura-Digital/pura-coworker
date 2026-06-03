@@ -333,7 +333,7 @@ export function SettingsAPI() {
                 onClick={() => {
                   void discoverPuraDigitalModels();
                 }}
-                disabled={isDiscoveringPuraModels || !apiKey.trim()}
+                disabled={isDiscoveringPuraModels}
                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors active:scale-95 bg-accent-muted text-accent hover:bg-accent-muted/80 disabled:opacity-50"
               >
                 <Sparkles className={`w-3 h-3 ${isDiscoveringPuraModels ? 'animate-pulse' : ''}`} />

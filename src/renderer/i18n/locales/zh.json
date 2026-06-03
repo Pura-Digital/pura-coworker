@@ -235,7 +235,7 @@
     "puraDigitalUrlHint": "Pura Digital LLM 网关（兼容 OpenAI）。除非另有说明，建议保留默认 URL。",
     "discoverPuraModels": "查找模型",
     "discoveringPuraModels": "查找中...",
-    "puraModelsDiscovered": "在 Pura Digital 网关上找到 {{count}} 个模型。",
+    "puraModelsDiscovered": "在 Pura Digital 目录中找到 {{count}} 个模型。",
     "puraNoModels": "Pura Digital 网关可访问，但未暴露任何模型。",
     "puraDiscoveryFailed": "无法从 Pura Digital 获取模型，请检查 API Key 后重试。",
     "localOllamaModelUnavailable": "已发现本地 Ollama，但模型 {{model}} 目前无法完成最小推理请求。",

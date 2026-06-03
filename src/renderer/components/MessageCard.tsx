@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Copy, Check, Clock, XCircle } from 'lucide-react';
 import type { Message, ContentBlock, ToolUseContent, ToolResultContent } from '../types';
 import { ContentBlockView } from './message/ContentBlockView';
+import { copySelectionAsPlainText } from '../utils/plain-text-copy';
 
 interface MessageCardProps {
   message: Message;
@@ -66,6 +67,7 @@ export const MessageCard = memo(function MessageCard({ message, isStreaming }: M
             className={`message-user px-4 py-3 rounded-[1.65rem] max-w-[80%] min-w-0 break-words ${
               isQueued ? 'opacity-70 border-dashed' : ''
             } ${isCancelled ? 'opacity-60' : ''}`}
+            onCopy={copySelectionAsPlainText}
           >
             {isQueued && (
               <div className="mb-1 flex items-center gap-1 text-[11px] text-text-muted">
@@ -108,7 +110,7 @@ export const MessageCard = memo(function MessageCard({ message, isStreaming }: M
         </div>
       ) : (
         // Assistant message — no bubble, direct content (Claude style)
-        <div className="space-y-1.5">
+        <div className="space-y-1.5" onCopy={copySelectionAsPlainText}>
           {contentBlocks.map((block, index) => {
             // Skip tool_result blocks that are merged into their tool_use card
             if (

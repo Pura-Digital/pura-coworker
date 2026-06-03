@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { copySelectionAsPlainText } from '../utils/plain-text-copy';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -42,7 +43,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({
   components,
 }: MessageMarkdownProps) {
   return (
-    <div className="prose-chat max-w-none text-text-primary">
+    <div className="prose-chat max-w-none text-text-primary" onCopy={copySelectionAsPlainText}>
       <ReactMarkdown
         remarkPlugins={
           REMARK_PLUGINS as unknown as Parameters<typeof ReactMarkdown>[0]['remarkPlugins']

@@ -1,4 +1,4 @@
-appId: com.aiden.app
+appId: com.puradigital.aiden
 productName: Aiden
 copyright: Copyright © 2026 Pura Digital Team
 
@@ -8,6 +8,7 @@ directories:
 
 npmRebuild: true
 afterPack: ./scripts/after-pack.js
+afterSign: ./scripts/notarize.js
 afterAllArtifactBuild: ./scripts/compress-dmg.js
 
 files:
@@ -82,6 +83,12 @@ win:
 mac:
   icon: resources/icon.icns
   target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
     - target: dir
       arch:
         - arm64
@@ -160,5 +167,5 @@ extraMetadata:
 
 publish:
   provider: github
-  owner: OpenCoworkAI
-  repo: aiden
+  owner: Pura-Digital
+  repo: pura-coworker

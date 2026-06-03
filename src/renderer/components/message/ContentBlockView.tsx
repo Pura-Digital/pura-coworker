@@ -11,6 +11,7 @@ import {
 import { resolvePathAgainstWorkspace } from '../../../shared/workspace-path';
 import {
   normalizeLocalFileMarkdownLinks,
+  normalizeExternalWebHref,
   resolveLocalFilePathFromHref,
 } from '../../utils/markdown-local-link';
 import { normalizeLatexDelimiters } from '../../utils/latex-delimiters';
@@ -153,7 +154,10 @@ export const ContentBlockView = memo(function ContentBlockView({
           );
         }
 
-        const safeHref = href && /^(?:https?:|mailto:|#)/i.test(href) ? href : undefined;
+        const externalHref = normalizeExternalWebHref(href);
+        const safeHref =
+          externalHref ??
+          (href && /^(?:https?:|mailto:|#)/i.test(href) ? href : undefined);
         return (
           <a
             href={safeHref}

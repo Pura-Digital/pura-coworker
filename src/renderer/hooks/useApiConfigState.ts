@@ -1603,24 +1603,14 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       return [];
     }
 
-    const trimmedKey = apiKey.trim();
-    if (!trimmedKey) {
-      showErrorKey('api.testError.missing_key');
-      return [];
-    }
-
     const requestedProfileKey = activeProfileKey;
-    const requestedBaseUrl = baseUrl.trim() || PURA_DIGITAL_BASE_URL;
     const requestId = ++puraDiscoverRequestIdRef.current;
 
     dispatch({ type: 'SET_IS_DISCOVERING_PURA_MODELS', payload: true });
     clearError();
 
     try {
-      const models = await window.electronAPI.config.listOpenAICompatibleModels({
-        baseUrl: requestedBaseUrl,
-        apiKey: trimmedKey,
-      });
+      const models = await window.electronAPI.config.listPuraDigitalModels();
 
       if (requestId !== puraDiscoverRequestIdRef.current) {
         return models;
@@ -1674,8 +1664,6 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     }
   }, [
     activeProfileKey,
-    apiKey,
-    baseUrl,
     clearError,
     clearSuccessMessage,
     isPuraMode,

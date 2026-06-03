@@ -20,7 +20,7 @@ exports.default = async function afterSign(context) {
     return;
   }
 
-  const appId = 'com.aiden.app';
+  const appId = context.packager.appInfo.id;
   const appName = context.packager.appInfo.productFilename;
   const appPath = `${appOutDir}/${appName}.app`;
 

@@ -3,6 +3,8 @@ import {
   normalizeLocalFileMarkdownLinks,
   extractLocalFilePathFromHref,
   resolveLocalFilePathFromHref,
+  looksLikeExternalWebHref,
+  normalizeExternalWebHref,
 } from '../src/renderer/utils/markdown-local-link';
 
 describe('normalizeLocalFileMarkdownLinks', () => {
@@ -54,7 +56,38 @@ describe('extractLocalFilePathFromHref', () => {
   });
 });
 
+describe('looksLikeExternalWebHref', () => {
+  it('detects bare and www web hosts', () => {
+    expect(looksLikeExternalWebHref('https://openai.com')).toBe(true);
+    expect(looksLikeExternalWebHref('www.example.com')).toBe(true);
+    expect(looksLikeExternalWebHref('example.com/docs')).toBe(true);
+    expect(looksLikeExternalWebHref('//cdn.example.com/assets')).toBe(true);
+  });
+
+  it('does not treat relative artifact paths as web links', () => {
+    expect(looksLikeExternalWebHref('reports/summary.docx')).toBe(false);
+    expect(looksLikeExternalWebHref('README.md')).toBe(false);
+  });
+});
+
+describe('normalizeExternalWebHref', () => {
+  it('adds https for bare and protocol-relative URLs', () => {
+    expect(normalizeExternalWebHref('www.example.com')).toBe('https://www.example.com');
+    expect(normalizeExternalWebHref('//example.com/path')).toBe('https://example.com/path');
+    expect(normalizeExternalWebHref('https://openai.com')).toBe('https://openai.com');
+  });
+});
+
 describe('resolveLocalFilePathFromHref', () => {
+  it('does not resolve bare web hosts against cwd', () => {
+    expect(
+      resolveLocalFilePathFromHref('www.example.com', '/tmp/workspace')
+    ).toBe(null);
+    expect(
+      resolveLocalFilePathFromHref('example.com/docs', '/tmp/workspace')
+    ).toBe(null);
+  });
+
   it('resolves relative artifact links using cwd', () => {
     const href = 'reports/北京未来一个月天气介绍.docx';
     expect(resolveLocalFilePathFromHref(href, '/Users/haoqing/Library/Application Support/open-cowork/default_working_dir'))

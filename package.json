@@ -24,13 +24,13 @@
     "slack",
     "multi-model"
   ],
-  "homepage": "https://github.com/OpenCoworkAI/aiden",
+  "homepage": "https://github.com/Pura-Digital/pura-coworker",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OpenCoworkAI/aiden.git"
+    "url": "https://github.com/Pura-Digital/pura-coworker.git"
   },
   "bugs": {
-    "url": "https://github.com/OpenCoworkAI/aiden/issues"
+    "url": "https://github.com/Pura-Digital/pura-coworker/issues"
   },
   "engines": {
     "node": ">=22"

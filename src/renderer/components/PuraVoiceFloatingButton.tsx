@@ -156,7 +156,7 @@ export function PuraVoiceFloatingButton() {
       y: 0,
       scale: 1,
       pointerEvents: 'auto' as const,
-      transition: { type: 'spring', damping: 25, stiffness: 300 },
+      transition: { type: 'spring' as const, damping: 25, stiffness: 300 },
     },
     exit: {
       opacity: 0,

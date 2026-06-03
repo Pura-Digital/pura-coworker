@@ -11,7 +11,7 @@ jobs:
   update-cask:
     name: Update Cask Formula
     runs-on: macos-14
-    if: contains(github.ref_name, 'v')
+    if: github.repository == 'OpenCoworkAI/aiden' && contains(github.ref_name, 'v')
     steps:
       - name: Extract version from tag
         id: version

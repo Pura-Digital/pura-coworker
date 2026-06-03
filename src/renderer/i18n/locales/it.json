@@ -235,7 +235,7 @@
     "puraDigitalUrlHint": "LLM gateway di Pura Digital (compatibile OpenAI). Lascia l'URL predefinito se non hai indicazioni diverse.",
     "discoverPuraModels": "Trova modelli",
     "discoveringPuraModels": "Ricerca modelli...",
-    "puraModelsDiscovered": "Trovati {{count}} modelli sul gateway Pura Digital.",
+    "puraModelsDiscovered": "Trovati {{count}} modelli nel catalogo Pura Digital.",
     "puraNoModels": "Il gateway Pura Digital è raggiungibile ma non espone modelli.",
     "puraDiscoveryFailed": "Impossibile recuperare i modelli da Pura Digital. Controlla la chiave API e riprova.",
     "localOllamaModelUnavailable": "Trovato Ollama locale, ma il modello {{model}} non è riuscito a completare una richiesta di inferenza minima.",

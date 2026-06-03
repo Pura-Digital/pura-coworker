@@ -11,6 +11,60 @@ const unixAbsolutePathPattern = /^\//;
 const webLikeUrlPattern = /^(?:https?:\/\/|mailto:|file:\/\/|#)/i;
 const httpLikeUrlPattern = /^(?:https?:\/\/|mailto:|#)/i;
 const explicitUrlSchemePattern = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+const protocolRelativeWebPattern =
+  /^\/\/(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:[:/]|$)/i;
+const domainHostPattern =
+  /^(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+
+const commonFileExtensionTlds = new Set([
+  'c',
+  'cc',
+  'cpp',
+  'css',
+  'csv',
+  'doc',
+  'docx',
+  'gif',
+  'gz',
+  'heic',
+  'html',
+  'jpeg',
+  'jpg',
+  'js',
+  'json',
+  'jsx',
+  'log',
+  'md',
+  'mov',
+  'mp3',
+  'mp4',
+  'pdf',
+  'png',
+  'ppt',
+  'pptx',
+  'py',
+  'rb',
+  'rs',
+  'scss',
+  'sh',
+  'sql',
+  'svg',
+  'tar',
+  'ts',
+  'tsx',
+  'txt',
+  'webp',
+  'xls',
+  'xlsx',
+  'xml',
+  'yaml',
+  'yml',
+  'zip',
+]);
+
+function isDomainLikeHost(segment: string): boolean {
+  return domainHostPattern.test(segment);
+}
 
 function normalizePathCandidate(value: string): string {
   return value.replace(/\r/g, '').replace(/\n+/g, '').trim();
@@ -72,13 +126,71 @@ export function normalizeLocalFileMarkdownLinks(markdown: string): string {
   });
 }
 
+export function looksLikeExternalWebHref(href: string): boolean {
+  const trimmed = normalizePathCandidate(href);
+  if (!trimmed || httpLikeUrlPattern.test(trimmed)) {
+    return !!trimmed && httpLikeUrlPattern.test(trimmed);
+  }
+
+  if (trimmed.startsWith('file://') || isUncPath(trimmed) || isWindowsDrivePath(trimmed)) {
+    return false;
+  }
+
+  if (protocolRelativeWebPattern.test(trimmed)) {
+    return true;
+  }
+
+  if (/^www\./i.test(trimmed)) {
+    return true;
+  }
+
+  const slashIndex = trimmed.indexOf('/');
+  const hostSegment = slashIndex === -1 ? trimmed : trimmed.slice(0, slashIndex);
+
+  if (!isDomainLikeHost(hostSegment)) {
+    return false;
+  }
+
+  if (slashIndex === -1) {
+    const labels = hostSegment.split('.');
+    if (labels.length >= 3) {
+      return true;
+    }
+    const tld = labels[labels.length - 1]?.toLowerCase() ?? '';
+    return !commonFileExtensionTlds.has(tld);
+  }
+
+  return true;
+}
+
+export function normalizeExternalWebHref(href: string | undefined): string | null {
+  if (!href) {
+    return null;
+  }
+
+  const trimmed = normalizePathCandidate(href);
+  if (!trimmed || !looksLikeExternalWebHref(trimmed)) {
+    return null;
+  }
+
+  if (httpLikeUrlPattern.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (protocolRelativeWebPattern.test(trimmed)) {
+    return `https:${trimmed}`;
+  }
+
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+}
+
 export function extractLocalFilePathFromHref(href?: string): string | null {
   if (!href) {
     return null;
   }
 
   const trimmed = normalizePathCandidate(href);
-  if (!trimmed || httpLikeUrlPattern.test(trimmed)) {
+  if (!trimmed || httpLikeUrlPattern.test(trimmed) || looksLikeExternalWebHref(trimmed)) {
     return null;
   }
 
@@ -99,7 +211,7 @@ export function resolveLocalFilePathFromHref(href: string | undefined, cwd?: str
   }
 
   const trimmed = normalizePathCandidate(href);
-  if (!trimmed || httpLikeUrlPattern.test(trimmed)) {
+  if (!trimmed || httpLikeUrlPattern.test(trimmed) || looksLikeExternalWebHref(trimmed)) {
     return null;
   }
 

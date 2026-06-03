@@ -8,8 +8,11 @@ import type { TSchema } from '@sinclair/typebox';
 import { resolveBffWebEnv, type ResolvedBffWebEnv } from './bff-web-env';
 import { bffWebCrawl, bffWebSearch, fetchWebPage, searchWebInstantAnswer } from './web-client';
 
-function toolTextResult(text: string): { content: Array<{ type: 'text'; text: string }> } {
-  return { content: [{ type: 'text' as const, text }] };
+function toolTextResult(text: string): {
+  content: Array<{ type: 'text'; text: string }>;
+  details: unknown;
+} {
+  return { content: [{ type: 'text' as const, text }], details: undefined as unknown };
 }
 
 function toolErrorText(error: unknown): string {
@@ -29,7 +32,8 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
       }),
       async execute(_toolCallId, params) {
         try {
-          const text = await searchWebInstantAnswer(String(params.query ?? ''));
+          const { query } = params as { query?: string };
+          const text = await searchWebInstantAnswer(String(query ?? ''));
           return toolTextResult(text);
         } catch (error) {
           return toolTextResult(`WebSearch failed: ${toolErrorText(error)}`);
@@ -46,7 +50,8 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
       }),
       async execute(_toolCallId, params) {
         try {
-          const text = await fetchWebPage(String(params.url ?? ''));
+          const { url } = params as { url?: string };
+          const text = await fetchWebPage(String(url ?? ''));
           return toolTextResult(text);
         } catch (error) {
           return toolTextResult(`WebFetch failed: ${toolErrorText(error)}`);
@@ -74,21 +79,25 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
         }),
         async execute(_toolCallId, params) {
           try {
+            const p = params as {
+              query?: string;
+              language?: string;
+              time_range?: 'day' | 'month' | 'year';
+              safesearch?: 0 | 1 | 2;
+            };
             const text = await bffWebSearch(
               {
-                query: String(params.query ?? ''),
-                language: typeof params.language === 'string' ? params.language : undefined,
+                query: String(p.query ?? ''),
+                language: typeof p.language === 'string' ? p.language : undefined,
                 time_range:
-                  params.time_range === 'day' ||
-                  params.time_range === 'month' ||
-                  params.time_range === 'year'
-                    ? params.time_range
+                  p.time_range === 'day' ||
+                  p.time_range === 'month' ||
+                  p.time_range === 'year'
+                    ? p.time_range
                     : undefined,
                 safesearch:
-                  params.safesearch === 0 ||
-                  params.safesearch === 1 ||
-                  params.safesearch === 2
-                    ? params.safesearch
+                  p.safesearch === 0 || p.safesearch === 1 || p.safesearch === 2
+                    ? p.safesearch
                     : undefined,
               },
               bffEnv
@@ -113,7 +122,8 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
         }),
         async execute(_toolCallId, params) {
           try {
-            const urls = Array.isArray(params.urls) ? params.urls.map((u) => String(u)) : [];
+            const { urls: rawUrls } = params as { urls?: unknown };
+            const urls = Array.isArray(rawUrls) ? rawUrls.map((u: unknown) => String(u)) : [];
             const text = await bffWebCrawl(urls, bffEnv);
             return toolTextResult(text);
           } catch (error) {

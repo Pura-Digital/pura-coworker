@@ -35,6 +35,7 @@ import {
 import { runConfigApiTest } from './config/config-test-routing';
 import { listOllamaModels } from './config/ollama-api';
 import { listOpenAICompatibleModels } from './config/openai-compat-models';
+import { listPuraDigitalModels } from './config/pura-digital-models';
 import { mcpConfigStore } from './mcp/mcp-config-store';
 import { getSandboxAdapter, shutdownSandbox } from './sandbox/sandbox-adapter';
 import { SandboxSync } from './sandbox/sandbox-sync';
@@ -1653,6 +1654,10 @@ ipcMain.handle(
     return listOpenAICompatibleModels(payload);
   }
 );
+
+ipcMain.handle('config.listPuraDigitalModels', async (): Promise<ProviderModelInfo[]> => {
+  return listPuraDigitalModels();
+});
 
 ipcMain.handle('config.diagnose', async (_event, payload: DiagnosticInput) => {
   try {
