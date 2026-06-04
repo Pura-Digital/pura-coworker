@@ -33,7 +33,7 @@ describe('ClaudeAgentRunner pi-coding-agent integration', () => {
     expect(agentRunnerContent).toContain("import { buildWebCustomTools } from '../tools/web-custom-tools'");
     expect(agentRunnerContent).toContain('const webCustomTools = buildWebCustomTools(bffEnv)');
     expect(agentRunnerContent).toContain('spawnHook: (ctx) => ({');
-    expect(agentRunnerContent).toContain('getBffEnvForSpawn(ctx.env ?? {})');
+    expect(agentRunnerContent).toContain('getBffEnvForSpawn({ ...(ctx.env ?? {}) })');
     expect(agentRunnerContent).toContain('BffWebSearch');
     expect(agentRunnerContent).toContain('Do NOT use raw curl against the BFF');
   });
