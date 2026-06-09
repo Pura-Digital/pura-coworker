@@ -15,7 +15,7 @@ import { useIPC } from '../hooks/useIPC';
 import { MessageCard } from './MessageCard';
 import { UserMessageNav, buildUserMessageNavItems, userMessageAnchorId } from './UserMessageNav';
 import type { Message, ContentBlock } from '../types';
-import { Send, Square, Plus, Plug, X, Clock } from 'lucide-react';
+import { Send, Square, Plus, Plug, X, Clock, FolderOpen } from 'lucide-react';
 import { AidenLogoLoader } from './AidenLogoLoader';
 import { ChatProcessingStatus } from './ChatProcessingStatus';
 
@@ -39,6 +39,9 @@ export function ChatView() {
   const executionClock = useActiveExecutionClock();
   const appConfig = useAppConfig();
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
+  const projects = useAppStore((s) => s.projects);
+  const setActiveProject = useAppStore((s) => s.setActiveProject);
+  const setActiveSession = useAppStore((s) => s.setActiveSession);
   const { continueSession, stopSession, isElectron } = useIPC();
   const [prompt, setPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -701,6 +704,17 @@ export function ChatView() {
     }
   };
 
+  const activeProject = useMemo(() => {
+    if (!activeSession?.projectId) return null;
+    return projects.find((project) => project.id === activeSession.projectId) ?? null;
+  }, [activeSession?.projectId, projects]);
+
+  const handleOpenProject = useCallback(() => {
+    if (!activeSession?.projectId) return;
+    setActiveSession(null);
+    setActiveProject(activeSession.projectId);
+  }, [activeSession?.projectId, setActiveProject, setActiveSession]);
+
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-text-muted">
@@ -716,7 +730,19 @@ export function ChatView() {
         ref={headerRef}
         className="relative h-12 border-b border-border-muted grid grid-cols-[1fr_auto_1fr] items-center px-4 lg:px-8 bg-background/88 backdrop-blur-md"
       >
-        <div aria-hidden className="min-w-0" />
+        <div className="min-w-0 flex items-center justify-self-start">
+          {activeProject && (
+            <button
+              type="button"
+              onClick={handleOpenProject}
+              className="flex items-center gap-1.5 max-w-[min(100%,12rem)] px-2.5 py-1 rounded-full bg-accent/8 border border-accent/15 hover:bg-accent/12 transition-colors"
+              title={t('project.openProject')}
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+              <span className="text-xs text-accent font-medium truncate">{activeProject.name}</span>
+            </button>
+          )}
+        </div>
         <h2
           ref={titleRef}
           className="text-[15px] font-medium text-text-primary text-center truncate max-w-[40vw] lg:max-w-[32rem]"

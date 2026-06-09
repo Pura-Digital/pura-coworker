@@ -39,7 +39,11 @@ import type {
   PairedUser,
   PairingRequest,
   RemoteSessionMapping,
+  IpcProject,
+  IpcProjectCreateInput,
+  IpcProjectUpdateInput,
 } from '../shared/ipc-types';
+import type { Session } from '../renderer/types';
 
 // Track registered callbacks to prevent duplicate listeners
 let registeredCallback: ((event: ServerEvent) => void) | null = null;
@@ -434,6 +438,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     runNow: (id: string): Promise<ScheduleTask | null> => ipcRenderer.invoke('schedule.runNow', id),
   },
 
+  project: {
+    list: (): Promise<IpcProject[]> => ipcRenderer.invoke('project.list'),
+    get: (projectId: string): Promise<IpcProject | null> =>
+      ipcRenderer.invoke('project.get', projectId),
+    create: (
+      input: IpcProjectCreateInput
+    ): Promise<{ success: boolean; project?: IpcProject; error?: string }> =>
+      ipcRenderer.invoke('project.create', input),
+    update: (
+      projectId: string,
+      updates: IpcProjectUpdateInput
+    ): Promise<{ success: boolean; project?: IpcProject; error?: string }> =>
+      ipcRenderer.invoke('project.update', projectId, updates),
+    delete: (projectId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('project.delete', projectId),
+    moveSession: (
+      sessionId: string,
+      projectId: string | null
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('project.moveSession', sessionId, projectId),
+    getSessions: (projectId: string): Promise<Session[]> =>
+      ipcRenderer.invoke('project.getSessions', projectId),
+    selectWorkDir: (): Promise<{ success: boolean; path: string | null }> =>
+      ipcRenderer.invoke('project.selectWorkDir'),
+  },
+
   memory: {
     getOverview: (cwd?: string): Promise<MemoryOverview> =>
       ipcRenderer.invoke('memory.getOverview', cwd),
@@ -687,6 +717,24 @@ declare global {
         delete: (id: string) => Promise<{ success: boolean }>;
         toggle: (id: string, enabled: boolean) => Promise<ScheduleTask | null>;
         runNow: (id: string) => Promise<ScheduleTask | null>;
+      };
+      project: {
+        list: () => Promise<IpcProject[]>;
+        get: (projectId: string) => Promise<IpcProject | null>;
+        create: (
+          input: IpcProjectCreateInput
+        ) => Promise<{ success: boolean; project?: IpcProject; error?: string }>;
+        update: (
+          projectId: string,
+          updates: IpcProjectUpdateInput
+        ) => Promise<{ success: boolean; project?: IpcProject; error?: string }>;
+        delete: (projectId: string) => Promise<{ success: boolean; error?: string }>;
+        moveSession: (
+          sessionId: string,
+          projectId: string | null
+        ) => Promise<{ success: boolean; error?: string }>;
+        getSessions: (projectId: string) => Promise<Session[]>;
+        selectWorkDir: () => Promise<{ success: boolean; path: string | null }>;
       };
       memory: {
         getOverview: (cwd?: string) => Promise<MemoryOverview>;

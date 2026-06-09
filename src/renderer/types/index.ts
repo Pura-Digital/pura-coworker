@@ -1,3 +1,48 @@
+// Project types
+export type ProjectConfigMode = 'merge' | 'replace';
+
+export interface Project {
+  id: string;
+  name: string;
+  workDir: string;
+  description?: string;
+  mcpServers: McpServerConfigRef[];
+  mcpMode?: ProjectConfigMode;
+  skillIds: string[];
+  skillsMode?: ProjectConfigMode;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Minimal MCP server config reference used by projects (mirrors McpServerConfig from shared/ipc-types)
+export interface McpServerConfigRef {
+  id: string;
+  name: string;
+  type: 'stdio' | 'sse' | 'streamable-http';
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+  url?: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
+}
+
+export interface ProjectCreateInput {
+  name: string;
+  workDir: string;
+  description?: string;
+}
+
+export interface ProjectUpdateInput {
+  name?: string;
+  description?: string;
+  mcpServers?: McpServerConfigRef[];
+  mcpMode?: ProjectConfigMode | null;
+  skillIds?: string[];
+  skillsMode?: ProjectConfigMode | null;
+}
+
 // Session types
 export interface Session {
   id: string;
@@ -10,6 +55,7 @@ export interface Session {
   allowedTools: string[];
   memoryEnabled: boolean;
   model?: string;
+  projectId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -445,7 +491,7 @@ export interface PermissionRule {
 
 // IPC Event types
 export type ClientEvent =
-  | { type: 'session.start'; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string[]; content?: ContentBlock[]; memoryEnabled?: boolean } }
+  | { type: 'session.start'; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string[]; content?: ContentBlock[]; memoryEnabled?: boolean; projectId?: string } }
   | { type: 'session.continue'; payload: { sessionId: string; prompt: string; content?: ContentBlock[] } }
   | { type: 'session.stop'; payload: { sessionId: string } }
   | { type: 'session.delete'; payload: { sessionId: string } }

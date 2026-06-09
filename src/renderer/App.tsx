@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from './store';
 import {
   useActiveSessionId,
+  useActiveProjectId,
   useSettings,
   useSystemDarkMode,
   useSettingsState,
@@ -16,6 +17,7 @@ import { useIPC } from './hooks/useIPC';
 import { useWindowSize } from './hooks/useWindowSize';
 import { Sidebar } from './components/Sidebar';
 import { WelcomeView } from './components/WelcomeView';
+import { ProjectView } from './components/ProjectView';
 import { PermissionDialog } from './components/PermissionDialog';
 import { SudoPasswordDialog } from './components/SudoPasswordDialog';
 import { Titlebar } from './components/Titlebar';
@@ -59,6 +61,7 @@ function ContextPanelFallback() {
 function App() {
   // --- Store state via selectors (each subscription is minimally scoped) ---
   const activeSessionId = useActiveSessionId();
+  const activeProjectId = useActiveProjectId();
   const settings = useSettings();
   const systemDarkMode = useSystemDarkMode();
   const { showSettings } = useSettingsState();
@@ -80,6 +83,9 @@ function App() {
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const setContextPanelCollapsed = useAppStore((s) => s.setContextPanelCollapsed);
 
+  const setProjects = useAppStore((s) => s.setProjects);
+  const setActiveProject = useAppStore((s) => s.setActiveProject);
+  const projects = useAppStore((s) => s.projects);
   const { listSessions, isElectron } = useIPC();
   const { width } = useWindowSize();
   const initialized = useRef(false);
@@ -92,10 +98,21 @@ function App() {
 
     if (isElectron) {
       listSessions();
+      window.electronAPI?.project
+        ?.list()
+        .then((projects) => setProjects(projects))
+        .catch(() => {/* non-critical */});
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only session list
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only init
   }, []);
+
+  // Clear stale project view if project was deleted
+  useEffect(() => {
+    if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+      setActiveProject(null);
+    }
+  }, [activeProjectId, projects, setActiveProject]);
 
   // Apply theme to document root
   useEffect(() => {
@@ -201,6 +218,14 @@ function App() {
               <Suspense fallback={<MainPanelFallback />}>
                 <ChatView />
               </Suspense>
+            </PanelErrorBoundary>
+          ) : activeProjectId ? (
+            <PanelErrorBoundary
+              name="ProjectView"
+              resetKey={activeProjectId}
+              fallback={<MainPanelFallback />}
+            >
+              <ProjectView />
             </PanelErrorBoundary>
           ) : (
             <WelcomeView />

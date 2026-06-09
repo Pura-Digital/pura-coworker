@@ -10,6 +10,7 @@ import type {
   SandboxSetupProgress,
   SandboxSyncStatus,
   SkillsStorageChangeEvent,
+  Project,
 } from '../types';
 import { applySessionUpdate } from '../utils/session-update';
 
@@ -73,6 +74,15 @@ function getSession(states: Record<string, SessionState>, sessionId: string): Se
 }
 
 interface AppState {
+  // Projects
+  projects: Project[];
+  activeProjectId: string | null;
+  setProjects: (projects: Project[]) => void;
+  addProject: (project: Project) => void;
+  updateProject: (id: string, patch: Partial<Project>) => void;
+  removeProject: (id: string) => void;
+  setActiveProject: (projectId: string | null) => void;
+
   // Sessions
   sessions: Session[];
   activeSessionId: string | null;
@@ -218,6 +228,22 @@ const defaultSettings: Settings = {
 };
 
 export const useAppStore = create<AppState>((set) => ({
+  // Projects
+  projects: [],
+  activeProjectId: null,
+  setProjects: (projects) => set({ projects }),
+  addProject: (project) => set((state) => ({ projects: [project, ...state.projects] })),
+  updateProject: (id, patch) =>
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    })),
+  removeProject: (id) =>
+    set((state) => ({
+      projects: state.projects.filter((p) => p.id !== id),
+      activeProjectId: state.activeProjectId === id ? null : state.activeProjectId,
+    })),
+  setActiveProject: (projectId) => set({ activeProjectId: projectId }),
+
   // Initial state
   sessions: [],
   activeSessionId: null,

@@ -173,6 +173,14 @@ function createSchema(db: Database.Database): void {
 function createDatabaseInstance(db: Database.Database): DatabaseInstance {
   return {
     raw: db,
+    projects: {
+      create: vi.fn(),
+      update: vi.fn(),
+      get: vi.fn(() => undefined),
+      getAll: vi.fn(() => []),
+      delete: vi.fn(),
+      getSessionsByProjectId: vi.fn(() => []),
+    },
     sessions: {
       create: vi.fn(),
       update: vi.fn(),

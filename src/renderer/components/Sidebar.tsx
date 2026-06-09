@@ -14,8 +14,13 @@ import {
   Plus,
   ListChecks,
   Check,
+  FolderPlus,
 } from 'lucide-react';
-import type { Session } from '../types';
+import type { Project, Session } from '../types';
+import { ProjectAccordion } from './ProjectAccordion';
+import { CreateProjectModal } from './CreateProjectModal';
+import { MoveToProjectModal } from './MoveToProjectModal';
+import { SettingsProject } from './settings/SettingsProject';
 
 type SessionGroup = {
   key: string;
@@ -27,6 +32,8 @@ export function Sidebar() {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const activeProjectId = useAppStore((s) => s.activeProjectId);
+  const setActiveProject = useAppStore((s) => s.setActiveProject);
   const settings = useAppStore((s) => s.settings);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
@@ -49,13 +56,23 @@ export function Sidebar() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [moveSessionId, setMoveSessionId] = useState<string | null>(null);
+  const [configureProject, setConfigureProject] = useState<Project | null>(null);
 
   const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
+  // Sessions shown in the main date-grouped list (no project)
+  const standaloneSessionsRaw = useMemo(
+    () => sessions.filter((s) => !s.projectId),
+    [sessions]
+  );
   const filteredSessions = useMemo(() => {
     return normalizedQuery
-      ? sessions.filter((session) => session.title.toLowerCase().includes(normalizedQuery))
-      : sessions;
-  }, [sessions, normalizedQuery]);
+      ? standaloneSessionsRaw.filter((session) =>
+          session.title.toLowerCase().includes(normalizedQuery)
+        )
+      : standaloneSessionsRaw;
+  }, [standaloneSessionsRaw, normalizedQuery]);
 
   const groupedSessions = useMemo(
     () => groupSessionsByDate(filteredSessions, t),
@@ -151,6 +168,13 @@ export function Sidebar() {
 
       if (activeSessionId === sessionId) return;
 
+      const session = sessions.find((s) => s.id === sessionId);
+      if (session?.projectId) {
+        setActiveProject(session.projectId);
+      } else {
+        setActiveProject(null);
+      }
+
       setActiveSession(sessionId);
 
       const existingMessages = sessionStates[sessionId]?.messages;
@@ -177,6 +201,8 @@ export function Sidebar() {
     },
     [
       activeSessionId,
+      sessions,
+      setActiveProject,
       getSessionMessages,
       getSessionTraceSteps,
       isElectron,
@@ -190,8 +216,25 @@ export function Sidebar() {
 
   const handleNewSession = () => {
     setActiveSession(null);
+    setActiveProject(null);
     setShowSettings(false);
   };
+
+  const handleOpenProject = useCallback(
+    (project: Project) => {
+      setActiveSession(null);
+      setActiveProject(project.id);
+      setShowSettings(false);
+    },
+    [setActiveSession, setActiveProject, setShowSettings]
+  );
+
+  const handleStartSessionInProject = useCallback(
+    (project: Project) => {
+      handleOpenProject(project);
+    },
+    [handleOpenProject]
+  );
 
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
@@ -278,6 +321,13 @@ export function Sidebar() {
             <span className="text-[13px] font-medium truncate">{t('sidebar.newTask')}</span>
           </button>
           <button
+            onClick={() => setShowCreateProject(true)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-surface-hover transition-colors text-text-secondary flex-shrink-0"
+            title={t('project.newProject')}
+          >
+            <FolderPlus className="w-4 h-4" />
+          </button>
+          <button
             onClick={toggleSidebar}
             className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-surface-hover transition-colors text-text-secondary flex-shrink-0"
             title={t('context.collapsePanel')}
@@ -320,12 +370,26 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        {groupedSessions.length === 0 ? (
+        {/* Projects accordion — always shown above date-grouped chats */}
+        <ProjectAccordion
+          onSessionClick={handleSessionClick}
+          onDeleteSession={handleDeleteSession}
+          onMoveSession={(sessionId) => setMoveSessionId(sessionId)}
+          onConfigureProject={(project) => setConfigureProject(project)}
+          onStartSessionInProject={handleStartSessionInProject}
+          onOpenProject={handleOpenProject}
+          activeSessionId={activeSessionId}
+          activeProjectId={activeProjectId}
+          hoveredSession={hoveredSession}
+          onSessionHover={setHoveredSession}
+        />
+
+        {groupedSessions.length === 0 && standaloneSessionsRaw.length === 0 ? (
           <div className="px-3 py-6">
             <p className="text-sm text-text-secondary">{t('sidebar.noTasks')}</p>
             <p className="mt-1 text-xs leading-5 text-text-muted">{t('sidebar.noTasksHint')}</p>
           </div>
-        ) : (
+        ) : groupedSessions.length > 0 ? (
           <div className="space-y-3">
             {groupedSessions.map((group) => (
               <section key={group.key}>
@@ -376,13 +440,25 @@ export function Sidebar() {
                         </div>
 
                         {!isSelectMode && hoveredSession === session.id && (
-                          <button
-                            onClick={(e) => handleDeleteSession(e, session.id)}
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
-                            title={t('common.delete')}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMoveSessionId(session.id);
+                              }}
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-text-secondary hover:bg-surface-active transition-colors"
+                              title={t('project.moveChat')}
+                            >
+                              <FolderPlus className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteSession(e, session.id)}
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
+                              title={t('common.delete')}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -391,6 +467,26 @@ export function Sidebar() {
               </section>
             ))}
           </div>
+        ) : null}
+
+        {/* Modals */}
+        {showCreateProject && (
+          <CreateProjectModal
+            onClose={() => setShowCreateProject(false)}
+            onCreated={handleOpenProject}
+          />
+        )}
+        {moveSessionId && (
+          <MoveToProjectModal
+            sessionId={moveSessionId}
+            onClose={() => setMoveSessionId(null)}
+          />
+        )}
+        {configureProject && (
+          <SettingsProject
+            project={configureProject}
+            onClose={() => setConfigureProject(null)}
+          />
         )}
       </div>
 

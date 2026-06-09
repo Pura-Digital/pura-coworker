@@ -169,3 +169,38 @@ export interface RemoteSessionMapping {
   createdAt: number;
   lastActiveAt: number;
 }
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+export type ProjectConfigMode = 'merge' | 'replace';
+
+/** A project groups chats under a dedicated working directory with optional custom MCP/skills. */
+export interface IpcProject {
+  id: string;
+  name: string;
+  workDir: string;
+  description?: string;
+  mcpServers: McpServerConfig[];
+  mcpMode?: ProjectConfigMode;
+  skillIds: string[];
+  skillsMode?: ProjectConfigMode;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface IpcProjectCreateInput {
+  name: string;
+  workDir: string;
+  description?: string;
+}
+
+export interface IpcProjectUpdateInput {
+  name?: string;
+  description?: string;
+  mcpServers?: McpServerConfig[];
+  mcpMode?: ProjectConfigMode | null;
+  skillIds?: string[];
+  skillsMode?: ProjectConfigMode | null;
+}

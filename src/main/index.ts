@@ -93,6 +93,14 @@ import {
   openAiCompatibleRealtimeWsUrl,
   type PuraRealtimeSessionResult,
 } from '../shared/pura-digital';
+import {
+  initProjectManager,
+  tryGetProjectManager,
+} from './project/project-manager';
+import type {
+  IpcProjectCreateInput,
+  IpcProjectUpdateInput,
+} from '../shared/ipc-types';
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -856,6 +864,9 @@ app
 
     // Initialize database
     const db = initDatabase();
+
+    // Initialize project manager
+    initProjectManager(db);
 
     pluginRuntimeService = new PluginRuntimeService(new PluginCatalogService());
     memoryService = new MemoryService(db);
@@ -2694,6 +2705,84 @@ ipcMain.handle('memory.setEnabled', (_event, enabled: boolean) => {
   return result;
 });
 
+// ---------------------------------------------------------------------------
+// Project IPC handlers
+// ---------------------------------------------------------------------------
+
+ipcMain.handle('project.list', () => {
+  const pm = tryGetProjectManager();
+  if (!pm) return [];
+  return pm.listProjects();
+});
+
+ipcMain.handle('project.get', (_event, projectId: string) => {
+  const pm = tryGetProjectManager();
+  if (!pm) throw new Error('Project manager not initialized');
+  return pm.getProject(projectId);
+});
+
+ipcMain.handle('project.create', (_event, input: IpcProjectCreateInput) => {
+  const pm = tryGetProjectManager();
+  if (!pm) throw new Error('Project manager not initialized');
+  try {
+    return { success: true, project: pm.createProject(input) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+ipcMain.handle('project.update', (_event, projectId: string, updates: IpcProjectUpdateInput) => {
+  const pm = tryGetProjectManager();
+  if (!pm) throw new Error('Project manager not initialized');
+  try {
+    return { success: true, project: pm.updateProject(projectId, updates) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+ipcMain.handle('project.delete', (_event, projectId: string) => {
+  const pm = tryGetProjectManager();
+  if (!pm) throw new Error('Project manager not initialized');
+  try {
+    pm.deleteProject(projectId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+ipcMain.handle(
+  'project.moveSession',
+  (_event, sessionId: string, projectId: string | null) => {
+    const pm = tryGetProjectManager();
+    if (!pm) throw new Error('Project manager not initialized');
+    try {
+      pm.moveSessionToProject(sessionId, projectId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+);
+
+ipcMain.handle('project.getSessions', (_event, projectId: string) => {
+  const pm = tryGetProjectManager();
+  if (!pm) throw new Error('Project manager not initialized');
+  return pm.getProjectSessions(projectId);
+});
+
+ipcMain.handle('project.selectWorkDir', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory'],
+    title: 'Select Project Working Directory',
+  });
+  if (!result.canceled && result.filePaths.length > 0) {
+    return { success: true, path: result.filePaths[0] };
+  }
+  return { success: false, path: null };
+});
+
 ipcMain.handle('logs.write', (_event, level: 'info' | 'warn' | 'error', args: unknown[]) => {
   try {
     if (level === 'warn') {
@@ -2800,7 +2889,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.cwd,
         event.payload.allowedTools,
         event.payload.content,
-        event.payload.memoryEnabled
+        event.payload.memoryEnabled,
+        event.payload.projectId
       );
 
     case 'session.continue':

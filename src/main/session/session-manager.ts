@@ -56,6 +56,7 @@ import {
 } from './session-title-utils';
 import { generateTitleWithClaudeSdk } from '../claude/claude-sdk-one-shot';
 import { buildScheduledTaskTitle } from '../../shared/schedule/task-title';
+import { tryGetProjectManager } from '../project/project-manager';
 
 interface AgentRunner {
   run(session: Session, prompt: string, existingMessages: Message[]): Promise<void>;
@@ -244,11 +245,12 @@ export class SessionManager {
     cwd?: string,
     allowedTools?: string[],
     content?: ContentBlock[],
-    memoryEnabled?: boolean
+    memoryEnabled?: boolean,
+    projectId?: string
   ): Promise<Session> {
     log('[SessionManager] Starting new session:', title);
 
-    const session = this.createSession(title, cwd, allowedTools, memoryEnabled);
+    const session = this.createSession(title, cwd, allowedTools, memoryEnabled, projectId);
 
     // Save to database
     this.saveSession(session);
@@ -271,7 +273,8 @@ export class SessionManager {
     title: string,
     cwd?: string,
     allowedTools?: string[],
-    memoryEnabled?: boolean
+    memoryEnabled?: boolean,
+    projectId?: string
   ): Session {
     const now = Date.now();
     // Prefer frontend-provided cwd; fallback to env vars if provided
@@ -300,6 +303,7 @@ export class SessionManager {
       ],
       memoryEnabled: resolvedMemoryEnabled,
       model: configStore.get('model') || undefined,
+      projectId,
       createdAt: now,
       updatedAt: now,
     };
@@ -318,6 +322,7 @@ export class SessionManager {
       allowed_tools: JSON.stringify(session.allowedTools),
       memory_enabled: session.memoryEnabled ? 1 : 0,
       model: session.model || null,
+      project_id: session.projectId || null,
       created_at: session.createdAt,
       updated_at: session.updatedAt,
     });
@@ -355,6 +360,7 @@ export class SessionManager {
       allowedTools,
       memoryEnabled: row.memory_enabled === 1,
       model: row.model || undefined,
+      projectId: row.project_id || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -392,6 +398,7 @@ export class SessionManager {
         allowedTools,
         memoryEnabled: row.memory_enabled === 1,
         model: row.model || undefined,
+        projectId: row.project_id || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
@@ -688,8 +695,18 @@ export class SessionManager {
           });
         }
 
+        // Inject project MEMORY.md context (first turn only, if project session and file exists)
+        let finalPrompt = enhancedPrompt;
+        if (session.projectId && existingMessages.length === 0) {
+          const projectMemoryContext = this.readProjectMemory(session.projectId);
+          if (projectMemoryContext) {
+            finalPrompt = `<project_memory>\n${projectMemoryContext}\n</project_memory>\n\n${enhancedPrompt}`;
+            logCtx('[SessionManager] Injected project MEMORY.md for project:', session.projectId);
+          }
+        }
+
         // Run the agent
-        await this.agentRunner.run(session, enhancedPrompt, messagesForContext);
+        await this.agentRunner.run(session, finalPrompt, messagesForContext);
 
         if (this.extensionManager) {
           const stableMessages = this.getMessages(session.id);
@@ -736,6 +753,90 @@ export class SessionManager {
         });
       }
     }); // end runWithLogContext
+  }
+
+  /**
+   * Read MEMORY.md from a project's working directory.
+   * Returns the file content as a string, or null if not found / not a project.
+   */
+  private readProjectMemory(projectId: string): string | null {
+    try {
+      const pm = tryGetProjectManager();
+      if (!pm) return null;
+      const project = pm.getProject(projectId);
+      if (!project?.workDir) return null;
+      const memoryPath = path.join(project.workDir, 'MEMORY.md');
+      if (!fs.existsSync(memoryPath)) return null;
+      const content = fs.readFileSync(memoryPath, 'utf-8').trim();
+      return content || null;
+    } catch (err) {
+      logError('[SessionManager] Failed to read project MEMORY.md:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Schedule an async job that updates MEMORY.md for a project session.
+   * The job summarises the last N messages and merges learnings into MEMORY.md.
+   */
+  private async scheduleProjectMemoryUpdate(session: Session): Promise<void> {
+    if (!session.projectId) return;
+    try {
+      const pm = tryGetProjectManager();
+      if (!pm) return;
+      const project = pm.getProject(session.projectId);
+      if (!project?.workDir) return;
+
+      const messages = this.getMessages(session.id);
+      if (messages.length < 2) return; // nothing meaningful to learn from
+
+      const memoryPath = path.join(project.workDir, 'MEMORY.md');
+      const existing = fs.existsSync(memoryPath)
+        ? fs.readFileSync(memoryPath, 'utf-8').trim()
+        : '';
+
+      // Build a lightweight transcript of the last 20 messages
+      const recent = messages.slice(-20);
+      const transcript = recent
+        .map((m) => {
+          const role = m.role === 'user' ? 'User' : 'Assistant';
+          const text = m.content
+            .filter((b) => b.type === 'text')
+            .map((b) => (b as { text: string }).text)
+            .join('\n');
+          return `**${role}:** ${text}`;
+        })
+        .filter((t) => t.length > 12)
+        .join('\n\n');
+
+      if (!transcript) return;
+
+      const systemPrompt = `You are a project memory manager. Your task is to update a project's MEMORY.md file with learnings from a completed session.
+
+The MEMORY.md file captures:
+- Key decisions made in this project
+- Patterns and conventions established
+- Technical context and architectural notes
+- User preferences and working style
+- Important facts discovered
+
+CURRENT MEMORY.md:
+${existing || '(empty)'}
+
+RECENT SESSION TRANSCRIPT (${project.name}):
+${transcript}
+
+Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new insights with existing ones; don't duplicate. Do not include preamble or commentary.`;
+
+      const currentConfig = configStore.getAll();
+      const updatedMemory = await generateTitleWithClaudeSdk(systemPrompt, currentConfig);
+      if (updatedMemory && updatedMemory.trim()) {
+        fs.writeFileSync(memoryPath, updatedMemory.trim() + '\n', 'utf-8');
+        log('[SessionManager] Updated project MEMORY.md for project:', project.id);
+      }
+    } catch (err) {
+      logError('[SessionManager] Failed to update project MEMORY.md:', err);
+    }
   }
 
   private async runSessionTitleGeneration(
@@ -914,6 +1015,14 @@ export class SessionManager {
         this.promptQueues.delete(session.id);
       }
       this.updateSessionStatus(session.id, 'idle');
+
+      // Trigger post-session MEMORY.md update for project sessions
+      const completedSession = this.loadSession(session.id);
+      if (completedSession?.projectId) {
+        this.scheduleProjectMemoryUpdate(completedSession).catch((err) =>
+          logError('[SessionManager] Project memory update failed:', err)
+        );
+      }
     }
   }
 

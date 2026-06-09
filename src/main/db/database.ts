@@ -13,6 +13,16 @@ export interface DatabaseInstance {
   // Raw database access (for advanced queries)
   raw: Database.Database;
 
+  // Project operations
+  projects: {
+    create: (project: ProjectRow) => void;
+    update: (id: string, updates: Partial<ProjectRow>) => void;
+    get: (id: string) => ProjectRow | undefined;
+    getAll: () => ProjectRow[];
+    delete: (id: string) => void;
+    getSessionsByProjectId: (projectId: string) => SessionRow[];
+  };
+
   // Session operations
   sessions: {
     create: (session: SessionRow) => void;
@@ -53,6 +63,19 @@ export interface DatabaseInstance {
   close: () => void;
 }
 
+export interface ProjectRow {
+  id: string;
+  name: string;
+  work_dir: string;
+  description: string | null;
+  mcp_servers: string; // JSON MCPServerConfig[]
+  mcp_mode: string | null; // NULL | 'merge' | 'replace'
+  skill_ids: string; // JSON string[]
+  skills_mode: string | null; // NULL | 'merge' | 'replace'
+  created_at: number;
+  updated_at: number;
+}
+
 export interface SessionRow {
   id: string;
   title: string;
@@ -64,6 +87,7 @@ export interface SessionRow {
   allowed_tools: string; // JSON string
   memory_enabled: number;
   model: string | null;
+  project_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -221,6 +245,27 @@ function initializeSchema(database: Database.Database): void {
     // Enable WAL mode for better performance
     database.pragma('journal_mode = WAL');
 
+    // Create projects table
+    database.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      work_dir TEXT NOT NULL,
+      description TEXT,
+      mcp_servers TEXT NOT NULL DEFAULT '[]',
+      mcp_mode TEXT,
+      skill_ids TEXT NOT NULL DEFAULT '[]',
+      skills_mode TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+    database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_projects_updated_at
+    ON projects(updated_at DESC)
+  `);
+
     // Create sessions table
     database.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -240,6 +285,7 @@ function initializeSchema(database: Database.Database): void {
 
     ensureColumn(database, 'sessions', 'openai_thread_id', 'openai_thread_id TEXT');
     ensureColumn(database, 'sessions', 'model', 'model TEXT');
+    ensureColumn(database, 'sessions', 'project_id', 'project_id TEXT');
 
     // Create messages table
     database.exec(`
@@ -430,10 +476,34 @@ export function initDatabase(): DatabaseInstance {
   initializeSchema(rawDb);
 
   // Prepare statements for better performance
+
+  // Project statements
+  const insertProject = rawDb.prepare(`
+    INSERT OR REPLACE INTO projects
+    (id, name, work_dir, description, mcp_servers, mcp_mode, skill_ids, skills_mode, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const getProjectStmt = rawDb.prepare(`
+    SELECT * FROM projects WHERE id = ?
+  `);
+
+  const getAllProjectsStmt = rawDb.prepare(`
+    SELECT * FROM projects ORDER BY updated_at DESC
+  `);
+
+  const deleteProjectStmt = rawDb.prepare(`
+    DELETE FROM projects WHERE id = ?
+  `);
+
+  const getSessionsByProjectIdStmt = rawDb.prepare(`
+    SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC
+  `);
+
   const insertSession = rawDb.prepare(`
     INSERT OR REPLACE INTO sessions
-    (id, title, claude_session_id, openai_thread_id, status, cwd, mounted_paths, allowed_tools, memory_enabled, model, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (id, title, claude_session_id, openai_thread_id, status, cwd, mounted_paths, allowed_tools, memory_enabled, model, project_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   // Note: Dynamic update queries are built in sessions.update() for flexibility
@@ -511,6 +581,61 @@ export function initDatabase(): DatabaseInstance {
   db = {
     raw: rawDb,
 
+    projects: {
+      create: (project: ProjectRow) => {
+        insertProject.run(
+          project.id,
+          project.name,
+          project.work_dir,
+          project.description,
+          project.mcp_servers,
+          project.mcp_mode,
+          project.skill_ids,
+          project.skills_mode,
+          project.created_at,
+          project.updated_at
+        );
+      },
+
+      update: (id: string, updates: Partial<ProjectRow>) => {
+        const IMMUTABLE_COLUMNS = new Set(['id', 'created_at']);
+        const setClauses: string[] = [];
+        const values: unknown[] = [];
+        for (const [key, value] of Object.entries(updates)) {
+          if (value !== undefined) {
+            if (IMMUTABLE_COLUMNS.has(key)) continue;
+            validateIdentifier(key);
+            setClauses.push(`${key} = ?`);
+            values.push(value);
+          }
+        }
+        if (setClauses.length === 0) return;
+        setClauses.push('updated_at = ?');
+        values.push(Date.now());
+        values.push(id);
+        const sql = `UPDATE projects SET ${setClauses.join(', ')} WHERE id = ?`;
+        rawDb.prepare(sql).run(...values);
+      },
+
+      get: (id: string): ProjectRow | undefined => {
+        return getProjectStmt.get(id) as ProjectRow | undefined;
+      },
+
+      getAll: (): ProjectRow[] => {
+        return getAllProjectsStmt.all() as ProjectRow[];
+      },
+
+      delete: (id: string) => {
+        // Set project_id = NULL on sessions that reference this project
+        rawDb.prepare(`UPDATE sessions SET project_id = NULL WHERE project_id = ?`).run(id);
+        deleteProjectStmt.run(id);
+      },
+
+      getSessionsByProjectId: (projectId: string): SessionRow[] => {
+        return getSessionsByProjectIdStmt.all(projectId) as SessionRow[];
+      },
+    },
+
     sessions: {
       create: (session: SessionRow) => {
         insertSession.run(
@@ -524,6 +649,7 @@ export function initDatabase(): DatabaseInstance {
           session.allowed_tools,
           session.memory_enabled,
           session.model,
+          session.project_id ?? null,
           session.created_at,
           session.updated_at
         );

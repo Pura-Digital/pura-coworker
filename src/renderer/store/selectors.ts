@@ -16,7 +16,7 @@
 
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from './index';
-import type { Session, Message, TraceStep, Settings, AppConfig } from '../types';
+import type { Session, Message, TraceStep, Settings, AppConfig, Project } from '../types';
 import type { GlobalNotice, SessionExecutionClock } from './index';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +31,22 @@ export function useSessions(): Session[] {
 /** Returns the ID of the currently active session (may be null). */
 export function useActiveSessionId(): string | null {
   return useAppStore((s) => s.activeSessionId);
+}
+
+/** Returns the ID of the currently active project view (may be null). */
+export function useActiveProjectId(): string | null {
+  return useAppStore((s) => s.activeProjectId);
+}
+
+/** Returns the active Project object, or null when none is selected. */
+export function useActiveProject(): Project | null {
+  return useAppStore(
+    useShallow((s) =>
+      s.activeProjectId
+        ? (s.projects.find((project) => project.id === s.activeProjectId) ?? null)
+        : null
+    )
+  );
 }
 
 /**
