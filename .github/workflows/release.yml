@@ -84,6 +84,12 @@ jobs:
       - name: Vite build
         run: npx vite build
 
+      - name: Verify macOS signing credentials
+        run: bash scripts/verify-macos-signing-env.sh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
       - name: Electron Builder (signed + notarized)
         run: npx electron-builder --mac dmg zip dir --publish never
         env:
