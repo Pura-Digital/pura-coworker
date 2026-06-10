@@ -94,8 +94,7 @@ mac:
       arch:
         - arm64
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
-  identity: auto
-  notarize: true
+  notarize: false
   hardenedRuntime: true
   gatekeeperAssess: true
   entitlements: resources/entitlements.mac.plist
