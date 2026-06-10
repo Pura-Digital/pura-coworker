@@ -18,7 +18,9 @@ echo "CSC_LINK length: ${#CSC_LINK}"
 echo "CSC_KEY_PASSWORD length: ${#CSC_KEY_PASSWORD}"
 
 TMP_P12="$(mktemp /tmp/csc-verify.XXXXXX.p12)"
-TMP_KC="$(mktemp /tmp/csc-verify.XXXXXX.keychain-db)"
+# Do not mktemp the keychain path — mktemp creates an empty file and
+# `security create-keychain` then fails with "already exists".
+TMP_KC="/tmp/csc-verify-$$-$(date +%s)-$RANDOM.keychain-db"
 cleanup() {
   rm -f "$TMP_P12"
   security delete-keychain "$TMP_KC" >/dev/null 2>&1 || true
@@ -51,6 +53,7 @@ else
 fi
 
 KC_PASS="$(openssl rand -base64 24 2>/dev/null || date +%s)"
+security delete-keychain "$TMP_KC" >/dev/null 2>&1 || true
 security create-keychain -p "$KC_PASS" "$TMP_KC"
 security unlock-keychain -p "$KC_PASS" "$TMP_KC"
 
