@@ -69,8 +69,6 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-win-${arch}.${ext}
-  # Keep resource editing (icon, metadata) but skip code signing in unsigned CI builds.
-  signExecutable: false
   extraResources:
     - from: resources/icon.ico
       to: icon.ico
