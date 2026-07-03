@@ -90,20 +90,12 @@ export function Titlebar() {
           </div>
           <div className="flex-1 min-w-0 h-full" />
         </>
-      ) : isFullscreen ? (
+      ) : (
         <>
           <div className="flex items-center h-full pl-3 pr-2 shrink-0">
             <TitlebarBrand />
           </div>
           <div className="flex-1 min-w-0 h-full" />
-          {windowControls}
-        </>
-      ) : (
-        <>
-          <div className="flex-1 min-w-0 h-full" />
-          <div className="flex items-center h-full pl-3 pr-1 border-l border-border-muted/60">
-            <TitlebarBrand />
-          </div>
           {windowControls}
         </>
       )}

@@ -716,11 +716,7 @@ export function ChatView() {
   }, [activeSession?.projectId, setActiveProject, setActiveSession]);
 
   if (!activeSession) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-text-muted">
-        <span>{t('chat.loadingConversation')}</span>
-      </div>
-    );
+    return null;
   }
 
   return (

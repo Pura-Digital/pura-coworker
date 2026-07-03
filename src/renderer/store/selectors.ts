@@ -51,14 +51,21 @@ export function useActiveProject(): Project | null {
 
 /**
  * Returns the active Session object, or null when none is selected.
- * Stable reference: re-renders only when the active session object changes.
  */
 export function useCurrentSession(): Session | null {
-  return useAppStore(
-    useShallow((s) =>
-      s.activeSessionId ? (s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null) : null
-    )
-  );
+  return useAppStore((s) => {
+    if (!s.activeSessionId) return null;
+    return s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null;
+  });
+}
+
+/** True when persisted messages for the active session are available (or hydration finished). */
+export function useIsActiveSessionMessagesHydrated(): boolean {
+  return useAppStore((s) => {
+    if (!s.activeSessionId) return true;
+    if (s.sessionMessagesHydrated[s.activeSessionId]) return true;
+    return (s.sessionStates[s.activeSessionId]?.messages?.length ?? 0) > 0;
+  });
 }
 
 /** Returns whether the active session is currently executing. */

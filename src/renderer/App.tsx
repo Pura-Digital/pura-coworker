@@ -25,12 +25,12 @@ import { SandboxSetupDialog } from './components/SandboxSetupDialog';
 import { SandboxSyncToast } from './components/SandboxSyncToast';
 import { GlobalNoticeToast } from './components/GlobalNoticeToast';
 import { PanelErrorBoundary } from './components/PanelErrorBoundary';
+import { ChatLoadingView } from './components/ChatLoadingView';
+import { ChatView } from './components/ChatView';
+import { ChatSessionGate } from './components/ChatSessionGate';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
 
-const ChatView = lazy(() =>
-  import('./components/ChatView').then((module) => ({ default: module.ChatView }))
-);
 const ContextPanel = lazy(() =>
   import('./components/ContextPanel').then((module) => ({ default: module.ContextPanel }))
 );
@@ -213,11 +213,11 @@ function App() {
             <PanelErrorBoundary
               name="ChatView"
               resetKey={activeSessionId}
-              fallback={<MainPanelFallback />}
+              fallback={<ChatLoadingView />}
             >
-              <Suspense fallback={<MainPanelFallback />}>
+              <ChatSessionGate sessionId={activeSessionId}>
                 <ChatView />
-              </Suspense>
+              </ChatSessionGate>
             </PanelErrorBoundary>
           ) : activeProjectId ? (
             <PanelErrorBoundary

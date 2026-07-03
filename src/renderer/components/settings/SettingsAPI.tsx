@@ -86,6 +86,7 @@ export function SettingsAPI() {
     refreshModelOptions,
     discoverLocalOllama,
     applyPuraDigitalSetup,
+    applyCustomModelsSetup,
     discoverPuraDigitalModels,
     diagnosticResult,
     isDiagnosing,
@@ -133,17 +134,28 @@ export function SettingsAPI() {
           {t('api.provider')}
         </label>
         <p className="text-xs leading-5 text-text-muted">{t('api.providerDescription')}</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {(
-            ['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'pura', 'custom'] as const
+            [
+              // 'openrouter',
+              // 'anthropic',
+              // 'openai',
+              // 'gemini',
+              'pura',
+              'ollama',
+              'custom',
+            ] as const
           ).map((p) => {
             const isPuraTab = p === 'pura';
+            const isCustomTab = p === 'custom';
             const isSelected = isPuraTab
               ? isPuraMode
               : provider === p && (p !== 'custom' || !isPuraMode);
             const handleClick = () => {
               if (isPuraTab) {
                 applyPuraDigitalSetup();
+              } else if (isCustomTab) {
+                applyCustomModelsSetup();
               } else {
                 changeProvider(p);
               }

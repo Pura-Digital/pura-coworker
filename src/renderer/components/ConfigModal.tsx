@@ -69,6 +69,7 @@ export function ConfigModal({
     testResult,
     friendlyTestDetails,
     isOllamaMode,
+    isPuraMode,
     requiresApiKey,
     protocolGuidanceText,
     protocolGuidanceTone,
@@ -90,6 +91,8 @@ export function ConfigModal({
     applyCommonProviderSetup,
     changeProvider,
     changeProtocol,
+    applyPuraDigitalSetup,
+    applyCustomModelsSetup,
     requestConfigSetSwitch,
     requestCreateBlankConfigSet,
     cancelPendingConfigSetAction,
@@ -201,29 +204,52 @@ export function ConfigModal({
               <Server className="w-4 h-4" />
               {t('api.provider')}
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'custom'] as const).map(
-                (p) => {
-                  const label =
-                    presets?.[p]?.name ||
-                    (p === 'custom' ? t('api.custom') : PROVIDER_LABELS[p]) ||
-                    p;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => changeProvider(p)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                        provider === p
-                          ? 'bg-accent text-white'
-                          : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
-                      }`}
-                    >
-                      <ProviderLogoBadge id={providerTabToLogoId(p)} />
-                      <span className="min-w-0 truncate">{label}</span>
-                    </button>
-                  );
-                }
-              )}
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  // 'openrouter',
+                  // 'anthropic',
+                  // 'openai',
+                  // 'gemini',
+                  'pura',
+                  'ollama',
+                  'custom',
+                ] as const
+              ).map((p) => {
+                const isPuraTab = p === 'pura';
+                const isCustomTab = p === 'custom';
+                const isSelected = isPuraTab
+                  ? isPuraMode
+                  : provider === p && (p !== 'custom' || !isPuraMode);
+                const label = isPuraTab
+                  ? t('api.puraDigital')
+                  : p === 'custom'
+                    ? t('api.moreModels')
+                    : presets?.[p]?.name || PROVIDER_LABELS[p as keyof typeof PROVIDER_LABELS] || p;
+                const handleClick = () => {
+                  if (isPuraTab) {
+                    applyPuraDigitalSetup();
+                  } else if (isCustomTab) {
+                    applyCustomModelsSetup();
+                  } else {
+                    changeProvider(p);
+                  }
+                };
+                return (
+                  <button
+                    key={p}
+                    onClick={handleClick}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      isSelected
+                        ? 'bg-accent text-white'
+                        : 'bg-surface-hover text-text-secondary hover:bg-surface-active'
+                    }`}
+                  >
+                    <ProviderLogoBadge id={providerTabToLogoId(p)} />
+                    <span className="min-w-0 truncate">{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -246,7 +272,7 @@ export function ConfigModal({
           </div>
 
           {/* Custom Protocol */}
-          {provider === 'custom' && (
+          {provider === 'custom' && !isPuraMode && (
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
                 <Server className="w-4 h-4" />
@@ -407,7 +433,7 @@ export function ConfigModal({
             {useCustomModel && <p className="text-xs text-text-muted">{modelInputHint}</p>}
           </div>
 
-          {provider === 'custom' && (
+          {provider === 'custom' && !isPuraMode && (
             <CommonProviderSetupsCard
               setups={commonProviderSetups}
               onApplySetup={applyCommonProviderSetup}

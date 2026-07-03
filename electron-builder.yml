@@ -69,8 +69,13 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-win-${arch}.${ext}
-  signAndEditExecutable: false
+  # Keep resource editing (icon, metadata) but skip code signing in unsigned CI builds.
+  signExecutable: false
   extraResources:
+    - from: resources/icon.ico
+      to: icon.ico
+    - from: resources/tray-icon.ico
+      to: tray-icon.ico
     - from: .bundle-resources/mcp
       to: mcp
     - from: resources/node/win32-x64

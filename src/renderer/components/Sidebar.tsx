@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
 import { useIPC } from '../hooks/useIPC';
+import { hydrateSessionMessages } from '../utils/session-hydration';
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,10 +36,7 @@ export function Sidebar() {
   const activeProjectId = useAppStore((s) => s.activeProjectId);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
   const settings = useAppStore((s) => s.settings);
-  const sessionStates = useAppStore((s) => s.sessionStates);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
-  const setMessages = useAppStore((s) => s.setMessages);
-  const setTraceSteps = useAppStore((s) => s.setTraceSteps);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const isConfigured = useAppStore((s) => s.isConfigured);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
@@ -47,8 +45,6 @@ export function Sidebar() {
   const {
     deleteSession,
     batchDeleteSessions,
-    getSessionMessages,
-    getSessionTraceSteps,
     isElectron,
   } = useIPC();
   const [hoveredSession, setHoveredSession] = useState<string | null>(null);
@@ -163,7 +159,7 @@ export function Sidebar() {
   }, [selectedIds, visibleSessionIds, batchDeleteSessions, exitSelectMode]);
 
   const handleSessionClick = useCallback(
-    async (sessionId: string) => {
+    (sessionId: string) => {
       setShowSettings(false);
 
       if (activeSessionId === sessionId) return;
@@ -177,40 +173,17 @@ export function Sidebar() {
 
       setActiveSession(sessionId);
 
-      const existingMessages = sessionStates[sessionId]?.messages;
-      if ((!existingMessages || existingMessages.length === 0) && isElectron) {
-        try {
-          const messages = await getSessionMessages(sessionId);
-          if (messages && messages.length > 0) {
-            setMessages(sessionId, messages);
-          }
-        } catch (error) {
-          console.error('[Sidebar] Failed to load messages:', error);
-        }
-      }
-
-      const existingSteps = sessionStates[sessionId]?.traceSteps;
-      if ((!existingSteps || existingSteps.length === 0) && isElectron) {
-        try {
-          const steps = await getSessionTraceSteps(sessionId);
-          setTraceSteps(sessionId, steps || []);
-        } catch (error) {
-          console.error('[Sidebar] Failed to load trace steps:', error);
-        }
+      if (isElectron) {
+        void hydrateSessionMessages(sessionId);
       }
     },
     [
       activeSessionId,
       sessions,
       setActiveProject,
-      getSessionMessages,
-      getSessionTraceSteps,
-      isElectron,
-      sessionStates,
       setActiveSession,
-      setMessages,
       setShowSettings,
-      setTraceSteps,
+      isElectron,
     ]
   );
 

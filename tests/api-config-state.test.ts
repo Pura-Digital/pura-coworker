@@ -12,7 +12,9 @@ import {
   isCustomOpenAiLoopbackGateway,
   profileKeyFromProvider,
   profileKeyToProvider,
+  shouldResetCustomOpenAiFromPura,
 } from '../src/renderer/hooks/useApiConfigState';
+import { PURA_DIGITAL_BASE_URL } from '../src/shared/pura-digital';
 
 const hookPath = path.resolve(process.cwd(), 'src/renderer/hooks/useApiConfigState.ts');
 
@@ -34,6 +36,41 @@ describe('api config state helpers', () => {
       provider: 'ollama',
       customProtocol: 'openai',
     });
+  });
+
+  it('detects when Altri Modelli must exit the Pura Digital gateway profile', () => {
+    const puraProfiles = {
+      'custom:openai': {
+        apiKey: 'pura-key',
+        baseUrl: PURA_DIGITAL_BASE_URL,
+        model: '',
+        customModel: '',
+        useCustomModel: false,
+        contextWindow: '',
+        maxTokens: '',
+      },
+      'custom:anthropic': {
+        apiKey: '',
+        baseUrl: '',
+        model: 'deepseek-chat',
+        customModel: 'deepseek-chat',
+        useCustomModel: true,
+        contextWindow: '',
+        maxTokens: '',
+      },
+      'custom:gemini': {
+        apiKey: '',
+        baseUrl: '',
+        model: '',
+        customModel: '',
+        useCustomModel: true,
+        contextWindow: '',
+        maxTokens: '',
+      },
+    } as const;
+
+    expect(shouldResetCustomOpenAiFromPura('openai', puraProfiles)).toBe(true);
+    expect(shouldResetCustomOpenAiFromPura('anthropic', puraProfiles)).toBe(false);
   });
 
   it('conservatively upgrades legacy localhost ollama config into the ollama profile', () => {

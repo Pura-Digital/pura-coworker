@@ -133,6 +133,17 @@ export function isCustomOpenAiLoopbackGateway(baseUrl: string): boolean {
 
 export { isPuraDigitalActive } from '../../shared/pura-digital';
 
+/** True when activating Altri Modelli would still show the Pura Digital gateway UI. */
+export function shouldResetCustomOpenAiFromPura(
+  lastCustomProtocol: CustomProtocolType,
+  profiles: Pick<Record<ProviderProfileKey, UIProviderProfile>, ProviderProfileKey>
+): boolean {
+  const targetProfileKey = profileKeyFromProvider('custom', lastCustomProtocol);
+  const { customProtocol } = profileKeyToProvider(targetProfileKey);
+  const targetBaseUrl = profiles[targetProfileKey]?.baseUrl;
+  return isPuraDigitalActive('custom', customProtocol, targetBaseUrl);
+}
+
 function isLegacyOllamaConfig(
   config: Pick<AppConfig, 'provider' | 'customProtocol' | 'baseUrl'> | null | undefined
 ): boolean {
@@ -1598,6 +1609,28 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     dispatch({ type: 'SET_ACTIVE_PROFILE_KEY', payload: targetProfileKey });
   }, []);
 
+  const applyCustomModelsSetup = useCallback(() => {
+    const targetProfileKey = profileKeyFromProvider('custom', lastCustomProtocol);
+
+    if (shouldResetCustomOpenAiFromPura(lastCustomProtocol, profiles)) {
+      dispatch({
+        type: 'UPDATE_PROFILE_FN',
+        profileKey: 'custom:openai',
+        updater: (current) => ({
+          ...current,
+          apiKey: '',
+          baseUrl: '',
+          model: '',
+          customModel: '',
+          useCustomModel: true,
+        }),
+      });
+      dispatch({ type: 'DELETE_DISCOVERED_MODELS', profileKey: 'custom:openai' });
+    }
+
+    dispatch({ type: 'SET_ACTIVE_PROFILE_KEY', payload: targetProfileKey });
+  }, [lastCustomProtocol, profiles]);
+
   const discoverPuraDigitalModels = useCallback(async () => {
     if (!isElectron || !isPuraMode) {
       return [];
@@ -2222,6 +2255,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     refreshModelOptions,
     discoverLocalOllama,
     applyPuraDigitalSetup,
+    applyCustomModelsSetup,
     discoverPuraDigitalModels,
     setError: showErrorText,
     setSuccessMessage: showSuccessText,

@@ -17,6 +17,7 @@ import { useActiveProject } from '../store/selectors';
 import { useIPC } from '../hooks/useIPC';
 import type { ContentBlock, Session, TextContent } from '../types';
 import { getInitialSessionTitle } from '../../shared/session-title';
+import { hydrateSessionMessages } from '../utils/session-hydration';
 import { SettingsProject } from './settings/SettingsProject';
 
 type ProjectTab = 'chats' | 'sources';
@@ -50,11 +51,10 @@ export function ProjectView() {
   const sessions = useAppStore((s) => s.sessions);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
-  const setMessages = useAppStore((s) => s.setMessages);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const isConfigured = useAppStore((s) => s.isConfigured);
 
-  const { startSession, isElectron, getSessionMessages } = useIPC();
+  const { startSession, isElectron } = useIPC();
 
   const [activeTab, setActiveTab] = useState<ProjectTab>('chats');
   const [prompt, setPrompt] = useState('');
@@ -86,17 +86,9 @@ export function ProjectView() {
   useEffect(() => {
     if (!isElectron || !project) return;
     for (const session of projectSessions.slice(0, 20)) {
-      const existing = sessionStates[session.id]?.messages;
-      if (existing && existing.length > 0) continue;
-      getSessionMessages(session.id)
-        .then((messages) => {
-          if (messages.length > 0) setMessages(session.id, messages);
-        })
-        .catch(() => {
-          /* non-critical */
-        });
+      void hydrateSessionMessages(session.id);
     }
-  }, [project, projectSessions, sessionStates, isElectron, getSessionMessages, setMessages]);
+  }, [project, projectSessions, isElectron]);
 
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -163,20 +155,11 @@ export function ProjectView() {
     }
   };
 
-  const handleOpenSession = async (sessionId: string) => {
+  const handleOpenSession = (sessionId: string) => {
     setShowSettings(false);
     setActiveSession(sessionId);
-
-    const existingMessages = sessionStates[sessionId]?.messages;
-    if ((!existingMessages || existingMessages.length === 0) && isElectron) {
-      try {
-        const messages = await getSessionMessages(sessionId);
-        if (messages?.length) {
-          useAppStore.getState().setMessages(sessionId, messages);
-        }
-      } catch {
-        /* non-critical */
-      }
+    if (isElectron) {
+      void hydrateSessionMessages(sessionId);
     }
   };
 

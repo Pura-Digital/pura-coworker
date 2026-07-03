@@ -90,6 +90,9 @@ interface AppState {
   // Per-session state (messages, partials, turns, traces, etc.)
   sessionStates: Record<string, SessionState>;
 
+  /** True after persisted messages were fetched (or confirmed empty) for a session. */
+  sessionMessagesHydrated: Record<string, boolean>;
+
   // UI state
   isLoading: boolean;
   sidebarCollapsed: boolean;
@@ -142,6 +145,7 @@ interface AppState {
   finishExecutionClock: (sessionId: string, endAt?: number) => void;
   clearExecutionClock: (sessionId: string) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
+  markSessionMessagesHydrated: (sessionId: string) => void;
   setPartialMessage: (sessionId: string, partial: string) => void;
   clearPartialMessage: (sessionId: string) => void;
   setPartialThinking: (sessionId: string, delta: string) => void;
@@ -248,6 +252,7 @@ export const useAppStore = create<AppState>((set) => ({
   sessions: [],
   activeSessionId: null,
   sessionStates: {},
+  sessionMessagesHydrated: {},
   isLoading: false,
   sidebarCollapsed: false,
   contextPanelCollapsed: false,
@@ -289,9 +294,11 @@ export const useAppStore = create<AppState>((set) => ({
   removeSession: (sessionId) =>
     set((state) => {
       const { [sessionId]: _, ...restSessionStates } = state.sessionStates;
+      const { [sessionId]: __, ...restHydrated } = state.sessionMessagesHydrated;
       return {
         sessions: state.sessions.filter((s) => s.id !== sessionId),
         sessionStates: restSessionStates,
+        sessionMessagesHydrated: restHydrated,
         activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId,
       };
     }),
@@ -300,13 +307,22 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => {
       const idSet = new Set(sessionIds);
       const newSessionStates: Record<string, SessionState> = {};
+      const newHydrated: Record<string, boolean> = {};
       for (const key of Object.keys(state.sessionStates)) {
-        if (!idSet.has(key)) newSessionStates[key] = state.sessionStates[key];
+        if (!idSet.has(key)) {
+          newSessionStates[key] = state.sessionStates[key];
+        }
+      }
+      for (const key of Object.keys(state.sessionMessagesHydrated)) {
+        if (!idSet.has(key)) {
+          newHydrated[key] = state.sessionMessagesHydrated[key];
+        }
       }
 
       return {
         sessions: state.sessions.filter((s) => !idSet.has(s.id)),
         sessionStates: newSessionStates,
+        sessionMessagesHydrated: newHydrated,
         activeSessionId:
           state.activeSessionId && idSet.has(state.activeSessionId) ? null : state.activeSessionId,
       };
@@ -402,6 +418,15 @@ export const useAppStore = create<AppState>((set) => ({
   setMessages: (sessionId, messages) =>
     set((state) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, { messages }),
+      sessionMessagesHydrated:
+        messages.length > 0
+          ? { ...state.sessionMessagesHydrated, [sessionId]: true }
+          : state.sessionMessagesHydrated,
+    })),
+
+  markSessionMessagesHydrated: (sessionId) =>
+    set((state) => ({
+      sessionMessagesHydrated: { ...state.sessionMessagesHydrated, [sessionId]: true },
     })),
 
   setPartialMessage: (sessionId, partial) =>
