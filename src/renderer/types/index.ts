@@ -572,6 +572,7 @@ export type ServerEvent =
   | { type: 'new-session' }
   | { type: 'navigate'; payload: string }
   | { type: 'scheduled-task.error'; payload: { taskId: string; error: string } }
+  | { type: 'updater.status'; payload: import('../../shared/updater-types').UpdaterSnapshot }
   | { type: 'error'; payload: { message: string; code?: 'CONFIG_REQUIRED_ACTIVE_SET'; action?: 'open_api_settings' } };
 
 // Settings types

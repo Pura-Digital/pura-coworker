@@ -44,6 +44,7 @@ import type {
   IpcProjectUpdateInput,
 } from '../shared/ipc-types';
 import type { Session } from '../renderer/types';
+import type { UpdaterSnapshot } from '../shared/updater-types';
 
 // Track registered callbacks to prevent duplicate listeners
 let registeredCallback: ((event: ServerEvent) => void) | null = null;
@@ -494,6 +495,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setEnabled: (enabled: boolean): Promise<{ success: boolean; enabled: boolean }> =>
       ipcRenderer.invoke('memory.setEnabled', enabled),
   },
+
+  updater: {
+    getStatus: () => ipcRenderer.invoke('updater.getStatus'),
+    check: () => ipcRenderer.invoke('updater.check'),
+    download: () => ipcRenderer.invoke('updater.download'),
+    install: () => ipcRenderer.invoke('updater.install'),
+  },
 });
 
 // Type declaration for the renderer process
@@ -761,6 +769,12 @@ declare global {
           workspaceKey?: string
         ) => Promise<MemoryInspectSessionResult | null>;
         setEnabled: (enabled: boolean) => Promise<{ success: boolean; enabled: boolean }>;
+      };
+      updater: {
+        getStatus: () => Promise<UpdaterSnapshot>;
+        check: () => Promise<UpdaterSnapshot>;
+        download: () => Promise<UpdaterSnapshot>;
+        install: () => Promise<{ success: boolean }>;
       };
     };
   }

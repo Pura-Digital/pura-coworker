@@ -24,6 +24,8 @@ import { Titlebar } from './components/Titlebar';
 import { SandboxSetupDialog } from './components/SandboxSetupDialog';
 import { SandboxSyncToast } from './components/SandboxSyncToast';
 import { GlobalNoticeToast } from './components/GlobalNoticeToast';
+import { UpdateToast } from './components/UpdateToast';
+import { useUpdater } from './hooks/useUpdater';
 import { PanelErrorBoundary } from './components/PanelErrorBoundary';
 import { ChatLoadingView } from './components/ChatLoadingView';
 import { ChatView } from './components/ChatView';
@@ -87,6 +89,7 @@ function App() {
   const setActiveProject = useAppStore((s) => s.setActiveProject);
   const projects = useAppStore((s) => s.projects);
   const { listSessions, isElectron } = useIPC();
+  const { status: updaterStatus, download, install, retry, dismiss } = useUpdater();
   const { width } = useWindowSize();
   const initialized = useRef(false);
   const sidebarBeforeSettings = useRef(false);
@@ -280,6 +283,14 @@ function App() {
         notice={globalNotice}
         onDismiss={clearGlobalNotice}
         onAction={handleGlobalNoticeAction}
+      />
+
+      <UpdateToast
+        status={updaterStatus}
+        onDownload={download}
+        onInstall={install}
+        onRetry={retry}
+        onDismiss={dismiss}
       />
     </div>
   );

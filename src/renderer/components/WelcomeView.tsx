@@ -544,29 +544,6 @@ export function WelcomeView() {
             </div>
           )}
 
-          {/* File attachments */}
-          {attachedFiles.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {attachedFiles.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-text-primary truncate">{file.name}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(index)}
-                    className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Text Input - Auto-resizing */}
           <textarea
             ref={textareaRef}
@@ -599,12 +576,12 @@ export function WelcomeView() {
           />
 
           {/* Bottom Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-border-muted">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border-muted min-w-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
                 type="button"
                 onClick={handleSelectFolder}
-                className={`flex items-center gap-2 text-sm transition-colors ${
+                className={`flex items-center gap-2 text-sm transition-colors shrink-0 ${
                   workingDir
                     ? 'text-text-secondary hover:text-text-primary'
                     : 'text-accent hover:text-accent-hover'
@@ -620,21 +597,43 @@ export function WelcomeView() {
               </button>
 
               {isElectron && (
-                <button
-                  type="button"
-                  onClick={handleFileSelect}
-                  className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  <Paperclip className="w-4 h-4" />
-                  <span>{t('welcome.attachFiles')}</span>
-                </button>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={handleFileSelect}
+                    className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors shrink-0"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                    <span>{t('welcome.attachFiles')}</span>
+                  </button>
+                  {attachedFiles.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto min-w-0 flex-nowrap">
+                      {attachedFiles.map((file, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1.5 max-w-[180px] shrink-0 rounded-full border border-border-muted bg-surface px-2.5 py-1 text-xs text-text-primary"
+                        >
+                          <span className="truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-text-muted hover:text-error hover:bg-error/10 transition-colors shrink-0"
+                            title={t('common.delete')}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
             <button
               type="submit"
               disabled={!canSubmit || isSubmitting}
-              className="btn btn-primary px-5 py-2.5 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary px-5 py-2.5 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
             >
               <span>{isSubmitting ? t('welcome.starting') : t('welcome.letsGo')}</span>
               <ArrowRight className="w-4 h-4" />

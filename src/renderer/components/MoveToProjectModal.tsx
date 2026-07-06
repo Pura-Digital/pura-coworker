@@ -36,14 +36,21 @@ export function MoveToProjectModal({ sessionId, onClose }: MoveToProjectModalPro
         setError(result?.error ?? t('project.moveError'));
         return;
       }
-      updateSession(sessionId, { projectId: selectedProjectId ?? undefined });
+
+      const targetProject = selectedProjectId
+        ? projects.find((p) => p.id === selectedProjectId)
+        : null;
+      updateSession(sessionId, {
+        projectId: selectedProjectId ?? undefined,
+        ...(targetProject?.workDir ? { cwd: targetProject.workDir } : {}),
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('project.moveError'));
     } finally {
       setIsSubmitting(false);
     }
-  }, [sessionId, selectedProjectId, currentProjectId, updateSession, onClose, t]);
+  }, [sessionId, selectedProjectId, currentProjectId, projects, updateSession, onClose, t]);
 
   return (
     <div

@@ -1113,5 +1113,20 @@
     "listening": "正在聆听…",
     "disconnect": "断开连接",
     "errorPrefix": "错误"
+  },
+  "updater": {
+    "availableTitle": "有可用更新 {{version}}",
+    "availableBody": "点击下载最新版本。",
+    "downloadingTitle": "正在下载 {{version}}…",
+    "downloadingBody": "已下载 {{transferred}} / {{total}}",
+    "readyTitle": "更新 {{version}} 已就绪",
+    "readyBody": "重启 Aiden 以安装更新。",
+    "errorTitle": "更新失败",
+    "errorBody": "请稍后重试。",
+    "downloadAction": "下载更新",
+    "restartAction": "重启并更新",
+    "retryAction": "重试",
+    "upToDateTitle": "已是最新版本",
+    "upToDateBody": "Aiden {{version}} 已是最新版本。"
   }
 }

@@ -42,6 +42,7 @@ import { SandboxSync } from './sandbox/sandbox-sync';
 import { WSLBridge } from './sandbox/wsl-bridge';
 import { LimaBridge } from './sandbox/lima-bridge';
 import { getSandboxBootstrap } from './sandbox/sandbox-bootstrap';
+import { autoUpdaterManager } from './update/auto-updater-manager';
 import type { MCPServerConfig } from './mcp/mcp-manager';
 import type {
   ClientEvent,
@@ -242,58 +243,104 @@ let tray: Tray | null = null;
 const DARK_BG = '#171614';
 const LIGHT_BG = '#f5f3ee';
 
-function buildMacMenu() {
-  if (process.platform !== 'darwin') return;
+function createUpdateMenuItem(): Electron.MenuItemConstructorOptions {
+  return {
+    label: autoUpdaterManager.getMenuLabel(),
+    enabled: autoUpdaterManager.isMenuEnabled(),
+    click: () => autoUpdaterManager.handleMenuAction(),
+  };
+}
 
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: app.name,
-      submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        {
-          label: 'Preferences…',
-          accelerator: 'CmdOrCtrl+,',
-          click: () =>
-            mainWindow?.webContents.send('server-event', { type: 'navigate', payload: 'settings' }),
-        },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'togglefullscreen' },
-        { type: 'separator' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { role: 'resetZoom' },
-      ],
-    },
-    {
-      label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }, { type: 'separator' }, { role: 'front' }],
-    },
-  ];
+function buildApplicationMenu() {
+  const settingsItem: Electron.MenuItemConstructorOptions = {
+    label: process.platform === 'darwin' ? 'Preferences…' : 'Settings…',
+    accelerator: 'CmdOrCtrl+,',
+    click: () =>
+      mainWindow?.webContents.send('server-event', { type: 'navigate', payload: 'settings' }),
+  };
+
+  const updateItem = createUpdateMenuItem();
+
+  const template: Electron.MenuItemConstructorOptions[] =
+    process.platform === 'darwin'
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' },
+              { type: 'separator' },
+              settingsItem,
+              updateItem,
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' },
+            ],
+          },
+          {
+            label: 'Edit',
+            submenu: [
+              { role: 'undo' },
+              { role: 'redo' },
+              { type: 'separator' },
+              { role: 'cut' },
+              { role: 'copy' },
+              { role: 'paste' },
+              { role: 'selectAll' },
+            ],
+          },
+          {
+            label: 'View',
+            submenu: [
+              { role: 'togglefullscreen' },
+              { type: 'separator' },
+              { role: 'zoomIn' },
+              { role: 'zoomOut' },
+              { role: 'resetZoom' },
+            ],
+          },
+          {
+            label: 'Window',
+            submenu: [
+              { role: 'minimize' },
+              { role: 'close' },
+              { type: 'separator' },
+              { role: 'front' },
+            ],
+          },
+        ]
+      : [
+          {
+            label: 'File',
+            submenu: [settingsItem, updateItem, { type: 'separator' }, { role: 'quit' }],
+          },
+          {
+            label: 'Edit',
+            submenu: [
+              { role: 'undo' },
+              { role: 'redo' },
+              { type: 'separator' },
+              { role: 'cut' },
+              { role: 'copy' },
+              { role: 'paste' },
+              { role: 'selectAll' },
+            ],
+          },
+          {
+            label: 'View',
+            submenu: [
+              { role: 'togglefullscreen' },
+              { type: 'separator' },
+              { role: 'zoomIn' },
+              { role: 'zoomOut' },
+              { role: 'resetZoom' },
+            ],
+          },
+        ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -329,6 +376,22 @@ function setupTray() {
 
   tray = new Tray(resolvedIconPath);
   tray.setToolTip('Aiden');
+  refreshTrayMenu();
+
+  tray.on('click', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createWindow();
+    } else if (mainWindow.isVisible()) {
+      mainWindow.hide();
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -364,21 +427,16 @@ function setupTray() {
         }
       },
     },
+    createUpdateMenuItem(),
     { type: 'separator' },
     { label: 'Quit', role: 'quit' },
   ]);
   tray.setContextMenu(contextMenu);
+}
 
-  tray.on('click', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      createWindow();
-    } else if (mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
+function refreshApplicationMenus() {
+  buildApplicationMenu();
+  refreshTrayMenu();
 }
 
 function getSavedThemePreference(): AppTheme {
@@ -890,8 +948,12 @@ app
     });
     // pi-ai handles model routing natively — no proxy warmup needed
 
-    // macOS: application menu, dock menu, tray icon
-    buildMacMenu();
+    // Application menu, tray icon, and auto-updater
+    autoUpdaterManager.configure({
+      sendToRenderer,
+      refreshMenus: refreshApplicationMenus,
+    });
+    buildApplicationMenu();
     setupTray();
 
     // Show window after core managers are ready so first-load actions can be handled.
@@ -920,6 +982,10 @@ app
           type: 'native-theme.changed',
           payload: { shouldUseDarkColors: nativeTheme.shouldUseDarkColors },
         });
+        sendToRenderer({
+          type: 'updater.status',
+          payload: autoUpdaterManager.getSnapshot(),
+        });
       });
     }
 
@@ -934,18 +1000,8 @@ app
       }
     });
 
-    // Auto-updater: check for updates in production
-    if (!isDev) {
-      import('electron-updater')
-        .then(({ autoUpdater }) => {
-          autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
-            log('[AutoUpdater] Update check failed:', err);
-          });
-        })
-        .catch((err: unknown) => {
-          log('[AutoUpdater] Failed to load electron-updater:', err);
-        });
-    }
+    // Auto-updater: check on startup in production, manual download via UI/menu
+    void autoUpdaterManager.initialize(isDev);
 
     startNavServer(() => mainWindow);
 
@@ -1206,6 +1262,20 @@ ipcMain.handle('get-version', () => {
     logError('[IPC] Error getting version:', error);
     return 'unknown';
   }
+});
+
+ipcMain.handle('updater.getStatus', () => autoUpdaterManager.getSnapshot());
+ipcMain.handle('updater.check', async () => {
+  await autoUpdaterManager.checkForUpdates({ userInitiated: true });
+  return autoUpdaterManager.getSnapshot();
+});
+ipcMain.handle('updater.download', async () => {
+  await autoUpdaterManager.downloadUpdate();
+  return autoUpdaterManager.getSnapshot();
+});
+ipcMain.handle('updater.install', () => {
+  autoUpdaterManager.quitAndInstall();
+  return { success: true };
 });
 
 ipcMain.handle('system.getTheme', () => {
@@ -2759,6 +2829,14 @@ ipcMain.handle(
     if (!pm) throw new Error('Project manager not initialized');
     try {
       pm.moveSessionToProject(sessionId, projectId);
+
+      if (projectId !== null && sessionManager) {
+        const project = pm.getProject(projectId);
+        if (project?.workDir) {
+          sessionManager.updateSessionCwd(sessionId, project.workDir);
+        }
+      }
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

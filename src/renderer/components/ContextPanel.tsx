@@ -25,12 +25,8 @@ import {
   FileVideo,
   Image as ImageIcon,
   FolderOpen,
-  FolderSync,
   File,
-  Check,
-  Loader2,
   Plug,
-  Copy,
   BookOpen,
 } from 'lucide-react';
 import type { TraceStep, MCPServerInfo } from '../types';
@@ -47,35 +43,18 @@ export function ContextPanel() {
   const toggleContextPanel = useAppStore((s) => s.toggleContextPanel);
   const workingDir = useAppStore((s) => s.workingDir);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
-  const { getMCPServers, changeWorkingDir } = useIPC();
+  const { getMCPServers } = useIPC();
   const [contextOpen, setContextOpen] = useState(true);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
   const [utilArtifactsOpen, setUtilArtifactsOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [mcpServers, setMcpServers] = useState<MCPServerInfo[]>([]);
-  const [copiedPath, setCopiedPath] = useState(false);
-  const [isChangingDir, setIsChangingDir] = useState(false);
   const [recentWorkspaceFiles, setRecentWorkspaceFiles] = useState<Array<{
     path: string;
     modifiedAt: number;
     size: number;
   }>>([]);
-
-  const handleCopyPath = async (path: string) => {
-    try {
-      let shellPath = path;
-      if (path.includes(' ')) {
-        const isWindows = window.electronAPI?.platform === 'win32';
-        shellPath = isWindows ? `"${path}"` : path.replace(/ /g, '\\ ');
-      }
-      await navigator.clipboard.writeText(shellPath);
-      setCopiedPath(true);
-      setTimeout(() => setCopiedPath(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy path:', err);
-    }
-  };
 
   const ss = activeSessionId ? sessionStates[activeSessionId] : undefined;
   const steps = ss?.traceSteps ?? EMPTY_STEPS;
@@ -210,31 +189,23 @@ export function ContextPanel() {
     return () => clearInterval(interval);
   }, [contextPanelCollapsed, getMCPServers]);
 
-  const handleChangeDir = async () => {
-    setIsChangingDir(true);
+  const handleOpenFolder = async () => {
+    if (!currentWorkingDir || !canShowItemInFolder) return;
     try {
-      const result = await changeWorkingDir(
-        activeSessionId || undefined,
-        currentWorkingDir || undefined
-      );
-      if (!result.success && result.error && result.error !== 'User cancelled') {
+      const revealed = await window.electronAPI!.showItemInFolder(currentWorkingDir);
+      if (!revealed) {
         setGlobalNotice({
-          id: `change-dir-failed-${Date.now()}`,
+          id: `open-folder-failed-${Date.now()}`,
           type: 'warning',
-          message: `${t('context.changeDirFailed')}: ${result.error}`,
+          message: t('context.revealFailed'),
         });
       }
-    } catch (error) {
+    } catch {
       setGlobalNotice({
-        id: `change-dir-failed-${Date.now()}`,
-        type: 'error',
-        message:
-          error instanceof Error && error.message
-            ? `${t('context.changeDirFailed')}: ${error.message}`
-            : t('context.changeDirFailed'),
+        id: `open-folder-failed-${Date.now()}`,
+        type: 'warning',
+        message: t('context.revealFailed'),
       });
-    } finally {
-      setIsChangingDir(false);
     }
   };
 
@@ -304,42 +275,17 @@ export function ContextPanel() {
           <ContextCard
             title={folderLabel}
             trailing={
-              <div className="flex items-center gap-1">
-                {currentWorkingDir && (
-                  <>
-                    <button
-                      onClick={() => handleCopyPath(currentWorkingDir)}
-                      className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-                      title={t('context.copyPath')}
-                    >
-                      {copiedPath ? (
-                        <Check className="w-3 h-3 text-success" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
-                    </button>
-                    <button
-                      onClick={handleChangeDir}
-                      disabled={isChangingDir}
-                      className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover disabled:opacity-50 transition-colors"
-                      title={t('context.changeDir')}
-                    >
-                      {isChangingDir ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <FolderSync className="w-3 h-3" />
-                      )}
-                    </button>
-                  </>
-                )}
-                <FolderOpen className="w-3.5 h-3.5 text-text-muted" />
-              </div>
+              currentWorkingDir && canShowItemInFolder ? (
+                <button
+                  type="button"
+                  onClick={() => void handleOpenFolder()}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+                  title={t('context.openInFileManager')}
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                </button>
+              ) : undefined
             }
-            onTitleClick={() => {
-              if (currentWorkingDir) {
-                window.electronAPI?.showItemInFolder(currentWorkingDir);
-              }
-            }}
             titleTooltip={currentWorkingDir ? formatPath(currentWorkingDir) : undefined}
           />
         )}

@@ -1122,5 +1122,20 @@
     "listening": "Listening… speak naturally.",
     "disconnect": "Disconnect",
     "errorPrefix": "Error"
+  },
+  "updater": {
+    "availableTitle": "Update {{version}} available",
+    "availableBody": "Click download to get the latest version.",
+    "downloadingTitle": "Downloading {{version}}…",
+    "downloadingBody": "{{transferred}} of {{total}}",
+    "readyTitle": "Update {{version}} ready",
+    "readyBody": "Restart Aiden to install the update.",
+    "errorTitle": "Update failed",
+    "errorBody": "Try again later.",
+    "downloadAction": "Download update",
+    "restartAction": "Restart to update",
+    "retryAction": "Try again",
+    "upToDateTitle": "You're on the latest version",
+    "upToDateBody": "Aiden {{version}} is up to date."
   }
 }
