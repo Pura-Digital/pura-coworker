@@ -1,5 +1,25 @@
 import { isUncPath, isWindowsDrivePath } from './local-file-path';
 
+/** Basename of the app's built-in default working directory under userData. */
+export const DEFAULT_WORKING_DIR_BASENAME = 'default_working_dir';
+
+export function getWorkingDirBasename(path: string): string {
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  const parts = normalized.split('/').filter(Boolean);
+  return parts[parts.length - 1] || path;
+}
+
+export function isDefaultWorkingDir(path: string): boolean {
+  return getWorkingDirBasename(path) === DEFAULT_WORKING_DIR_BASENAME;
+}
+
+export function formatWorkingDirDisplayName(path: string, defaultLabel: string): string {
+  if (isDefaultWorkingDir(path)) {
+    return defaultLabel;
+  }
+  return getWorkingDirBasename(path);
+}
+
 export function resolvePathAgainstWorkspace(
   pathValue: string,
   workspacePath?: string | null

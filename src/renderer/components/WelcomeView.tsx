@@ -4,6 +4,7 @@ import { useAppStore } from '../store';
 import { useIPC } from '../hooks/useIPC';
 import type { ContentBlock } from '../types';
 import { getInitialSessionTitle } from '../../shared/session-title';
+import { formatWorkingDirDisplayName } from '../../shared/workspace-path';
 import {
   FileText,
   BarChart3,
@@ -612,7 +613,9 @@ export function WelcomeView() {
               >
                 <FolderOpen className="w-4 h-4" />
                 <span>
-                  {workingDir ? workingDir.split(/[/\\]/).pop() : t('welcome.selectWorkingFolder')}
+                  {workingDir
+                    ? formatWorkingDirDisplayName(workingDir, t('workspace.defaultFolderLabel'))
+                    : t('welcome.selectWorkingFolder')}
                 </span>
               </button>
 

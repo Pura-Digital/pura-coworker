@@ -5,7 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { Copy, Check, Clock, XCircle } from 'lucide-react';
 import type { Message, ContentBlock, ToolUseContent, ToolResultContent } from '../types';
 import { ContentBlockView } from './message/ContentBlockView';
+import { ThinkingBlock } from './message/ThinkingBlock';
+import { ThinkingStackBlock } from './message/ThinkingStackBlock';
+import { ToolStackBlock } from './message/ToolStackBlock';
+import { ToolUseBlock } from './message/ToolUseBlock';
 import { copySelectionAsPlainText } from '../utils/plain-text-copy';
+import {
+  accumulateAssistantRenderItems,
+  groupAssistantContentBlocks,
+} from '../utils/message-content-groups';
 
 interface MessageCardProps {
   message: Message;
@@ -37,6 +45,14 @@ export const MessageCard = memo(function MessageCard({ message, isStreaming }: M
     }
     return ids;
   }, [contentBlocks]);
+
+  const assistantRenderItems = useMemo(
+    () =>
+      accumulateAssistantRenderItems(
+        groupAssistantContentBlocks(contentBlocks, mergedResultIds)
+      ),
+    [contentBlocks, mergedResultIds]
+  );
 
   // Extract text content for copying
   const getTextContent = () =>
@@ -111,14 +127,53 @@ export const MessageCard = memo(function MessageCard({ message, isStreaming }: M
       ) : (
         // Assistant message — no bubble, direct content (Claude style)
         <div className="space-y-1.5" onCopy={copySelectionAsPlainText}>
-          {contentBlocks.map((block, index) => {
-            // Skip tool_result blocks that are merged into their tool_use card
-            if (
-              block.type === 'tool_result' &&
-              mergedResultIds.has((block as ToolResultContent).toolUseId)
-            ) {
-              return null;
+          {assistantRenderItems.map((item) => {
+            if (item.kind === 'thinking_stack') {
+              return (
+                <ThinkingStackBlock
+                  key={item.key}
+                  groups={item.groups}
+                  allBlocks={contentBlocks}
+                  message={message}
+                />
+              );
             }
+
+            if (item.kind === 'thinking_group') {
+              return (
+                <ThinkingBlock
+                  key={item.key}
+                  block={item.thinking}
+                  toolBlocks={item.tools}
+                  allBlocks={contentBlocks}
+                  message={message}
+                />
+              );
+            }
+
+            if (item.kind === 'tool_stack') {
+              return (
+                <ToolStackBlock
+                  key={item.key}
+                  tools={item.tools}
+                  allBlocks={contentBlocks}
+                  message={message}
+                />
+              );
+            }
+
+            if (item.kind === 'tool_group') {
+              return (
+                <ToolUseBlock
+                  key={item.key}
+                  block={item.tools[0]}
+                  allBlocks={contentBlocks}
+                  message={message}
+                />
+              );
+            }
+
+            const { block, index } = item;
             return (
               <ContentBlockView
                 key={'id' in block ? (block as { id: string }).id : `block-${block.type}-${index}`}

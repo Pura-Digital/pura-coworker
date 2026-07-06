@@ -1,6 +1,20 @@
 // Utility functions for tool use/result display
 import { Terminal, FileCode, FileText, Pencil, Search, Globe, FolderSearch } from 'lucide-react';
 
+/** Extract MCP server name from a tool name like mcp__Server__tool */
+export function getMcpServerName(name: string): string | null {
+  if (!name.startsWith('mcp__')) return null;
+  return name.match(/^mcp__(.+?)__/)?.[1] ?? null;
+}
+
+/** Short label for tool chips in thinking headers */
+export function getToolChipLabel(name: string): string {
+  if (name.startsWith('mcp__')) {
+    return name.match(/^mcp__(.+?)__(.+)$/)?.[2] ?? name;
+  }
+  return name;
+}
+
 /** Map a tool name to a small icon element */
 export function getToolIcon(name: string) {
   const n = name.toLowerCase();

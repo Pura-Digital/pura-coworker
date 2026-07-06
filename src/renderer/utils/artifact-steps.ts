@@ -1,4 +1,5 @@
 import type { TraceStep } from '../types';
+import { resolveArtifactPath } from './artifact-path';
 import { extractFilePathFromToolInput, extractFilePathFromToolOutput } from './tool-output-path';
 
 const FILE_TOOL_NAMES = new Set([
@@ -157,6 +158,174 @@ export function getArtifactIconComponent(filename: string): ArtifactIconComponen
     default:
       return 'file';
   }
+}
+
+export type ArtifactKind = 'output' | 'util';
+
+export type ArtifactCatalogItem = {
+  label: string;
+  path: string;
+  kind: ArtifactKind;
+};
+
+export type ArtifactCatalog = {
+  outputs: ArtifactCatalogItem[];
+  utils: ArtifactCatalogItem[];
+};
+
+const UTIL_EXTENSIONS = new Set([
+  'py', 'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs',
+  'sh', 'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd',
+  'rb', 'pl', 'php', 'java', 'go', 'rs', 'cpp', 'c', 'h', 'hpp',
+  'json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'env',
+  'log', 'lock', 'sql',
+]);
+
+const OUTPUT_EXTENSIONS = new Set([
+  'docx', 'doc', 'pdf', 'pptx', 'ppt', 'key',
+  'xlsx', 'xls', 'csv', 'tsv', 'ods', 'odt',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'tiff',
+  'mp4', 'mov', 'mkv', 'webm', 'avi',
+  'mp3', 'wav', 'm4a', 'ogg', 'flac',
+  'zip', 'rar', '7z', 'tar', 'gz',
+  'epub', 'mobi', 'html', 'htm', 'md', 'markdown', 'txt', 'rtf',
+]);
+
+const UTIL_PATH_PATTERNS = [
+  /\/(?:tmp|temp|scratch|cache|\.cache|__pycache__|\.venv|venv|node_modules)(?:\/|$)/i,
+  /\/scripts?\//i,
+  /\/(?:utils?|helpers?|tools?)\//i,
+];
+
+type ArtifactSource = 'artifact' | 'file' | 'recent';
+
+function parseArtifactMeta(toolOutput?: string): { path: string; name?: string; type?: string } | null {
+  if (!toolOutput) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(toolOutput) as Record<string, unknown>;
+    const path = typeof parsed.path === 'string' ? parsed.path : '';
+    if (!path) {
+      return null;
+    }
+    return {
+      path,
+      name: typeof parsed.name === 'string' ? parsed.name : undefined,
+      type: typeof parsed.type === 'string' ? parsed.type : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function classifyArtifactKind(
+  pathValue: string,
+  options?: {
+    explicitType?: string;
+    source?: ArtifactSource;
+    toolName?: string;
+  }
+): ArtifactKind {
+  if (options?.explicitType) {
+    const normalizedType = options.explicitType.trim().toLowerCase();
+    if (['util', 'utility', 'intermediate', 'script', 'tool'].includes(normalizedType)) {
+      return 'util';
+    }
+    if (['output', 'deliverable', 'result', 'final'].includes(normalizedType)) {
+      return 'output';
+    }
+  }
+
+  if (options?.source === 'artifact') {
+    return 'output';
+  }
+
+  const normalizedPath = pathValue.replace(/\\/g, '/').toLowerCase();
+  const fileName = normalizedPath.split('/').pop() || '';
+  const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.') + 1) : '';
+
+  if (UTIL_PATH_PATTERNS.some((pattern) => pattern.test(normalizedPath))) {
+    return 'util';
+  }
+
+  if (UTIL_EXTENSIONS.has(ext)) {
+    return 'util';
+  }
+
+  if (OUTPUT_EXTENSIONS.has(ext)) {
+    return 'output';
+  }
+
+  if (options?.toolName && /screenshot/i.test(options.toolName)) {
+    return 'output';
+  }
+
+  return 'output';
+}
+
+export function getArtifactCatalog(
+  steps: TraceStep[],
+  recentFiles: Array<{ path: string }>,
+  cwd?: string | null
+): ArtifactCatalog {
+  const { artifactSteps, fileSteps } = getArtifactSteps(steps);
+  const seenPaths = new Set<string>();
+  const outputs: ArtifactCatalogItem[] = [];
+  const utils: ArtifactCatalogItem[] = [];
+
+  const addItem = (pathValue: string, label: string, kind: ArtifactKind) => {
+    const resolvedPath = resolveArtifactPath(pathValue, cwd);
+    const key = resolvedPath.trim();
+    if (!key || seenPaths.has(key)) {
+      return;
+    }
+
+    seenPaths.add(key);
+    const item: ArtifactCatalogItem = {
+      label: label || getArtifactLabel(pathValue),
+      path: resolvedPath,
+      kind,
+    };
+
+    if (kind === 'util') {
+      utils.push(item);
+    } else {
+      outputs.push(item);
+    }
+  };
+
+  for (const step of artifactSteps) {
+    const meta = parseArtifactMeta(step.toolOutput);
+    if (!meta?.path) {
+      continue;
+    }
+    const kind = classifyArtifactKind(meta.path, {
+      explicitType: meta.type,
+      source: 'artifact',
+    });
+    addItem(meta.path, meta.name || getArtifactLabel(meta.path), kind);
+  }
+
+  for (const step of fileSteps) {
+    const pathValue = extractFilePathFromToolOutput(step.toolOutput)
+      || extractFilePathFromToolInput(step.toolInput);
+    if (!pathValue) {
+      continue;
+    }
+    const kind = classifyArtifactKind(pathValue, {
+      source: 'file',
+      toolName: step.toolName,
+    });
+    addItem(pathValue, getArtifactLabel(pathValue), kind);
+  }
+
+  for (const file of recentFiles) {
+    const kind = classifyArtifactKind(file.path, { source: 'recent' });
+    addItem(file.path, getArtifactLabel(file.path), kind);
+  }
+
+  return { outputs, utils };
 }
 
 export function getArtifactSteps(steps: TraceStep[]): ArtifactStepResult {

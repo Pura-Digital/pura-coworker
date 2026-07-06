@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { TraceStep } from '../src/renderer/types';
-import { getArtifactSteps, getArtifactLabel } from '../src/renderer/utils/artifact-steps';
+import {
+  getArtifactSteps,
+  getArtifactLabel,
+  classifyArtifactKind,
+  getArtifactCatalog,
+} from '../src/renderer/utils/artifact-steps';
 
 describe('getArtifactSteps', () => {
   it('includes completed Write tool calls as file steps when no artifacts exist', () => {
@@ -319,5 +324,77 @@ describe('getArtifactSteps', () => {
 
   it('prefers basename over translated name', () => {
     expect(getArtifactLabel('/Users/haoqing/tmp/simple.pptx', '简单PPT演示文稿')).toBe('simple.pptx');
+  });
+});
+
+describe('classifyArtifactKind', () => {
+  it('treats explicit artifact blocks as output by default', () => {
+    expect(classifyArtifactKind('/tmp/report.pptx', { source: 'artifact' })).toBe('output');
+  });
+
+  it('respects explicit util type metadata', () => {
+    expect(classifyArtifactKind('/tmp/report.pptx', { explicitType: 'util' })).toBe('util');
+  });
+
+  it('classifies scripts and config files as utilities', () => {
+    expect(classifyArtifactKind('/workspace/generate.py', { source: 'file' })).toBe('util');
+    expect(classifyArtifactKind('/workspace/data.json', { source: 'recent' })).toBe('util');
+  });
+
+  it('classifies deliverable files as output', () => {
+    expect(classifyArtifactKind('/workspace/report.docx', { source: 'file' })).toBe('output');
+    expect(classifyArtifactKind('/workspace/deck.pptx', { source: 'recent' })).toBe('output');
+  });
+});
+
+describe('getArtifactCatalog', () => {
+  it('splits explicit artifacts and utility scripts into separate lists', () => {
+    const steps: TraceStep[] = [
+      {
+        id: 'artifact_1',
+        type: 'tool_result',
+        status: 'completed',
+        title: 'artifact',
+        toolName: 'artifact',
+        toolOutput: '{"path":"/tmp/report.pptx","name":"Final deck"}',
+        timestamp: Date.now(),
+      },
+      {
+        id: 'call_write_script',
+        type: 'tool_call',
+        status: 'completed',
+        title: 'Write',
+        toolName: 'Write',
+        toolInput: { path: '/tmp/build.py', content: 'print("hi")' },
+        toolOutput: 'File written: /tmp/build.py',
+        timestamp: Date.now(),
+      },
+    ];
+
+    const catalog = getArtifactCatalog(steps, [], '/tmp');
+
+    expect(catalog.outputs).toHaveLength(1);
+    expect(catalog.outputs[0].label).toBe('Final deck');
+    expect(catalog.utils).toHaveLength(1);
+    expect(catalog.utils[0].label).toBe('build.py');
+  });
+
+  it('includes artifact-only summaries in the output list', () => {
+    const steps: TraceStep[] = [
+      {
+        id: 'artifact_only',
+        type: 'tool_result',
+        status: 'completed',
+        title: 'artifact',
+        toolName: 'artifact',
+        toolOutput: '{"path":"/tmp/report.xlsx"}',
+        timestamp: Date.now(),
+      },
+    ];
+
+    const catalog = getArtifactCatalog(steps, [], '/tmp');
+
+    expect(catalog.outputs).toHaveLength(1);
+    expect(catalog.utils).toHaveLength(0);
   });
 });

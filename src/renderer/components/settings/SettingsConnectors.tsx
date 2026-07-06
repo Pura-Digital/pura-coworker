@@ -15,8 +15,38 @@ import {
   X,
 } from 'lucide-react';
 import type { MCPServerConfig, MCPServerStatus, MCPToolInfo, MCPPreset } from './shared';
+import { McpPresetLogo } from '../McpPresetLogo';
+import {
+  maskPresetUrl,
+  presetUrlHasUnresolvedPlaceholders,
+  resolvePresetUrl,
+} from '../../../shared/mcp-preset-url';
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
+
+function isPresetAlreadyAdded(servers: MCPServerConfig[], preset: MCPPreset): boolean {
+  return servers.some((server) => {
+    if (server.name !== preset.name) return false;
+    if (preset.type === 'stdio') {
+      return server.command === preset.command;
+    }
+    return server.type === preset.type;
+  });
+}
+
+function presetSummaryLine(preset: MCPPreset): string {
+  if (preset.type === 'stdio') {
+    return `${preset.command} ${preset.args?.join(' ') || ''}`.trim();
+  }
+  return maskPresetUrl(preset.url);
+}
+
+function presetEnvLabel(preset: MCPPreset, envKey: string, t: (key: string) => string): string {
+  if (envKey === 'ARCHIVEYE_API_KEY') {
+    return t('mcp.presetArchiveyeApiKey');
+  }
+  return preset.envDescription?.[envKey] || envKey;
+}
 
 export function SettingsConnectors({ isActive }: { isActive: boolean }) {
   const { t } = useTranslation();
@@ -98,8 +128,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
     const preset = presets[presetKey];
     if (!preset) return;
 
-    const existing = servers.find((s) => s.name === preset.name && s.command === preset.command);
-    if (existing) {
+    if (isPresetAlreadyAdded(servers, preset)) {
       setError(t('mcp.presetAlreadyConfigured', { name: preset.name }));
       return;
     }
@@ -125,6 +154,12 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
     preset: MCPPreset,
     envOverrides: Record<string, string>
   ) {
+    const resolvedUrl = resolvePresetUrl(preset.url, envOverrides);
+    if (presetUrlHasUnresolvedPlaceholders(resolvedUrl)) {
+      setError(t('mcp.presetConfigIncomplete'));
+      return;
+    }
+
     const serverConfig: MCPServerConfig = {
       id: `mcp-${presetKey}-${Date.now()}`,
       name: preset.name,
@@ -132,9 +167,9 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
       // STDIO fields
       command: preset.command,
       args: preset.args,
-      env: { ...preset.env, ...envOverrides },
-      // SSE fields
-      url: preset.url,
+      env: preset.type === 'stdio' ? { ...preset.env, ...envOverrides } : undefined,
+      // Remote fields
+      url: resolvedUrl,
       headers: preset.headers,
       enabled: false,
     };
@@ -248,9 +283,12 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
       {configuringPreset && (
         <div className="p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-text-primary">
-              {t('mcp.configure')} {configuringPreset.preset.name}
-            </h3>
+            <div className="flex items-center gap-2">
+              <McpPresetLogo presetKey={configuringPreset.key} />
+              <h3 className="text-sm font-medium text-text-primary">
+                {t('mcp.configure')} {configuringPreset.preset.name}
+              </h3>
+            </div>
             <button
               onClick={() => {
                 setConfiguringPreset(null);
@@ -268,7 +306,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
             {configuringPreset.preset.requiresEnv?.map((envKey: string) => (
               <div key={envKey}>
                 <label className="block text-xs font-medium text-text-secondary mb-1">
-                  {configuringPreset.preset.envDescription?.[envKey] || envKey}
+                  {presetEnvLabel(configuringPreset.preset, envKey, t)}
                 </label>
                 <input
                   type="password"
@@ -332,9 +370,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
           {showPresets && (
             <div className="grid grid-cols-1 gap-2">
               {Object.entries(presets).map(([key, preset]) => {
-                const isAdded = servers.some(
-                  (s) => s.name === preset.name && s.command === preset.command
-                );
+                const isAdded = isPresetAlreadyAdded(servers, preset);
                 const requiresConfig = preset.requiresEnv && preset.requiresEnv.length > 0;
                 return (
                   <div
@@ -345,6 +381,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
                         : 'border-border bg-surface'
                     }`}
                   >
+                    <McpPresetLogo presetKey={key} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm text-text-primary">{preset.name}</span>
@@ -355,9 +392,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
                         )}
                       </div>
                       <div className="text-xs text-text-muted mt-0.5 truncate">
-                        {preset.type === 'stdio'
-                          ? `${preset.command} ${preset.args?.join(' ') || ''}`
-                          : preset.url || 'Remote server'}
+                        {presetSummaryLine(preset)}
                       </div>
                     </div>
                     {isAdded ? (

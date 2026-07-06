@@ -48,6 +48,9 @@
     "apiNotConfigured": "API 尚未配置，请前往设置页面填写 API 提供商和密钥。",
     "goToSettings": "前往设置"
   },
+  "workspace": {
+    "defaultFolderLabel": "默认工作区"
+  },
   "settings": {
     "title": "设置",
     "apiSettings": "API 设置",
@@ -534,6 +537,8 @@
     "urlPlaceholder": "https://...",
     "enableConnector": "启用此连接器",
     "presetAlreadyConfigured": "连接器“{{name}}”已配置",
+    "presetConfigIncomplete": "请先填写所有必填的预设字段。",
+    "presetArchiveyeApiKey": "Archiveye API 密钥（来自 Archiveye 账户设置）",
     "envValuePlaceholder": "输入值",
     "removeVar": "移除",
     "loadServersFailed": "加载连接器失败",
@@ -846,6 +851,9 @@
     "noQuestions": "暂无问题",
     "question": "问题",
     "thinking": "思考",
+    "thinkingCount": "{{count}} 个思考步骤",
+    "tools": "工具",
+    "toolsCount": "{{count}} 次工具调用",
     "executionTime": "执行时间: {{time}}"
   },
   "schedule": {

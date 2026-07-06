@@ -48,6 +48,9 @@
     "apiNotConfigured": "API not configured yet. Please go to Settings to set up your API provider and key.",
     "goToSettings": "Go to Settings"
   },
+  "workspace": {
+    "defaultFolderLabel": "Base workspace"
+  },
   "settings": {
     "title": "Settings",
     "apiSettings": "API Settings",
@@ -534,6 +537,8 @@
     "urlPlaceholder": "https://...",
     "enableConnector": "Enable this connector",
     "presetAlreadyConfigured": "Connector \"{{name}}\" is already configured",
+    "presetConfigIncomplete": "Complete all required preset fields before adding.",
+    "presetArchiveyeApiKey": "Archiveye API key (from your Archiveye account settings)",
     "envValuePlaceholder": "Enter value",
     "removeVar": "Remove",
     "loadServersFailed": "Failed to load connectors",
@@ -803,8 +808,17 @@
   },
   "context": {
     "progress": "Progress",
+    "progressCount": "{{completed}} of {{total}}",
     "artifacts": "Artifacts",
+    "outputArtifacts": "Output",
+    "utilArtifacts": "Utilities",
+    "noOutputArtifactsYet": "No outputs yet",
+    "noUtilArtifactsYet": "No utility files yet",
     "context": "Context",
+    "connectors": "Connectors",
+    "skills": "Skills",
+    "files": "Files",
+    "emptyContext": "Nothing active yet",
     "workingDirectory": "Working Directory",
     "toolsUsed": "Tools Used",
     "mcpConnectors": "MCP Connectors",
@@ -846,6 +860,9 @@
     "noQuestions": "No questions",
     "question": "Question",
     "thinking": "Thinking",
+    "thinkingCount": "{{count}} thinking steps",
+    "tools": "Tools",
+    "toolsCount": "{{count}} tool calls",
     "executionTime": "Execution time: {{time}}"
   },
   "schedule": {

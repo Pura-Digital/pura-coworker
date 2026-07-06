@@ -19,12 +19,14 @@ interface ToolUseBlockProps {
   block: ToolUseContent;
   allBlocks?: ContentBlock[];
   message?: Message;
+  nested?: boolean;
 }
 
 export const ToolUseBlock = memo(function ToolUseBlock({
   block,
   allBlocks,
   message,
+  nested = false,
 }: ToolUseBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId ? (s.sessionStates[message.sessionId]?.traceSteps ?? []) : []
@@ -118,18 +120,22 @@ export const ToolUseBlock = memo(function ToolUseBlock({
 
   return (
     <div
-      className={`rounded-2xl border overflow-hidden transition-colors ${
+      className={`${nested ? 'rounded-xl' : 'rounded-2xl'} border overflow-hidden transition-colors ${
         isError
           ? 'border-error/25 bg-error/5'
           : isRunning
             ? 'border-accent/15 bg-accent/5'
-            : 'border-border-subtle bg-background/40'
+            : nested
+              ? 'border-border/60 bg-background/60'
+              : 'border-border-subtle bg-background/40'
       }`}
     >
       {/* Header — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-surface-hover/50 transition-colors"
+        className={`w-full flex items-center gap-2 text-left hover:bg-surface-hover/50 transition-colors ${
+          nested ? 'px-2 py-1.5' : 'px-2.5 py-1.5'
+        }`}
       >
         {/* Status icon */}
         <div

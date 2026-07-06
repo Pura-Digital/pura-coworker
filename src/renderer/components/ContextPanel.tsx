@@ -1,13 +1,19 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
-import { resolveArtifactPath } from '../utils/artifact-path';
-import { extractFilePathFromToolInput, extractFilePathFromToolOutput } from '../utils/tool-output-path';
-import { getArtifactLabel, getArtifactIconComponent, getArtifactSteps } from '../utils/artifact-steps';
+import { getArtifactIconComponent, getArtifactCatalog } from '../utils/artifact-steps';
+import type { ArtifactCatalogItem } from '../utils/artifact-steps';
+import {
+  formatTokenCount,
+  getCalledMcpConnectors,
+  getReadSkills,
+} from '../utils/context-session-items';
+import { formatWorkingDirDisplayName } from '../../shared/workspace-path';
 import { useIPC } from '../hooks/useIPC';
+import type { TodoItem } from './message/types';
 import {
   ChevronDown,
-  ChevronUp,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -24,11 +30,8 @@ import {
   Check,
   Loader2,
   Plug,
-  Wrench,
-  MessageSquare,
-  Cpu,
   Copy,
-  Layers,
+  BookOpen,
 } from 'lucide-react';
 import type { TraceStep, MCPServerInfo } from '../types';
 
@@ -38,15 +41,18 @@ export function ContextPanel() {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessions = useAppStore((s) => s.sessions);
+  const projects = useAppStore((s) => s.projects);
   const sessionStates = useAppStore((s) => s.sessionStates);
-  const appConfig = useAppStore((s) => s.appConfig);
   const contextPanelCollapsed = useAppStore((s) => s.contextPanelCollapsed);
   const toggleContextPanel = useAppStore((s) => s.toggleContextPanel);
   const workingDir = useAppStore((s) => s.workingDir);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const { getMCPServers, changeWorkingDir } = useIPC();
+  const [contextOpen, setContextOpen] = useState(true);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
-  const [expandedConnector, setExpandedConnector] = useState<string | null>(null);
+  const [utilArtifactsOpen, setUtilArtifactsOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
   const [mcpServers, setMcpServers] = useState<MCPServerInfo[]>([]);
   const [copiedPath, setCopiedPath] = useState(false);
   const [isChangingDir, setIsChangingDir] = useState(false);
@@ -58,7 +64,6 @@ export function ContextPanel() {
 
   const handleCopyPath = async (path: string) => {
     try {
-      // Escape spaces for shell usage so the path can be pasted into terminal
       let shellPath = path;
       if (path.includes(' ')) {
         const isWindows = window.electronAPI?.platform === 'win32';
@@ -76,32 +81,20 @@ export function ContextPanel() {
   const steps = ss?.traceSteps ?? EMPTY_STEPS;
   const activeSession = activeSessionId ? sessions.find(s => s.id === activeSessionId) : null;
   const currentWorkingDir = activeSession?.cwd || workingDir;
-  const { displayArtifactSteps } = getArtifactSteps(steps);
+  const project = activeSession?.projectId
+    ? projects.find((p) => p.id === activeSession.projectId)
+    : null;
+  const { outputs: outputArtifacts, utils: utilArtifacts } = useMemo(
+    () => getArtifactCatalog(steps, recentWorkspaceFiles, currentWorkingDir),
+    [currentWorkingDir, recentWorkspaceFiles, steps]
+  );
   const canShowItemInFolder = typeof window !== 'undefined' && !!window.electronAPI?.showItemInFolder;
 
-  // Session info computations
   const messages = useMemo(
     () => (activeSessionId ? sessionStates[activeSessionId]?.messages || [] : []),
     [activeSessionId, sessionStates]
   );
-  const messageCount = messages.length;
-  const toolCallCount = steps.filter((s) => s.type === 'tool_call').length;
-  const modelName = activeSession?.model || appConfig?.model || '—';
 
-  // Token usage aggregation
-  const tokenUsage = useMemo(() => {
-    let input = 0;
-    let output = 0;
-    for (const msg of messages) {
-      if (msg.tokenUsage) {
-        input += msg.tokenUsage.input || 0;
-        output += msg.tokenUsage.output || 0;
-      }
-    }
-    return { input, output, total: input + output };
-  }, [messages]);
-
-  // Context usage: last message's input tokens ≈ current context occupation
   const contextUsage = useMemo(() => {
     const contextWindow = activeSessionId ? sessionStates[activeSessionId]?.contextWindow : undefined;
     if (!contextWindow) return null;
@@ -113,11 +106,39 @@ export function ContextPanel() {
         break;
       }
     }
-    if (lastInput === 0) return null;
 
-    const percentage = Math.min((lastInput / contextWindow) * 100, 100);
+    const percentage = lastInput > 0
+      ? Math.min((lastInput / contextWindow) * 100, 100)
+      : 0;
     return { used: lastInput, total: contextWindow, percentage };
   }, [activeSessionId, sessionStates, messages]);
+
+  const calledConnectors = useMemo(
+    () => getCalledMcpConnectors(steps, messages, mcpServers),
+    [messages, mcpServers, steps]
+  );
+
+  const readSkills = useMemo(
+    () => getReadSkills(steps, messages),
+    [messages, steps]
+  );
+
+  const latestTodos = useMemo((): TodoItem[] => {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const step = steps[i];
+      if (step.toolName === 'TodoWrite' && Array.isArray(step.toolInput?.todos)) {
+        return step.toolInput.todos as TodoItem[];
+      }
+    }
+    return [];
+  }, [steps]);
+
+  const todoProgress = useMemo(() => {
+    const total = latestTodos.length;
+    if (total === 0) return null;
+    const completed = latestTodos.filter((item) => item.status === 'completed').length;
+    return { completed, total };
+  }, [latestTodos]);
 
   const completedStepCount = useMemo(
     () => steps.reduce((n, s) => n + (s.status === 'completed' ? 1 : 0), 0),
@@ -170,46 +191,7 @@ export function ContextPanel() {
     currentWorkingDir,
   ]);
 
-  const displayArtifacts = useMemo(() => {
-    const seenPaths = new Set<string>();
-    const items: Array<{ label: string; path: string }> = [];
-
-    for (const step of displayArtifactSteps) {
-      const fallbackPath = extractFilePathFromToolOutput(step.toolOutput)
-        || extractFilePathFromToolInput(step.toolInput);
-      if (!fallbackPath) {
-        continue;
-      }
-
-      const resolvedPath = resolveArtifactPath(fallbackPath, currentWorkingDir);
-      const key = resolvedPath.trim();
-      if (!key || seenPaths.has(key)) {
-        continue;
-      }
-
-      seenPaths.add(key);
-      items.push({
-        label: getArtifactLabel(fallbackPath),
-        path: resolvedPath,
-      });
-    }
-
-    for (const file of recentWorkspaceFiles) {
-      const resolvedPath = resolveArtifactPath(file.path, currentWorkingDir);
-      const key = resolvedPath.trim();
-      if (!key || seenPaths.has(key)) {
-        continue;
-      }
-
-      seenPaths.add(key);
-      items.push({
-        label: getArtifactLabel(file.path),
-        path: resolvedPath,
-      });
-    }
-
-    return items;
-  }, [currentWorkingDir, displayArtifactSteps, recentWorkspaceFiles]);
+  const hasArtifacts = outputArtifacts.length > 0 || utilArtifacts.length > 0;
 
   useEffect(() => {
     if (contextPanelCollapsed) {
@@ -228,6 +210,34 @@ export function ContextPanel() {
     return () => clearInterval(interval);
   }, [contextPanelCollapsed, getMCPServers]);
 
+  const handleChangeDir = async () => {
+    setIsChangingDir(true);
+    try {
+      const result = await changeWorkingDir(
+        activeSessionId || undefined,
+        currentWorkingDir || undefined
+      );
+      if (!result.success && result.error && result.error !== 'User cancelled') {
+        setGlobalNotice({
+          id: `change-dir-failed-${Date.now()}`,
+          type: 'warning',
+          message: `${t('context.changeDirFailed')}: ${result.error}`,
+        });
+      }
+    } catch (error) {
+      setGlobalNotice({
+        id: `change-dir-failed-${Date.now()}`,
+        type: 'error',
+        message:
+          error instanceof Error && error.message
+            ? `${t('context.changeDirFailed')}: ${error.message}`
+            : t('context.changeDirFailed'),
+      });
+    } finally {
+      setIsChangingDir(false);
+    }
+  };
+
   if (contextPanelCollapsed) {
     return (
       <div className="w-10 bg-background border-l border-border-muted flex items-start justify-center pt-3">
@@ -242,10 +252,14 @@ export function ContextPanel() {
     );
   }
 
+  const folderLabel = project?.name
+    || (currentWorkingDir
+      ? formatWorkingDirDisplayName(currentWorkingDir, t('workspace.defaultFolderLabel'))
+      : null);
+
   return (
     <div className="w-72 bg-background border-l border-border-muted flex flex-col overflow-hidden text-sm">
-      {/* Header */}
-      <div className="px-3 h-10 flex items-center gap-2 border-b border-border-muted shrink-0">
+      <div className="px-3 h-10 flex items-center justify-end border-b border-border-muted shrink-0">
         <button
           onClick={toggleContextPanel}
           className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
@@ -253,373 +267,515 @@ export function ContextPanel() {
         >
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
-        <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
-          {t('context.context')}
-        </span>
       </div>
 
-      {/* Session Stats */}
-      {activeSession && (
-        <div className="px-4 py-3 border-b border-border-muted space-y-1.5">
-          <div className="flex items-center gap-1.5 text-text-primary font-medium">
-            <Cpu className="w-3.5 h-3.5 text-text-muted shrink-0" />
-            <span className="truncate">{modelName}</span>
-          </div>
-          <div className="flex items-center gap-3 text-xs text-text-muted pl-5">
-            <span className="flex items-center gap-1">
-              <MessageSquare className="w-3 h-3" />
-              {messageCount}
-            </span>
-            <span className="flex items-center gap-1">
-              <Wrench className="w-3 h-3" />
-              {toolCallCount}
-            </span>
-            {tokenUsage.total > 0 && (
-              <span className="ml-auto text-text-muted/70">
-                {t('context.inputTokens')} {formatTokenCount(tokenUsage.input)} · {t('context.outputTokens')} {formatTokenCount(tokenUsage.output)}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {todoProgress && (
+          <ContextCard
+            title={t('context.progress')}
+            trailing={
+              <span className="text-xs text-text-muted">
+                {t('context.progressCount', todoProgress)}
               </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Context Usage */}
-      {activeSession && contextUsage && (
-        <div className="px-4 py-2.5 border-b border-border-muted space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
-              {t('context.contextUsage')}
-            </span>
-            <span className={`text-xs font-medium ${
-              contextUsage.percentage > 95 ? 'text-error' :
-              contextUsage.percentage > 80 ? 'text-warning' :
-              'text-text-primary'
-            }`}>
-              {Math.round(contextUsage.percentage)}%
-            </span>
-          </div>
-          <div className="h-1.5 bg-surface-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ease-out ${
-                contextUsage.percentage > 95 ? 'bg-error' :
-                contextUsage.percentage > 80 ? 'bg-warning' :
-                'bg-gradient-to-r from-accent to-accent-hover'
-              }`}
-              style={{ width: `${contextUsage.percentage}%` }}
-            />
-          </div>
-          <p className="text-xs text-text-muted">
-            {t('context.contextUsageLabel', {
-              used: formatTokenCount(contextUsage.used),
-              total: formatTokenCount(contextUsage.total),
-            })}
-          </p>
-        </div>
-      )}
-
-      {/* Artifacts Section */}
-      <div className="border-b border-border-muted">
-        <button
-          onClick={() => setArtifactsOpen(!artifactsOpen)}
-          className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-surface-hover transition-colors"
-        >
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
-            {t('context.artifacts')}
-          </span>
-          {artifactsOpen ? (
-            <ChevronUp className="w-3.5 h-3.5 text-text-muted" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
-          )}
-        </button>
-
-        {artifactsOpen && (
-          <div className="pb-2 max-h-64 overflow-y-auto">
-            {displayArtifacts.length === 0 ? (
-              <div className="flex items-center gap-2 px-4 py-2 text-xs text-text-muted">
-                <Layers className="w-3.5 h-3.5 shrink-0" />
-                <span>{t('context.noArtifactsYet')}</span>
-              </div>
-            ) : (
-              <div>
-                {displayArtifacts.map((artifact, index) => {
-                  const label = artifact.label || t('context.fileCreated');
-                  const artifactPath = artifact.path;
-                  const canClick = Boolean(artifactPath && canShowItemInFolder);
-                  const iconComponent = getArtifactIconComponent(label);
-                  const IconComponent =
-                    iconComponent === 'presentation' ? FilePieChart
-                    : iconComponent === 'table' ? FileSpreadsheet
-                    : iconComponent === 'document' ? FileText
-                    : iconComponent === 'code' ? FileCode2
-                    : iconComponent === 'image' ? ImageIcon
-                    : iconComponent === 'audio' ? FileAudio2
-                    : iconComponent === 'video' ? FileVideo
-                    : iconComponent === 'archive' ? FileArchive
-                    : iconComponent === 'text' ? File
-                    : File;
-
-                  return (
-                    <div
-                      key={artifact.path || artifact.label || `artifact-${index}`}
-                      className={`flex items-center gap-2 px-4 py-1.5 transition-colors ${canClick ? 'cursor-pointer hover:bg-surface-hover' : ''}`}
-                      onClick={async () => {
-                        if (!canClick) return;
-                        const revealed = await window.electronAPI.showItemInFolder(artifactPath, currentWorkingDir ?? undefined);
-                        if (!revealed) {
-                          setGlobalNotice({
-                            id: `artifact-reveal-failed-${Date.now()}`,
-                            type: 'warning',
-                            message: t('context.revealFailed'),
-                          });
-                        }
-                      }}
-                      title={artifactPath || undefined}
-                    >
-                      <IconComponent className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                      <span className="text-xs text-text-primary truncate">{label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Working Directory */}
-      <div className="border-b border-border-muted">
-        <div className="px-4 py-2.5">
-          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
-            {t('context.workingDirectory')}
-          </p>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <FolderOpen className="w-3.5 h-3.5 text-text-muted shrink-0" />
-            <span
-              className={`text-xs truncate flex-1 ${currentWorkingDir ? 'text-text-primary cursor-pointer hover:text-accent-primary transition-colors' : 'text-text-muted'}`}
-              title={currentWorkingDir ? t('context.openInFileManager') : ''}
-              onClick={() => currentWorkingDir && window.electronAPI?.showItemInFolder(currentWorkingDir)}
-            >
-              {currentWorkingDir ? formatPath(currentWorkingDir) : t('context.noFolderSelected')}
-            </span>
-            {currentWorkingDir && (
-              <button
-                onClick={() => handleCopyPath(currentWorkingDir)}
-                className="text-text-muted hover:text-text-primary transition-colors shrink-0 ml-1"
-                title={t('context.copyPath')}
-              >
-                {copiedPath ? (
-                  <Check className="w-3 h-3 text-success" />
-                ) : (
-                  <Copy className="w-3 h-3" />
-                )}
-              </button>
-            )}
-            <button
-              onClick={async () => {
-                setIsChangingDir(true);
-                try {
-                  const result = await changeWorkingDir(
-                    activeSessionId || undefined,
-                    currentWorkingDir || undefined
-                  );
-                  if (!result.success && result.error && result.error !== 'User cancelled') {
-                    setGlobalNotice({
-                      id: `change-dir-failed-${Date.now()}`,
-                      type: 'warning',
-                      message: `${t('context.changeDirFailed')}: ${result.error}`,
-                    });
-                  }
-                } catch (error) {
-                  setGlobalNotice({
-                    id: `change-dir-failed-${Date.now()}`,
-                    type: 'error',
-                    message:
-                      error instanceof Error && error.message
-                        ? `${t('context.changeDirFailed')}: ${error.message}`
-                        : t('context.changeDirFailed'),
-                  });
-                } finally {
-                  setIsChangingDir(false);
-                }
-              }}
-              disabled={isChangingDir}
-              className="text-text-muted hover:text-text-primary disabled:opacity-50 transition-colors shrink-0"
-              title={t('context.changeDir')}
-            >
-              {isChangingDir ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <FolderSync className="w-3 h-3" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* MCP Connectors */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-2.5">
-          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
-            {t('context.mcpConnectors')}
-          </p>
-          {mcpServers.length === 0 ? (
-            <div className="flex items-center gap-2 text-xs text-text-muted py-1">
-              <Plug className="w-3.5 h-3.5 shrink-0" />
-              <span>{t('mcp.noConnectors')}</span>
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {mcpServers.map((server) => (
-                <ConnectorItem
-                  key={server.id}
-                  server={server}
-                  steps={steps}
-                  expanded={expandedConnector === server.id}
-                  onToggle={() =>
-                    setExpandedConnector(expandedConnector === server.id ? null : server.id)
-                  }
-                />
+            }
+            expanded={progressOpen}
+            onToggle={() => setProgressOpen((open) => !open)}
+          >
+            <ul className="space-y-1.5 pt-0.5">
+              {latestTodos.map((todo, index) => (
+                <li
+                  key={todo.id || `${todo.content}-${index}`}
+                  className={`text-xs leading-5 ${
+                    todo.status === 'completed' || todo.status === 'cancelled'
+                      ? 'text-text-muted line-through'
+                      : todo.status === 'in_progress'
+                        ? 'text-text-primary font-medium'
+                        : 'text-text-secondary'
+                  }`}
+                >
+                  {todo.activeForm || todo.content}
+                </li>
               ))}
-            </div>
-          )}
-        </div>
+            </ul>
+          </ContextCard>
+        )}
+
+        {folderLabel && (
+          <ContextCard
+            title={folderLabel}
+            trailing={
+              <div className="flex items-center gap-1">
+                {currentWorkingDir && (
+                  <>
+                    <button
+                      onClick={() => handleCopyPath(currentWorkingDir)}
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+                      title={t('context.copyPath')}
+                    >
+                      {copiedPath ? (
+                        <Check className="w-3 h-3 text-success" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </button>
+                    <button
+                      onClick={handleChangeDir}
+                      disabled={isChangingDir}
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                      title={t('context.changeDir')}
+                    >
+                      {isChangingDir ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <FolderSync className="w-3 h-3" />
+                      )}
+                    </button>
+                  </>
+                )}
+                <FolderOpen className="w-3.5 h-3.5 text-text-muted" />
+              </div>
+            }
+            onTitleClick={() => {
+              if (currentWorkingDir) {
+                window.electronAPI?.showItemInFolder(currentWorkingDir);
+              }
+            }}
+            titleTooltip={currentWorkingDir ? formatPath(currentWorkingDir) : undefined}
+          />
+        )}
+
+        <ContextCard
+          title={t('context.artifacts')}
+          trailing={
+            hasArtifacts ? (
+              <span className="text-xs text-text-muted">
+                {outputArtifacts.length + utilArtifacts.length}
+              </span>
+            ) : undefined
+          }
+          expanded={artifactsOpen}
+          onToggle={() => setArtifactsOpen((open) => !open)}
+        >
+          <div className="space-y-3 pt-0.5">
+            <ContextSubsection label={t('context.outputArtifacts')}>
+              {outputArtifacts.length > 0 ? (
+                <ArtifactList
+                  items={outputArtifacts}
+                  canShowItemInFolder={canShowItemInFolder}
+                  currentWorkingDir={currentWorkingDir}
+                  onRevealFailed={() => {
+                    setGlobalNotice({
+                      id: `artifact-reveal-failed-${Date.now()}`,
+                      type: 'warning',
+                      message: t('context.revealFailed'),
+                    });
+                  }}
+                />
+              ) : (
+                <p className="text-xs text-text-muted py-1">{t('context.noOutputArtifactsYet')}</p>
+              )}
+            </ContextSubsection>
+
+            <ContextAccordion
+              label={t('context.utilArtifacts')}
+              count={utilArtifacts.length}
+              expanded={utilArtifactsOpen}
+              onToggle={() => setUtilArtifactsOpen((open) => !open)}
+            >
+              {utilArtifacts.length > 0 ? (
+                <ArtifactList
+                  items={utilArtifacts}
+                  canShowItemInFolder={canShowItemInFolder}
+                  currentWorkingDir={currentWorkingDir}
+                  onRevealFailed={() => {
+                    setGlobalNotice({
+                      id: `artifact-reveal-failed-${Date.now()}`,
+                      type: 'warning',
+                      message: t('context.revealFailed'),
+                    });
+                  }}
+                />
+              ) : (
+                <p className="text-xs text-text-muted py-1">{t('context.noUtilArtifactsYet')}</p>
+              )}
+            </ContextAccordion>
+          </div>
+        </ContextCard>
+
+        <ContextCard
+          title={t('context.context')}
+          trailing={contextUsage ? <ContextUsageRing usage={contextUsage} /> : undefined}
+          expanded={contextOpen}
+          onToggle={() => setContextOpen((open) => !open)}
+        >
+          <div className="space-y-3 pt-0.5">
+            {calledConnectors.length > 0 && (
+              <ContextSubsection label={t('context.connectors')}>
+                <div className="flex flex-wrap gap-1.5">
+                  {calledConnectors.map((connector) => (
+                    <span
+                      key={connector.key}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border-muted bg-surface px-2.5 py-1 text-xs text-text-primary"
+                    >
+                      <Plug className="w-3 h-3 text-text-muted shrink-0" />
+                      {connector.name}
+                    </span>
+                  ))}
+                </div>
+              </ContextSubsection>
+            )}
+
+            {readSkills.length > 0 && (
+              <ContextAccordion
+                label={t('context.skills')}
+                count={readSkills.length}
+                expanded={skillsOpen}
+                onToggle={() => setSkillsOpen((open) => !open)}
+              >
+                <div className="space-y-1">
+                  {readSkills.map((skill) => (
+                    <div key={skill.key} className="flex items-center gap-2 py-0.5">
+                      <div className="w-7 h-7 rounded-md bg-surface-muted flex items-center justify-center shrink-0">
+                        <BookOpen className="w-3.5 h-3.5 text-text-muted" />
+                      </div>
+                      <span className="text-xs text-text-primary truncate">{skill.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </ContextAccordion>
+            )}
+
+            {calledConnectors.length === 0 && readSkills.length === 0 && (
+              <p className="text-xs text-text-muted py-1">{t('context.emptyContext')}</p>
+            )}
+          </div>
+        </ContextCard>
       </div>
     </div>
   );
 }
 
-function ConnectorItem({ 
-  server, 
-  steps, 
-  expanded, 
-  onToggle 
-}: { 
-  server: MCPServerInfo; 
-  steps: TraceStep[];
-  expanded: boolean;
-  onToggle: () => void;
+function ContextUsageRing({
+  usage,
+}: {
+  usage: { used: number; total: number; percentage: number };
 }) {
   const { t } = useTranslation();
-  // Get MCP tools used from this server
-  // Tool names are in format: mcp__ServerName__toolname (with double underscores)
-  // Server name preserves original case and spaces are replaced with underscores
-  const serverNamePattern = server.name.replace(/\s+/g, '_');
-  
-  const mcpToolsUsed = steps
-    .filter(s => s.toolName?.startsWith('mcp__'))
-    .map(s => s.toolName!)
-    .filter((name, index, self) => self.indexOf(name) === index)
-    .filter(name => {
-      // Check if this tool belongs to this server
-      // Format: mcp__ServerName__toolname
-      const match = name.match(/^mcp__(.+?)__(.+)$/);
-      if (match) {
-        const toolServerName = match[1];
-        return toolServerName === serverNamePattern;
-      }
-      return false;
-    });
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [tooltipStyle, setTooltipStyle] = useState<{ top: number; left: number } | null>(null);
+  const size = 18;
+  const stroke = 2.5;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (usage.percentage / 100) * circumference;
+  const toneClass =
+    usage.percentage > 95 ? 'text-error' :
+    usage.percentage > 80 ? 'text-warning' :
+    'text-accent';
 
-  const usageCount = steps.filter(s => 
-    s.toolName?.startsWith('mcp__') && mcpToolsUsed.includes(s.toolName)
-  ).length;
+  const updateTooltipPosition = () => {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    const tooltipWidth = 208;
+    setTooltipStyle({
+      top: rect.top - 8,
+      left: Math.max(8, rect.right - tooltipWidth),
+    });
+  };
+
+  const showTooltip = () => {
+    updateTooltipPosition();
+    setTooltipOpen(true);
+  };
+
+  const hideTooltip = () => {
+    setTooltipOpen(false);
+  };
+
+  useEffect(() => {
+    if (!tooltipOpen) {
+      return;
+    }
+
+    const handleReposition = () => updateTooltipPosition();
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
+
+    return () => {
+      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener('resize', handleReposition);
+    };
+  }, [tooltipOpen]);
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <button
-        onClick={onToggle}
-        className={`w-full px-3 py-2 flex items-center gap-2 transition-colors ${
-          server.connected 
-            ? 'bg-mcp/10 hover:bg-mcp/20' 
-            : 'bg-surface-muted hover:bg-surface-hover'
-        }`}
+    <>
+      <div
+        ref={anchorRef}
+        className="relative shrink-0"
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={showTooltip}
+        onBlur={hideTooltip}
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className={`w-6 h-6 rounded flex items-center justify-center ${
-          server.connected ? 'bg-mcp/20' : 'bg-surface-muted'
-        }`}>
-          <Plug className={`w-3.5 h-3.5 ${server.connected ? 'text-mcp' : 'text-text-muted'}`} />
-        </div>
-        <div className="flex-1 text-left min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-primary truncate">
-              {server.name}
-            </span>
-            {!server.connected && (
-              <span className="text-xs text-text-muted">({t('mcp.notConnected')})</span>
-            )}
-          </div>
-          {server.connected && (
-            <p className="text-xs text-text-muted">
-              {t('mcp.toolCount', { count: server.toolCount })}
-              {usageCount > 0 && ` • ${t('mcp.callCount', { count: usageCount })}`}
-            </p>
-          )}
-        </div>
-        {server.connected && (
-          expanded ? (
-            <ChevronDown className="w-4 h-4 text-text-muted" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-text-muted" />
-          )
-        )}
-      </button>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="-rotate-90"
+          aria-hidden
+        >
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            strokeWidth={stroke}
+            className={`stroke-current ${toneClass}`}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            className="stroke-current text-text-muted/70 transition-all duration-500 ease-out"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+          />
+        </svg>
+      </div>
 
-      {expanded && server.connected && (
-        <div className="px-3 pb-2 space-y-1 bg-surface">
-          {mcpToolsUsed.length > 0 ? (
-            <>
-              <p className="text-xs text-text-muted px-2 py-1">{t('context.toolsUsedLabel')}</p>
-              {mcpToolsUsed.map((toolName, index) => {
-                const count = steps.filter(s => s.toolName === toolName).length;
-                // Extract readable tool name - remove mcp__ServerName__ prefix
-                const match = toolName.match(/^mcp__(.+?)__(.+)$/);
-                const readableName = match ? match[2] : toolName;
-                
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-mcp/5 hover:bg-mcp/10 transition-colors"
-                  >
-                    <Wrench className="w-3.5 h-3.5 text-mcp" />
-                    <span className="text-xs text-text-primary flex-1">{readableName}</span>
-                    <span className="text-xs text-text-muted">{count}x</span>
-                  </div>
-                );
-              })}
-            </>
-          ) : (
-            <p className="text-xs text-text-muted px-2 py-1">{t('context.noToolsUsedYet')}</p>
-          )}
+      {tooltipOpen && tooltipStyle && createPortal(
+        <div
+          className="pointer-events-none fixed z-[100] w-52 -translate-y-full rounded-xl border border-border-muted bg-surface px-3 py-2.5 shadow-lg"
+          style={{ top: tooltipStyle.top, left: tooltipStyle.left }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+              {t('context.contextUsage')}
+            </span>
+            <span className={`text-xs font-medium tabular-nums ${toneClass}`}>
+              {Math.round(usage.percentage)}%
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-background overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                usage.percentage > 95 ? 'bg-error' :
+                usage.percentage > 80 ? 'bg-warning' :
+                'bg-accent'
+              }`}
+              style={{ width: `${usage.percentage}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-text-muted tabular-nums">
+            {t('context.contextUsageLabel', {
+              used: formatTokenCount(usage.used),
+              total: formatTokenCount(usage.total),
+            })}
+          </p>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function ArtifactList({
+  items,
+  canShowItemInFolder,
+  currentWorkingDir,
+  onRevealFailed,
+}: {
+  items: ArtifactCatalogItem[];
+  canShowItemInFolder: boolean;
+  currentWorkingDir?: string | null;
+  onRevealFailed: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-0.5">
+      {items.map((artifact, index) => {
+        const label = artifact.label || t('context.fileCreated');
+        const artifactPath = artifact.path;
+        const canClick = Boolean(artifactPath && canShowItemInFolder);
+        const iconComponent = getArtifactIconComponent(label);
+        const IconComponent =
+          iconComponent === 'presentation' ? FilePieChart
+          : iconComponent === 'table' ? FileSpreadsheet
+          : iconComponent === 'document' ? FileText
+          : iconComponent === 'code' ? FileCode2
+          : iconComponent === 'image' ? ImageIcon
+          : iconComponent === 'audio' ? FileAudio2
+          : iconComponent === 'video' ? FileVideo
+          : iconComponent === 'archive' ? FileArchive
+          : iconComponent === 'text' ? File
+          : File;
+
+        return (
+          <button
+            key={artifact.path || artifact.label || `artifact-${index}`}
+            type="button"
+            disabled={!canClick}
+            className={`w-full flex items-center gap-2 py-1.5 rounded-md text-left transition-colors ${
+              canClick ? 'hover:bg-surface-hover cursor-pointer' : 'cursor-default'
+            }`}
+            onClick={async () => {
+              if (!canClick) return;
+              const revealed = await window.electronAPI.showItemInFolder(
+                artifactPath,
+                currentWorkingDir ?? undefined
+              );
+              if (!revealed) {
+                onRevealFailed();
+              }
+            }}
+            title={artifactPath || undefined}
+          >
+            <IconComponent className="w-3.5 h-3.5 text-text-muted shrink-0" />
+            <span className="text-xs text-text-primary truncate">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ContextCard({
+  title,
+  trailing,
+  expanded = false,
+  onToggle,
+  onTitleClick,
+  titleTooltip,
+  children,
+}: {
+  title: string;
+  trailing?: ReactNode;
+  expanded?: boolean;
+  onToggle?: () => void;
+  onTitleClick?: () => void;
+  titleTooltip?: string;
+  children?: ReactNode;
+}) {
+  const isCollapsible = Boolean(onToggle);
+  const hasBody = Boolean(children);
+
+  return (
+    <div className="rounded-xl border border-border-muted bg-surface/60">
+      <div className="relative z-10 flex items-center gap-2 px-3 py-2.5 min-h-[42px]">
+        {isCollapsible ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex-1 min-w-0 flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
+          >
+            <span className="text-[13px] font-medium text-text-primary truncate">{title}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onTitleClick}
+            disabled={!onTitleClick}
+            title={titleTooltip}
+            className={`flex-1 min-w-0 text-left ${onTitleClick ? 'hover:opacity-80 transition-opacity' : ''}`}
+          >
+            <span className="text-[13px] font-medium text-text-primary truncate">{title}</span>
+          </button>
+        )}
+        {trailing}
+        {isCollapsible && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors shrink-0"
+          >
+            {expanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+        {!isCollapsible && !trailing && onTitleClick && (
+          <ChevronRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
+        )}
+      </div>
+      {hasBody && expanded && (
+        <div className="px-3 pb-3 border-t border-border-muted/60">
+          {children}
         </div>
       )}
     </div>
   );
 }
 
-// Format long paths to show abbreviated version
+function ContextSubsection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] text-text-muted mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function ContextAccordion({
+  label,
+  count,
+  expanded,
+  onToggle,
+  children,
+}: {
+  label: string;
+  count?: number;
+  expanded: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-1.5 py-1 rounded-md hover:bg-surface-hover/60 transition-colors"
+      >
+        <span className="text-[11px] text-text-muted flex-1 text-left">{label}</span>
+        {count !== undefined && count > 0 && (
+          <span className="text-[11px] text-text-muted/70 tabular-nums">{count}</span>
+        )}
+        {expanded ? (
+          <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />
+        ) : (
+          <ChevronRight className="w-3 h-3 text-text-muted shrink-0" />
+        )}
+      </button>
+      {expanded && <div className="pt-0.5">{children}</div>}
+    </div>
+  );
+}
+
 function formatPath(path: string): string {
   if (!path) return '';
-  
-  // Windows: Replace C:\Users\username with ~
+
   const winHome = /^[A-Z]:\\Users\\[^\\]+/i;
   const winMatch = path.match(winHome);
   if (winMatch) {
     return '~' + path.slice(winMatch[0].length).replace(/\\/g, '/');
   }
-  
-  // macOS/Linux: Replace /Users/username or /home/username with ~
+
   const unixHome = /^\/(?:Users|home)\/[^/]+/;
   const unixMatch = path.match(unixHome);
   if (unixMatch) {
     return '~' + path.slice(unixMatch[0].length);
   }
-  
-  return path;
-}
 
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
+  return path;
 }

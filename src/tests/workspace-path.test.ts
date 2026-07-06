@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePathAgainstWorkspace } from '../shared/workspace-path';
+import {
+  resolvePathAgainstWorkspace,
+  getWorkingDirBasename,
+  isDefaultWorkingDir,
+  formatWorkingDirDisplayName,
+  DEFAULT_WORKING_DIR_BASENAME,
+} from '../shared/workspace-path';
 
 describe('resolvePathAgainstWorkspace', () => {
   it('returns empty/falsy pathValue as-is', () => {
@@ -57,5 +63,25 @@ describe('resolvePathAgainstWorkspace', () => {
 
   it('returns /workspace/ path as-is when no workspace provided', () => {
     expect(resolvePathAgainstWorkspace('/workspace/src/main.ts')).toBe('/workspace/src/main.ts');
+  });
+});
+
+describe('working dir display name', () => {
+  const defaultLabel = 'Base workspace';
+  const defaultPath = `/Users/alfred/Library/Application Support/Aiden/${DEFAULT_WORKING_DIR_BASENAME}`;
+
+  it('extracts basename from POSIX and Windows paths', () => {
+    expect(getWorkingDirBasename('/Users/foo/my-project')).toBe('my-project');
+    expect(getWorkingDirBasename('C:\\Users\\foo\\my-project\\')).toBe('my-project');
+  });
+
+  it('detects the built-in default working directory', () => {
+    expect(isDefaultWorkingDir(defaultPath)).toBe(true);
+    expect(isDefaultWorkingDir('/tmp/my-project')).toBe(false);
+  });
+
+  it('maps default working dir to a friendly label without changing custom paths', () => {
+    expect(formatWorkingDirDisplayName(defaultPath, defaultLabel)).toBe(defaultLabel);
+    expect(formatWorkingDirDisplayName('/Users/foo/my-project', defaultLabel)).toBe('my-project');
   });
 });

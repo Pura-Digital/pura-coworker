@@ -15,6 +15,7 @@ import { useIPC } from '../hooks/useIPC';
 import { MessageCard } from './MessageCard';
 import { UserMessageNav, buildUserMessageNavItems, userMessageAnchorId } from './UserMessageNav';
 import type { Message, ContentBlock } from '../types';
+import { coalesceAssistantMessagesForDisplay } from '../utils/message-display-groups';
 import { Send, Square, Plus, Plug, X, Clock, FolderOpen } from 'lucide-react';
 import { AidenLogoLoader } from './AidenLogoLoader';
 import { ChatProcessingStatus } from './ChatProcessingStatus';
@@ -122,6 +123,11 @@ export function ChatView() {
 
     return [...messages.slice(0, insertIndex), streamingMessage, ...messages.slice(insertIndex)];
   }, [activeSessionId, activeTurn?.userMessageId, messages, partialMessage, partialThinking]);
+
+  const chatDisplayUnits = useMemo(
+    () => coalesceAssistantMessagesForDisplay(displayedMessages),
+    [displayedMessages]
+  );
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -784,9 +790,7 @@ export function ChatView() {
               <p className="text-base text-text-secondary">{t('chat.startConversation')}</p>
             </div>
           ) : (
-            displayedMessages.map((message) => {
-              const isStreaming =
-                typeof message.id === 'string' && message.id.startsWith('partial-');
+            chatDisplayUnits.map(({ message, isStreaming }) => {
               return (
                 <div key={message.id} id={userMessageAnchorId(message.id)} className="scroll-mt-6">
                   <MessageCard message={message} isStreaming={isStreaming} />

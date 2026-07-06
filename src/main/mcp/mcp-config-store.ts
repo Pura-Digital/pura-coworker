@@ -17,6 +17,15 @@ export const MCP_SERVER_PRESETS: Record<
     envDescription?: Record<string, string>;
   }
 > = {
+  archiveye: {
+    name: 'Archiveye',
+    type: 'streamable-http',
+    url: 'https://mcp.archiveye.ai/user/{ARCHIVEYE_API_KEY}/mcp',
+    requiresEnv: ['ARCHIVEYE_API_KEY'],
+    envDescription: {
+      ARCHIVEYE_API_KEY: 'Archiveye API key (from your Archiveye account settings)',
+    },
+  },
   chrome: {
     name: 'Chrome',
     type: 'stdio',

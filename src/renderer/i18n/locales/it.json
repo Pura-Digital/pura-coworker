@@ -48,6 +48,9 @@
     "apiNotConfigured": "API non ancora configurata. Vai su Impostazioni per configurare il provider API e la chiave.",
     "goToSettings": "Vai su Impostazioni"
   },
+  "workspace": {
+    "defaultFolderLabel": "Workspace base"
+  },
   "settings": {
     "title": "Impostazioni",
     "apiSettings": "Impostazioni dell'API",
@@ -534,6 +537,8 @@
     "urlPlaceholder": "https://...",
     "enableConnector": "Abilita questo connettore",
     "presetAlreadyConfigured": "Connector \"{{name}}\" is already configured",
+    "presetConfigIncomplete": "Completa tutti i campi obbligatori del preset prima di aggiungerlo.",
+    "presetArchiveyeApiKey": "API key Archiveye (dalle impostazioni del tuo account Archiveye)",
     "envValuePlaceholder": "Enter value",
     "removeVar": "Remove",
     "loadServersFailed": "Failed to load connectors",
@@ -802,9 +807,18 @@
     }
   },
   "context": {
-    "progress": "Progress",
-    "artifacts": "Artifacts",
-    "context": "Context",
+    "progress": "Avanzamento",
+    "progressCount": "{{completed}} di {{total}}",
+    "artifacts": "Artefatti",
+    "outputArtifacts": "Output",
+    "utilArtifacts": "Utility",
+    "noOutputArtifactsYet": "Nessun output ancora",
+    "noUtilArtifactsYet": "Nessun file di utility",
+    "context": "Contesto",
+    "connectors": "Connettori",
+    "skills": "Competenze",
+    "files": "File",
+    "emptyContext": "Nessun elemento attivo",
     "workingDirectory": "Directory di lavoro",
     "toolsUsed": "Strumenti utilizzati",
     "mcpConnectors": "Connettori MCP",
@@ -846,6 +860,9 @@
     "noQuestions": "Nessuna domanda",
     "question": "Question",
     "thinking": "Thinking",
+    "thinkingCount": "{{count}} passaggi di thinking",
+    "tools": "Strumenti",
+    "toolsCount": "{{count}} chiamate tool",
     "executionTime": "Tempo di esecuzione: {{time}}"
   },
   "schedule": {
