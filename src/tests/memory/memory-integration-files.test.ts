@@ -27,13 +27,14 @@ describe('memory integration wiring', () => {
     expect(memoryExtension).not.toContain('customTools: this.memoryService.getTools()');
   });
 
-  it('adds a dedicated Memory settings tab and preload bridge', () => {
+  it('embeds memory settings in General and exposes preload bridge', () => {
     const settingsPanel = readProjectFile('src/renderer/components/SettingsPanel.tsx');
+    const settingsGeneral = readProjectFile('src/renderer/components/settings/SettingsGeneral.tsx');
     const preload = readProjectFile('src/preload/index.ts');
     const memorySettings = readProjectFile('src/renderer/components/settings/SettingsMemory.tsx');
 
-    expect(settingsPanel).toContain("id: 'memory'");
-    expect(settingsPanel).toContain('<SettingsMemory />');
+    expect(settingsPanel).toContain("memory: 'general'");
+    expect(settingsGeneral).toContain('<SettingsMemory');
     expect(preload).toContain('memory: {');
     expect(preload).toContain("ipcRenderer.invoke('memory.search'");
     expect(preload).toContain("ipcRenderer.invoke('memory.listFiles')");

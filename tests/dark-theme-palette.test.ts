@@ -9,7 +9,7 @@ describe('dark theme palette', () => {
     const source = fs.readFileSync(stylesPath, 'utf8');
     expect(source).toContain('deep blue-black');
     expect(source).toContain('--color-background: #060b17;');
-    expect(source).toContain('--color-surface: #0f1729;');
+    expect(source).toContain('--color-surface: #070e1d;');
     expect(source).toContain('--color-text-primary: #eaf2ff;');
   });
 
