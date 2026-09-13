@@ -53,6 +53,9 @@ function makeConfig(timeoutMs: number): AppConfig {
       promptIterationRounds: 2,
     },
     enableThinking: false,
+    uiZoom: 1,
+    alwaysOn: false,
+    launchAtStartup: false,
     isConfigured: true,
   };
 }
