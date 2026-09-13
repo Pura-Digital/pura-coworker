@@ -16,7 +16,7 @@ export function isPromptAmbiguousForTitleGeneration(prompt: string): boolean {
     return true;
   }
   // Very short ASCII-only prompts are too ambiguous for reliable language detection.
-  if (trimmed.length <= 2 && /^[\x00-\x7F]+$/.test(trimmed)) {
+  if (trimmed.length <= 2 && [...trimmed].every((char) => char.charCodeAt(0) <= 0x7f)) {
     return true;
   }
   return false;
