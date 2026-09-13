@@ -1,9 +1,13 @@
 import { Minus, Square, X, Copy } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import appLogo from '../assets/logo.png';
+import { useAppStore } from '../store';
+import { toElectronZoomFactor } from '../../shared/ui-zoom';
 
 const isMac = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
+const MAC_TRAFFIC_LIGHT_CLEARANCE_PX = 82;
+const MAC_TITLEBAR_MIN_PAD_PX = 96;
 
 function TitlebarBrand() {
   const { t } = useTranslation();
@@ -21,8 +25,17 @@ function TitlebarBrand() {
 
 export function Titlebar() {
   const { t } = useTranslation();
+  const uiZoom = useAppStore((s) => s.settings.uiZoom);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const macTrafficLightPadPx = useMemo(() => {
+    const electronZoom = toElectronZoomFactor(uiZoom);
+    return Math.max(
+      MAC_TITLEBAR_MIN_PAD_PX,
+      Math.ceil(MAC_TRAFFIC_LIGHT_CLEARANCE_PX / electronZoom)
+    );
+  }, [uiZoom]);
 
   useEffect(() => {
     const api = window.electronAPI?.window;
@@ -79,9 +92,10 @@ export function Titlebar() {
 
   return (
     <div
-      className={`h-10 bg-background-secondary border-b border-border flex items-center shrink-0 ${
-        macPadForTrafficLights ? 'pl-20 titlebar-drag' : isMac ? 'pl-3 titlebar-drag' : 'titlebar-drag'
+      className={`h-10 bg-background flex items-center shrink-0 ${
+        macPadForTrafficLights ? 'titlebar-drag' : isMac ? 'pl-3 titlebar-drag' : 'titlebar-drag'
       }`}
+      style={macPadForTrafficLights ? { paddingLeft: macTrafficLightPadPx } : undefined}
     >
       {isMac ? (
         <>

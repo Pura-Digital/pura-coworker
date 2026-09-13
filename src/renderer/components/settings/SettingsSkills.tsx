@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  AlertCircle,
   CheckCircle,
   Package,
-  Power,
-  PowerOff,
   Trash2,
   Plus,
   Loader2,
@@ -16,7 +13,13 @@ import {
 } from 'lucide-react';
 import type { Skill, PluginCatalogItemV2, InstalledPlugin, PluginComponentKind } from '../../types';
 import { useAppStore } from '../../store';
-import { SettingsContentSection } from './shared';
+import {
+  SettingsAlert,
+  SettingsCard,
+  SettingsCardHeader,
+  SettingsDisclosure,
+  SettingsToggle,
+} from './shared';
 import type { LocalizedBanner } from './shared';
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
@@ -409,58 +412,34 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
-          <AlertCircle className="w-4 h-4" />
-          {error.key ? t(error.key) : error.text}
-        </div>
+        <SettingsAlert variant="error">{error.key ? t(error.key) : error.text}</SettingsAlert>
       )}
       {success && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-success/10 text-success text-sm">
-          <CheckCircle className="w-4 h-4" />
-          {success.key ? t(success.key) : success.text}
-        </div>
+        <SettingsAlert variant="success">{success.key ? t(success.key) : success.text}</SettingsAlert>
       )}
 
-      <SettingsContentSection
-        title={t('skills.storagePathTitle')}
-        description={t('skills.storagePathHint')}
-      >
-        <div className="text-xs text-text-muted break-all">
+      <SettingsDisclosure title={t('skills.advancedStorage')} description={t('skills.storagePathHint')}>
+        <p className="text-xs text-text-muted break-all mb-3">
           {storagePath || t('skills.storagePathUnavailable')}
-        </div>
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <button
-            onClick={handleSelectStoragePath}
-            disabled={isLoading}
-            className="w-full py-2.5 px-3 rounded-lg border border-border hover:border-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-2 text-text-secondary hover:text-accent disabled:opacity-50"
-          >
+          <button onClick={handleSelectStoragePath} disabled={isLoading} className="btn btn-secondary text-sm py-2">
             <FolderOpen className="w-4 h-4" />
             {t('skills.selectStoragePath')}
           </button>
-          <button
-            onClick={handleOpenStoragePath}
-            disabled={isLoading}
-            className="w-full py-2.5 px-3 rounded-lg border border-border hover:border-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-2 text-text-secondary hover:text-accent disabled:opacity-50"
-          >
+          <button onClick={handleOpenStoragePath} disabled={isLoading} className="btn btn-secondary text-sm py-2">
             <Globe className="w-4 h-4" />
             {t('skills.openStoragePath')}
           </button>
-          <button
-            onClick={handleRefreshSkills}
-            disabled={isLoading}
-            className="w-full py-2.5 px-3 rounded-lg border border-border hover:border-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-2 text-text-secondary hover:text-accent disabled:opacity-50"
-          >
+          <button onClick={handleRefreshSkills} disabled={isLoading} className="btn btn-secondary text-sm py-2">
             <RefreshCw className="w-4 h-4" />
             {t('skills.refreshSkills')}
           </button>
         </div>
-      </SettingsContentSection>
+      </SettingsDisclosure>
 
-      {/* Built-in Skills */}
-      <SettingsContentSection
-        title={t('skills.builtinSkills')}
-        description={t('skills.builtinSkillsDesc')}
-      >
+      <SettingsCard>
+        <SettingsCardHeader title={t('skills.builtinSkills')} description={t('skills.builtinSkillsDesc')} />
         {builtinSkills.map((skill) => (
           <SkillCard
             key={skill.id}
@@ -470,13 +449,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             isLoading={isLoading}
           />
         ))}
-      </SettingsContentSection>
+      </SettingsCard>
 
-      {/* Custom Skills */}
-      <SettingsContentSection
-        title={t('skills.customSkills')}
-        description={t('skills.installSkillsDesc')}
-      >
+      <SettingsCard>
+        <SettingsCardHeader title={t('skills.customSkills')} description={t('skills.installSkillsDesc')} />
         {customSkills.length === 0 ? (
           <div className="text-center py-8 text-text-muted">
             <Package className="w-10 h-10 mx-auto mb-3 opacity-50" />
@@ -494,12 +470,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             />
           ))
         )}
-      </SettingsContentSection>
+      </SettingsCard>
 
-      <SettingsContentSection
-        title={t('skills.pluginsTitle')}
-        description={t('skills.pluginsDesc')}
-      >
+      <SettingsCard>
+        <SettingsCardHeader title={t('skills.pluginsTitle')} description={t('skills.pluginsDesc')} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <button
             onClick={handleBrowsePlugins}
@@ -522,7 +496,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             {t('skills.installSkillFromFolder')}
           </button>
         </div>
-      </SettingsContentSection>
+      </SettingsCard>
 
       {isPluginModalOpen && (
         <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
@@ -755,56 +729,37 @@ function SkillCard({
 }) {
   const { t } = useTranslation();
   const isBuiltin = skill.type === 'builtin';
+  const typeLabel = isBuiltin
+    ? t('skills.typeBuiltin')
+    : skill.type === 'mcp'
+      ? t('skills.typeMcp')
+      : t('skills.typeCustom');
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className={`w-3 h-3 rounded-full ${skill.enabled ? 'bg-success' : 'bg-text-muted'}`}
-            />
-            <h3 className="font-medium text-text-primary">{skill.name}</h3>
-            <span
-              className={`px-2 py-0.5 text-xs rounded ${
-                isBuiltin
-                  ? 'bg-accent/10 text-accent'
-                  : skill.type === 'mcp'
-                    ? 'bg-mcp/10 text-mcp'
-                    : 'bg-success/10 text-success'
-              }`}
-            >
-              {skill.type.toUpperCase()}
-            </span>
-          </div>
-          {skill.description && (
-            <p className="text-sm text-text-muted ml-6 line-clamp-2">{skill.description}</p>
-          )}
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-border-subtle last:border-0">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-sm font-medium text-text-primary">{skill.name}</h3>
+          <span className="px-2 py-0.5 text-[10px] rounded-full bg-surface-muted text-text-muted">
+            {typeLabel}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+        {skill.description && (
+          <p className="text-xs text-text-muted mt-1 line-clamp-2">{skill.description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <SettingsToggle enabled={skill.enabled} disabled={isLoading} onToggle={onToggleEnabled} />
+        {onDelete && (
           <button
-            onClick={onToggleEnabled}
+            onClick={onDelete}
             disabled={isLoading}
-            className={`p-2 rounded-lg transition-colors ${
-              skill.enabled
-                ? 'bg-success/10 text-success hover:bg-success/20'
-                : 'bg-surface-muted text-text-muted hover:bg-surface-active'
-            }`}
-            title={skill.enabled ? t('common.disable') : t('common.enable')}
+            className="p-2 rounded-lg text-error hover:bg-error/10 transition-colors"
+            title={t('common.delete')}
           >
-            {skill.enabled ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+            <Trash2 className="w-4 h-4" />
           </button>
-          {onDelete && (
-            <button
-              onClick={onDelete}
-              disabled={isLoading}
-              className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
-              title={t('common.delete')}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

@@ -103,7 +103,12 @@ export function useIPC() {
       const isInitialConfigStatus = !store.hasSeenInitialConfigStatus;
       store.setIsConfigured(isConfigured);
       store.setAppConfig(config);
-      store.setSettings({ theme: config.theme || 'light' });
+      store.setSettings({
+        theme: config.theme || 'light',
+        uiZoom: config.uiZoom ?? 1,
+        alwaysOn: config.alwaysOn ?? false,
+        launchAtStartup: config.launchAtStartup ?? false,
+      });
       if (isInitialConfigStatus) {
         store.markInitialConfigStatusSeen();
       }

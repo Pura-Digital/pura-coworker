@@ -43,25 +43,27 @@ export function ConfigStepNav({
   ];
 
   return (
-    <div className="flex items-center gap-2 p-1 bg-surface rounded-xl">
-      {steps.map((step) => (
+    <div className="settings-segment-track w-full" role="tablist">
+      {steps.map((step) => {
+        const selected = activeStep === step.id;
+        return (
         <button
           key={step.id}
           onClick={() => onStepChange(step.id)}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
-            activeStep === step.id
-              ? 'bg-accent text-white'
-              : 'hover:bg-surface-hover text-text-secondary'
-          }`}
+          role="tab"
+          aria-selected={selected}
+          data-selected={selected ? 'true' : 'false'}
+          className="settings-segment-option flex-1 min-w-[7rem] flex items-center justify-center gap-2"
         >
           {step.done && activeStep !== step.id ? (
-            <CheckCircle2 className="w-4 h-4 text-success" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
           ) : (
-            <step.icon className="w-4 h-4" />
+            <step.icon className="w-3.5 h-3.5" />
           )}
-          <span className="text-sm font-medium">{t(step.labelKey)}</span>
+          <span>{t(step.labelKey)}</span>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

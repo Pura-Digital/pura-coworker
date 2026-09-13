@@ -30,6 +30,7 @@ import {
   shouldUseAnthropicAuthToken,
 } from './auth-utils';
 import { API_PROVIDER_PRESETS, PI_AI_CURATED_PRESETS } from '../../shared/api-model-presets';
+import { migrateLegacyUiZoom, normalizeDisplayScale } from '../../shared/ui-zoom';
 
 /**
  * Application configuration schema
@@ -116,6 +117,15 @@ export interface AppConfig {
   // UI theme preference
   theme: AppTheme;
 
+  // UI display scale (1 = standard Aiden density, rendered at 80% Electron zoom)
+  uiZoom: number;
+
+  // Prevent system sleep while Aiden is actively working
+  alwaysOn: boolean;
+
+  // Launch Aiden automatically at system startup
+  launchAtStartup: boolean;
+
   // Sandbox mode (WSL/Lima isolation)
   sandboxEnabled: boolean;
 
@@ -171,6 +181,9 @@ const DIRECT_READ_KEYS = new Set<keyof AppConfig>([
   'globalSkillsPath',
   'enableDevLogs',
   'theme',
+  'uiZoom',
+  'alwaysOn',
+  'launchAtStartup',
   'sandboxEnabled',
   'memoryEnabled',
   'enableThinking',
@@ -249,6 +262,9 @@ const defaultConfig: AppConfig = {
   webServicesKey: '',
   enableDevLogs: false,
   theme: 'light',
+  uiZoom: 1,
+  alwaysOn: false,
+  launchAtStartup: false,
   sandboxEnabled: false,
   memoryEnabled: true,
   memoryRuntime: {
@@ -994,6 +1010,9 @@ export class ConfigStore {
           : defaultConfig.webServicesKey,
       enableDevLogs: toBoolean(raw.enableDevLogs, defaultConfig.enableDevLogs),
       theme: isAppTheme(raw.theme) ? raw.theme : defaultConfig.theme,
+      uiZoom: normalizeDisplayScale(migrateLegacyUiZoom(raw.uiZoom), defaultConfig.uiZoom),
+      alwaysOn: toBoolean(raw.alwaysOn, defaultConfig.alwaysOn),
+      launchAtStartup: toBoolean(raw.launchAtStartup, defaultConfig.launchAtStartup),
       sandboxEnabled: toBoolean(raw.sandboxEnabled, defaultConfig.sandboxEnabled),
       memoryEnabled: toBoolean(raw.memoryEnabled, defaultConfig.memoryEnabled),
       memoryRuntime: normalizeMemoryRuntimeConfig(raw.memoryRuntime),

@@ -1,6 +1,7 @@
 import {
   buildTitlePrompt,
   getDefaultTitleFromPrompt,
+  isGeneratedTitleCompatibleWithPrompt,
   normalizeGeneratedTitle,
   shouldGenerateTitle,
 } from './session-title-utils';
@@ -62,6 +63,11 @@ export async function maybeGenerateSessionTitle(deps: TitleFlowDeps): Promise<vo
 
   if (!generatedTitle) {
     deps.log('[SessionTitle] No title generated', deps.sessionId);
+    return;
+  }
+
+  if (!isGeneratedTitleCompatibleWithPrompt(deps.prompt, generatedTitle)) {
+    deps.log('[SessionTitle] Skip: generated title language mismatch', deps.sessionId, generatedTitle);
     return;
   }
 

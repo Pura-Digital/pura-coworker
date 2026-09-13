@@ -2110,6 +2110,11 @@ Tool routing:
         if (ollamaColdStartTimerId) {
           clearTimeout(ollamaColdStartTimerId);
         }
+        if (firstResponseTimeoutId) {
+          clearTimeout(firstResponseTimeoutId);
+          firstResponseTimeoutId = undefined;
+        }
+        resetActivityTimeout();
         this.sendTraceUpdate(session.id, thinkingStepId, {
           title: 'Processing request...',
         });
@@ -2128,8 +2133,13 @@ Tool routing:
         }
       };
 
-      // Activity-based timeout: reset the 5-min timer whenever the SDK sends events
-      const PROMPT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+      // Activity-based timeout: reset the 5-min timer whenever the SDK sends events.
+      // Ollama cold start can take several minutes before the first token arrives,
+      // so use a longer first-response timeout and only start activity tracking after that.
+      const ACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+      const OLLAMA_FIRST_RESPONSE_TIMEOUT_MS = 15 * 60 * 1000;
+      const DEFAULT_FIRST_RESPONSE_TIMEOUT_MS = 3 * 60 * 1000;
+      let firstResponseTimeoutId: ReturnType<typeof setTimeout> | undefined;
       let activityTimeoutId: ReturnType<typeof setTimeout> | undefined;
       const resetActivityTimeout = () => {
         if (activityTimeoutId) clearTimeout(activityTimeoutId);
@@ -2137,7 +2147,24 @@ Tool routing:
           logWarn('[ClaudeAgentRunner] Prompt timed out (no activity for 5 min), aborting');
           abortedByTimeout = true;
           controller.abort();
-        }, PROMPT_TIMEOUT_MS);
+        }, ACTIVITY_TIMEOUT_MS);
+      };
+      const startFirstResponseTimeout = () => {
+        const timeoutMs =
+          provider === 'ollama' ? OLLAMA_FIRST_RESPONSE_TIMEOUT_MS : DEFAULT_FIRST_RESPONSE_TIMEOUT_MS;
+        firstResponseTimeoutId = setTimeout(() => {
+          if (!receivedFirstStreamEvent && !controller.signal.aborted) {
+            logWarn('[ClaudeAgentRunner] First response timed out, aborting');
+            abortedByTimeout = true;
+            controller.abort();
+          }
+        }, timeoutMs);
+      };
+      const onStreamActivity = () => {
+        if (provider === 'ollama' && !receivedFirstStreamEvent) {
+          return;
+        }
+        resetActivityTimeout();
       };
 
       const recordStreamEvent = (eventType: string) => {
@@ -2156,7 +2183,7 @@ Tool routing:
           if (controller.signal.aborted) return;
 
           // Reset activity timeout on meaningful events
-          resetActivityTimeout();
+          onStreamActivity();
 
           if (event.type === 'message_update') {
             const updateType = event.assistantMessageEvent.type;
@@ -2264,6 +2291,8 @@ Tool routing:
               const resolvedPayload = resolveMessageEndPayload({
                 message: msg as Parameters<typeof resolveMessageEndPayload>[0]['message'],
                 streamedText,
+                provider,
+                receivedFirstStreamEvent,
               });
               streamedText = resolvedPayload.nextStreamedText;
               if (provider === 'ollama') {
@@ -2488,7 +2517,7 @@ Tool routing:
 
       // Execute the prompt — unsubscribe in finally to prevent event listener leak
       try {
-        resetActivityTimeout();
+        startFirstResponseTimeout();
         if (provider === 'ollama') {
           log(
             '[ClaudeAgentRunner] Starting Ollama prompt',
@@ -2515,6 +2544,7 @@ Tool routing:
           logWarn('[ClaudeAgentRunner] unsubscribe error:', e);
         }
         if (activityTimeoutId) clearTimeout(activityTimeoutId);
+        if (firstResponseTimeoutId) clearTimeout(firstResponseTimeoutId);
         if (ollamaColdStartTimerId) clearTimeout(ollamaColdStartTimerId);
       }
 

@@ -57,6 +57,22 @@ describe('resolveMessageEndPayload', () => {
       'The model returned an empty success result. The current model or gateway may be incompatible. Retry or switch protocol.',
     );
   });
+
+  it('surfaces ollama cold-start guidance when Ollama returns empty before first stream event', () => {
+    const result = resolveMessageEndPayload({
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: 'stop',
+      },
+      streamedText: '',
+      provider: 'ollama',
+      receivedFirstStreamEvent: false,
+    });
+
+    expect(result.errorText).toContain('Ollama model returned an empty response');
+    expect(result.errorText).toContain('cold start');
+  });
 });
 
 describe('toUserFacingErrorText', () => {

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Plug,
-  AlertCircle,
   CheckCircle,
   Edit3,
   Trash2,
@@ -15,9 +14,13 @@ import {
   X,
 } from 'lucide-react';
 import type { MCPServerConfig, MCPServerStatus, MCPToolInfo, MCPPreset } from './shared';
+import {
+  SettingsAlert,
+  SettingsCard,
+  SettingsDisclosure,
+} from './shared';
 import { McpPresetLogo } from '../McpPresetLogo';
 import {
-  maskPresetUrl,
   presetUrlHasUnresolvedPlaceholders,
   resolvePresetUrl,
 } from '../../../shared/mcp-preset-url';
@@ -34,11 +37,25 @@ function isPresetAlreadyAdded(servers: MCPServerConfig[], preset: MCPPreset): bo
   });
 }
 
-function presetSummaryLine(preset: MCPPreset): string {
-  if (preset.type === 'stdio') {
-    return `${preset.command} ${preset.args?.join(' ') || ''}`.trim();
-  }
-  return maskPresetUrl(preset.url);
+const PRESET_DESC_KEYS: Record<string, string> = {
+  archiveye: 'mcp.presetDesc.archiveye',
+  chrome: 'mcp.presetDesc.chrome',
+  notion: 'mcp.presetDesc.notion',
+  'software-development': 'mcp.presetDesc.softwareDevelopment',
+  'gui-operate': 'mcp.presetDesc.guiOperate',
+};
+
+function presetUserDescription(presetKey: string, t: (key: string) => string): string {
+  const key = PRESET_DESC_KEYS[presetKey];
+  return key ? t(key) : '';
+}
+
+function friendlyConnectionType(
+  type: MCPServerConfig['type'],
+  t: (key: string) => string
+): string {
+  if (type === 'stdio') return t('mcp.typeLocal');
+  return t('mcp.typeCloud');
 }
 
 function presetEnvLabel(preset: MCPPreset, envKey: string, t: (key: string) => string): string {
@@ -227,12 +244,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
-          <AlertCircle className="w-4 h-4" />
-          {error}
-        </div>
-      )}
+      {error && <SettingsAlert variant="error">{error}</SettingsAlert>}
 
       {/* Add/Edit Form */}
       {(showAddForm || editingServer) && (
@@ -368,32 +380,33 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
             </div>
           </button>
           {showPresets && (
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {Object.entries(presets).map(([key, preset]) => {
                 const isAdded = isPresetAlreadyAdded(servers, preset);
                 const requiresConfig = preset.requiresEnv && preset.requiresEnv.length > 0;
+                const description = presetUserDescription(key, t);
                 return (
                   <div
                     key={key}
-                    className={`p-3 rounded-lg border flex items-center gap-3 ${
+                    className={`p-4 rounded-xl border flex items-start gap-3 ${
                       isAdded
-                        ? 'border-border bg-surface-muted opacity-60'
-                        : 'border-border bg-surface'
+                        ? 'border-border-subtle bg-surface-muted/60 opacity-70'
+                        : 'border-border-subtle bg-surface hover:border-accent/30 transition-colors'
                     }`}
                   >
                     <McpPresetLogo presetKey={key} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm text-text-primary">{preset.name}</span>
                         {requiresConfig && !isAdded && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-warning/10 text-warning border border-warning/20">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-warning/10 text-warning">
                             {t('mcp.requiresToken')}
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-text-muted mt-0.5 truncate">
-                        {presetSummaryLine(preset)}
-                      </div>
+                      {description && (
+                        <p className="text-xs text-text-muted mt-1 leading-5">{description}</p>
+                      )}
                     </div>
                     {isAdded ? (
                       <div className="flex items-center gap-1 text-success text-xs whitespace-nowrap">
@@ -461,14 +474,19 @@ function ServerCard({
   const serverStatus = status?.status ?? (server.enabled ? 'connecting' : 'disabled');
   const [showTools, setShowTools] = useState(false);
 
+  const technicalDetail =
+    server.type === 'stdio'
+      ? `${server.command} ${server.args?.join(' ') || ''}`.trim()
+      : server.url || '';
+
   return (
-    <div className="rounded-lg border border-border bg-surface overflow-hidden">
+    <SettingsCard className="!p-0 overflow-hidden">
       <div className="p-4">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <div
-                className={`w-3 h-3 rounded-full ${
+                className={`w-2.5 h-2.5 rounded-full ${
                   serverStatus === 'connected'
                     ? 'bg-success'
                     : serverStatus === 'failed'
@@ -479,32 +497,13 @@ function ServerCard({
                 }`}
               />
               <h3 className="font-medium text-text-primary">{server.name}</h3>
-              <span className="px-2 py-0.5 text-xs rounded bg-surface-muted text-text-muted">
-                {server.type.toUpperCase()}
+              <span className="px-2 py-0.5 text-xs rounded-full bg-surface-muted text-text-muted">
+                {friendlyConnectionType(server.type, t)}
               </span>
             </div>
-            <div className="text-sm text-text-muted space-y-1 ml-6 min-w-0">
-              {server.type === 'stdio' && (
-                <div
-                  className="font-mono text-xs truncate"
-                  title={`${server.command} ${server.args?.join(' ') || ''}`}
-                >
-                  {server.command} {server.args?.join(' ') || ''}
-                </div>
-              )}
-              {server.type === 'sse' && (
-                <div className="font-mono text-xs truncate" title={server.url}>
-                  {server.url}
-                </div>
-              )}
-              {server.type === 'streamable-http' && (
-                <div className="font-mono text-xs truncate" title={server.url}>
-                  {server.url}
-                </div>
-              )}
-              {/* Status hint — consistent for all servers */}
+            <div className="text-sm text-text-muted space-y-2 min-w-0">
               <div
-                className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md w-fit ${
+                className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full w-fit ${
                   serverStatus === 'connected'
                     ? 'bg-success/10 text-success'
                     : serverStatus === 'failed'
@@ -515,14 +514,19 @@ function ServerCard({
                 }`}
               >
                 {serverStatus === 'connected'
-                  ? `✓ ${t('mcp.connected')}`
+                  ? t('mcp.connected')
                   : serverStatus === 'failed'
                     ? t('mcp.failed', { defaultValue: 'Connection failed' })
                     : serverStatus === 'connecting'
-                      ? `⏳ ${t('mcp.connecting')}`
+                      ? t('mcp.connecting')
                       : t('mcp.disabled', { defaultValue: 'Disabled' })}
               </div>
-              <div className="flex items-center gap-4 mt-2">
+              {technicalDetail && (
+                <SettingsDisclosure title={t('mcp.showTechnicalDetails')}>
+                  <p className="font-mono text-xs text-text-secondary break-all">{technicalDetail}</p>
+                </SettingsDisclosure>
+              )}
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowTools(!showTools)}
                   className="flex items-center gap-1 hover:text-accent transition-colors"
@@ -576,7 +580,7 @@ function ServerCard({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={onToggleEnabled}
               disabled={isLoading}
@@ -610,7 +614,7 @@ function ServerCard({
           </div>
         </div>
       </div>
-    </div>
+    </SettingsCard>
   );
 }
 

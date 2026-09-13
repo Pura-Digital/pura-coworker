@@ -8,6 +8,8 @@ type MessageEndMessage = Pick<AssistantMessage, 'role' | 'content' | 'stopReason
 interface ResolveMessageEndPayloadOptions {
   message?: MessageEndMessage;
   streamedText: string;
+  provider?: string;
+  receivedFirstStreamEvent?: boolean;
 }
 
 interface ResolvedMessageEndPayload {
@@ -21,6 +23,9 @@ export function toUserFacingErrorText(errorText: string): string {
   const lower = errorText.toLowerCase();
   if (lower.includes('first_response_timeout')) {
     return 'Model response timed out: no upstream response received for a long time. Retry later or check model/gateway load.';
+  }
+  if (lower.includes('ollama_empty_during_load')) {
+    return 'The Ollama model returned an empty response, often during cold start while the model is loading into memory. Wait a moment and try again, or preload the model with `ollama run <model>`.';
   }
   if (lower.includes('empty_success_result')) {
     return 'The model returned an empty success result. The current model or gateway may be incompatible. Retry or switch protocol.';
@@ -75,7 +80,7 @@ export function toUserFacingErrorText(errorText: string): string {
 export function resolveMessageEndPayload(
   options: ResolveMessageEndPayloadOptions
 ): ResolvedMessageEndPayload {
-  const { message, streamedText } = options;
+  const { message, streamedText, provider, receivedFirstStreamEvent } = options;
   const nextStreamedText = '';
 
   if (message?.stopReason === 'error' && message.errorMessage) {
@@ -95,9 +100,13 @@ export function resolveMessageEndPayload(
         : [];
 
   if (rawContent.length === 0) {
+    const emptyErrorCode =
+      provider === 'ollama' && receivedFirstStreamEvent === false
+        ? 'ollama_empty_during_load'
+        : 'empty_success_result';
     return {
       effectiveContent: [],
-      errorText: toUserFacingErrorText('empty_success_result'),
+      errorText: toUserFacingErrorText(emptyErrorCode),
       nextStreamedText,
       shouldEmitMessage: false,
     };

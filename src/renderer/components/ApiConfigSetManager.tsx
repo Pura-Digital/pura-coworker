@@ -88,9 +88,9 @@ export function ApiConfigSetManager(props: ApiConfigSetManagerProps) {
   };
 
   return (
-    <div className="space-y-3 py-5 border-b border-border-muted px-4">
-      <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
-        <Layers className="w-4 h-4" />
+    <div className="space-y-3">
+      <label className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+        <Layers className="w-4 h-4 text-accent" />
         {t('api.configSet')}
         {hasUnsavedChanges && (
           <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] text-warning">

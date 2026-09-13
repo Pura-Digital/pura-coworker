@@ -1,80 +1,51 @@
 import { useState, useEffect } from 'react';
-import {
-  X,
-  Settings,
-  Plug,
-  Shield,
-  Package,
-  Clock3,
-  Wifi,
-  AlertCircle,
-  Globe,
-  ChevronRight,
-  BrainCircuit,
-} from 'lucide-react';
+import { X, Settings, Shield, Briefcase, Clock3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { RemoteControlPanel } from './RemoteControlPanel';
 import { useAppStore } from '../store';
 import { SettingsAPI } from './settings/SettingsAPI';
 import { SettingsSandbox } from './settings/SettingsSandbox';
-import { SettingsConnectors } from './settings/SettingsConnectors';
-import { SettingsSkills } from './settings/SettingsSkills';
+import { SettingsCustomize } from './settings/SettingsCustomize';
 import { SettingsSchedule } from './settings/SettingsSchedule';
 import { SettingsGeneral } from './settings/SettingsGeneral';
-import { SettingsLogs } from './settings/SettingsLogs';
-import { SettingsMemory } from './settings/SettingsMemory';
+import { ApiSystemIcon, WalkieTalkieIcon } from './settings/SettingsNavIcons';
 
 interface SettingsPanelProps {
   onClose: () => void;
-  initialTab?:
-    | 'api'
-    | 'sandbox'
-    | 'connectors'
-    | 'skills'
-    | 'memory'
-    | 'schedule'
-    | 'remote'
-    | 'logs'
-    | 'general';
+  initialTab?: TabId;
 }
 
-type TabId =
-  | 'api'
-  | 'sandbox'
-  | 'connectors'
-  | 'skills'
-  | 'memory'
-  | 'schedule'
-  | 'remote'
-  | 'logs'
-  | 'general';
+type TabId = 'api' | 'sandbox' | 'customize' | 'schedule' | 'remote' | 'general';
 
-const VALID_TABS = new Set<TabId>([
-  'api',
-  'sandbox',
-  'connectors',
-  'skills',
-  'memory',
-  'schedule',
-  'remote',
-  'logs',
-  'general',
-]);
+const VALID_TABS = new Set<TabId>(['api', 'sandbox', 'customize', 'schedule', 'remote', 'general']);
+
+const TAB_ALIASES: Record<string, TabId> = {
+  connectors: 'customize',
+  skills: 'customize',
+  memory: 'general',
+  logs: 'general',
+};
+
+function resolveTabId(tab: string | null | undefined, fallback: TabId): TabId {
+  if (tab && VALID_TABS.has(tab as TabId)) {
+    return tab as TabId;
+  }
+  if (tab && TAB_ALIASES[tab]) {
+    return TAB_ALIASES[tab];
+  }
+  return fallback;
+}
 
 export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProps) {
   const { t } = useTranslation();
   const { width } = useWindowSize();
   const compactSidebar = width < 900;
-  // Read settingsTab from store at mount time so external navigation (nav-server)
-  // takes effect even before this component mounts.
   const storeTab = useAppStore((s) => s.settingsTab);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
-  const resolvedInitial =
-    storeTab && VALID_TABS.has(storeTab as TabId) ? (storeTab as TabId) : initialTab;
+  const resolvedInitial = resolveTabId(storeTab, initialTab);
 
   const [activeTab, setActiveTab] = useState<TabId>(resolvedInitial);
-  // Track which tabs have been viewed at least once (for lazy loading)
   const [viewedTabs, setViewedTabs] = useState<Set<TabId>>(new Set([resolvedInitial]));
   const [appVersion, setAppVersion] = useState('');
   useEffect(() => {
@@ -87,49 +58,36 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
     }
   }, []);
 
-  // Consume the store signal and apply tab in one effect
   useEffect(() => {
-    if (storeTab && VALID_TABS.has(storeTab as TabId)) {
-      setActiveTab(storeTab as TabId);
+    if (storeTab) {
+      const resolved = resolveTabId(storeTab, initialTab);
+      setActiveTab(resolved);
       setSettingsTab(null);
     }
-  }, [storeTab, setSettingsTab]);
+  }, [storeTab, setSettingsTab, initialTab]);
 
-  // Mark tab as viewed when it becomes active
   useEffect(() => {
     setViewedTabs((prev) => (prev.has(activeTab) ? prev : new Set([...prev, activeTab])));
   }, [activeTab]);
 
   const tabs = [
     {
+      id: 'general' as TabId,
+      label: t('settings.general'),
+      icon: Settings,
+      description: t('settings.generalDesc'),
+    },
+    {
       id: 'api' as TabId,
       label: t('settings.apiSettings'),
-      icon: Settings,
+      icon: ApiSystemIcon,
       description: t('settings.apiSettingsDesc'),
     },
     {
-      id: 'sandbox' as TabId,
-      label: t('settings.sandbox'),
-      icon: Shield,
-      description: t('settings.sandboxDesc'),
-    },
-    {
-      id: 'connectors' as TabId,
-      label: t('settings.connectors'),
-      icon: Plug,
-      description: t('settings.connectorsDesc'),
-    },
-    {
-      id: 'skills' as TabId,
-      label: t('settings.skills'),
-      icon: Package,
-      description: t('settings.skillsDesc'),
-    },
-    {
-      id: 'memory' as TabId,
-      label: t('settings.memory'),
-      icon: BrainCircuit,
-      description: t('settings.memoryDesc'),
+      id: 'customize' as TabId,
+      label: t('settings.customize'),
+      icon: Briefcase,
+      description: t('settings.customizeDesc'),
     },
     {
       id: 'schedule' as TabId,
@@ -140,91 +98,71 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
     {
       id: 'remote' as TabId,
       label: t('settings.remote'),
-      icon: Wifi,
+      icon: WalkieTalkieIcon,
       description: t('settings.remoteDesc'),
     },
     {
-      id: 'logs' as TabId,
-      label: t('settings.logs'),
-      icon: AlertCircle,
-      description: t('settings.logsDesc'),
-    },
-    {
-      id: 'general' as TabId,
-      label: t('settings.general'),
-      icon: Globe,
-      description: t('settings.generalDesc'),
+      id: 'sandbox' as TabId,
+      label: t('settings.sandbox'),
+      icon: Shield,
+      description: t('settings.sandboxDesc'),
     },
   ];
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-background">
-      {/* Sidebar */}
       <div
-        className={`${compactSidebar ? 'w-14' : 'w-52 lg:w-60'} bg-background-secondary/88 border-r border-border-muted flex flex-col flex-shrink-0`}
+        className={`${compactSidebar ? 'w-12' : 'w-44 lg:w-48'} bg-background-secondary/88 border-r border-border-muted flex flex-col flex-shrink-0`}
       >
         {!compactSidebar && (
-          <div className="px-4 pt-4 pb-3 border-b border-border-muted">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
+          <div className="px-3 pt-3 pb-2 border-b border-border-muted">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">
               {t('settings.title')}
             </p>
-            <p className="mt-1.5 text-[11px] leading-4 text-text-muted">{t('settings.panelDesc')}</p>
           </div>
         )}
-        <div className={`flex-1 ${compactSidebar ? 'p-1 space-y-0.5' : 'p-2.5 space-y-1'}`}>
+        <div className={`flex-1 ${compactSidebar ? 'p-1 space-y-0.5' : 'p-1.5 space-y-0.5'}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               title={compactSidebar ? tab.label : undefined}
-              className={`w-full flex items-center ${compactSidebar ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5'} rounded-lg text-left transition-colors active:scale-[0.98] ${
+              className={`w-full flex items-center ${compactSidebar ? 'justify-center p-1.5' : 'gap-2 px-2 py-1.5'} rounded-md text-left transition-colors active:scale-[0.98] ${
                 activeTab === tab.id
-                  ? 'bg-accent/10 text-text-primary font-medium border-l-4 border-accent rounded-none'
-                  : 'hover:bg-surface-hover text-text-secondary hover:text-text-primary'
+                  ? 'bg-surface-hover text-text-primary font-medium'
+                  : 'hover:bg-surface-hover/60 text-text-secondary hover:text-text-primary'
               }`}
             >
               <tab.icon
-                className={`flex-shrink-0 ${compactSidebar ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+                className={`flex-shrink-0 ${compactSidebar ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5'}`}
               />
               {!compactSidebar && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{tab.label}</p>
-                  <p className="text-[11px] leading-4 text-text-muted line-clamp-2 mt-0.5">
-                    {tab.description}
-                  </p>
-                </div>
-              )}
-              {!compactSidebar && activeTab === tab.id && (
-                <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="flex-1 min-w-0 text-[13px] truncate">{tab.label}</span>
               )}
             </button>
           ))}
         </div>
-        <div className={`${compactSidebar ? 'p-1.5' : 'p-4'} border-t border-border-muted`}>
+        <div className={`${compactSidebar ? 'p-1' : 'p-2'} border-t border-border-muted`}>
           <button
             onClick={onClose}
-            className={`w-full py-2 ${compactSidebar ? 'px-2' : 'px-4'} rounded-lg bg-background hover:bg-background transition-colors text-text-secondary text-sm`}
+            className={`w-full ${compactSidebar ? 'p-1.5' : 'px-2 py-1.5'} rounded-md hover:bg-surface-hover transition-colors text-text-secondary text-[13px]`}
             title={compactSidebar ? t('common.close') : undefined}
           >
-            {compactSidebar ? <X className="w-4 h-4 mx-auto" /> : t('common.close')}
+            {compactSidebar ? <X className="w-3.5 h-3.5 mx-auto" /> : t('common.close')}
           </button>
-          {!compactSidebar && (
-            <p className="text-[10px] text-text-muted text-center mt-2 select-text">
+          {!compactSidebar && appVersion && (
+            <p className="text-[10px] text-text-muted text-center mt-1.5 select-text">
               v{appVersion}
             </p>
           )}
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <div className="flex items-center justify-between px-4 lg:px-8 py-4 border-b border-border-muted flex-shrink-0 bg-background/88 backdrop-blur-sm">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">
-              {t('settings.title')}
-            </p>
-            <h3 className="mt-1 text-[1.15rem] font-semibold tracking-[-0.02em] text-text-primary">
+            <h3 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-text-primary">
               {activeTabMeta?.label}
             </h3>
             {activeTabMeta?.description && (
@@ -241,28 +179,18 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
           </button>
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 lg:px-8 lg:py-8">
-          <div className="max-w-[860px] w-full min-w-0 mx-auto">
-            <div className="">
+          <div className="w-full min-w-0">
+            <div>
               <div className={activeTab === 'api' ? '' : 'hidden'}>
-                {viewedTabs.has('api') && (
-                  <>
-                    <SettingsAPI />
-                  </>
-                )}
+                {viewedTabs.has('api') && <SettingsAPI />}
               </div>
               <div className={activeTab === 'sandbox' ? '' : 'hidden'}>
                 {viewedTabs.has('sandbox') && <SettingsSandbox />}
               </div>
-              <div className={activeTab === 'connectors' ? '' : 'hidden'}>
-                {viewedTabs.has('connectors') && (
-                  <SettingsConnectors isActive={activeTab === 'connectors'} />
+              <div className={activeTab === 'customize' ? '' : 'hidden'}>
+                {viewedTabs.has('customize') && (
+                  <SettingsCustomize isActive={activeTab === 'customize'} />
                 )}
-              </div>
-              <div className={activeTab === 'skills' ? '' : 'hidden'}>
-                {viewedTabs.has('skills') && <SettingsSkills isActive={activeTab === 'skills'} />}
-              </div>
-              <div className={activeTab === 'memory' ? '' : 'hidden'}>
-                {viewedTabs.has('memory') && <SettingsMemory />}
               </div>
               <div className={activeTab === 'schedule' ? '' : 'hidden'}>
                 {viewedTabs.has('schedule') && (
@@ -274,11 +202,10 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
                   <RemoteControlPanel isActive={activeTab === 'remote'} />
                 )}
               </div>
-              <div className={activeTab === 'logs' ? '' : 'hidden'}>
-                {viewedTabs.has('logs') && <SettingsLogs isActive={activeTab === 'logs'} />}
-              </div>
               <div className={activeTab === 'general' ? '' : 'hidden'}>
-                {viewedTabs.has('general') && <SettingsGeneral />}
+                {viewedTabs.has('general') && (
+                  <SettingsGeneral isActive={activeTab === 'general'} />
+                )}
               </div>
             </div>
           </div>

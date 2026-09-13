@@ -152,6 +152,9 @@ function mapPiAiError(errorText: string, durationMs: number, provider?: string):
   if (provider === 'ollama' && /econnrefused/i.test(lowered)) {
     return { ok: false, latencyMs: durationMs, errorType: 'ollama_not_running', details };
   }
+  if (provider === 'ollama' && /timed?\s*out|timeout|abort/i.test(lowered)) {
+    return { ok: false, latencyMs: durationMs, errorType: 'ollama_loading', details };
+  }
   if (NETWORK_ERROR_RE.test(lowered)) {
     return { ok: false, latencyMs: durationMs, errorType: 'network_error', details };
   }

@@ -200,6 +200,61 @@ describe('SessionManager processQueue concurrency', () => {
     // processQueue should have been entered exactly once (not re-entered from finally)
     expect(processQueueEntries).toBe(1);
   });
+
+  it('restarts queue processing when a prompt is enqueued during wind-down after stop', async () => {
+    const manager = new SessionManager(db, sendToRenderer);
+
+    let resolveRun!: () => void;
+    const runPromise = new Promise<void>((resolve) => {
+      resolveRun = resolve;
+    });
+
+    const agentRunner = (manager as unknown as { agentRunner: { run: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> } }).agentRunner;
+    agentRunner.run = vi.fn(() => runPromise);
+    agentRunner.cancel = vi.fn();
+
+    (manager as unknown as { loadSession: (id: string) => unknown }).loadSession = (id: string) => ({
+      id,
+      title: 'Test',
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      status: 'running' as const,
+      cwd: '/tmp',
+    });
+
+    const session = {
+      id: 's1',
+      title: 'Test',
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      status: 'idle' as const,
+      cwd: '/tmp',
+    };
+
+    (manager as unknown as { enqueuePrompt: (s: unknown, p: string) => void }).enqueuePrompt(
+      session,
+      'first prompt',
+    );
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    manager.stopSession('s1');
+
+    (manager as unknown as { enqueuePrompt: (s: unknown, p: string) => void }).enqueuePrompt(
+      session,
+      'second prompt after stop',
+    );
+
+    resolveRun();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(agentRunner.run).toHaveBeenCalledTimes(2);
+    expect(agentRunner.run).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 's1' }),
+      'second prompt after stop',
+      expect.any(Array),
+    );
+  });
 });
 
 describe('SessionManager cache eviction', () => {

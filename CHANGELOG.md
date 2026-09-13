@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-09-13
+
+### Added
+
+- UI zoom control in settings (80%–150% presets)
+- Power-save blocker to keep agent sessions running when "always on" is enabled
+- Settings panel redesign with sidebar navigation and Customize section (Connectors + Skills)
+- Session workspace sync when switching projects
+- Release cheat sheet (`RELEASE.md`)
+
+### Changed
+
+- Settings pages refactored to shared layout components (`settings-ui.tsx`)
+- Session title generation and memory settings UI improvements
+
+### Fixed
+
+- Theme and settings persistence edge cases
+- Agent runner message-end handling
+
 ## [3.3.0] - 2026-04-18
 
 First stable release of the 3.3.x series. Graduated from 9 beta releases with 30+ commits since beta.9.

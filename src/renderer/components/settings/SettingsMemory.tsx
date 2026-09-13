@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import type { AppConfig } from '../../types';
 import type {
   MemoryDebugFileContent,
   MemoryDebugFileInfo,
@@ -11,7 +13,11 @@ import type {
   MemorySearchScope,
 } from '../../types';
 import { useAppStore } from '../../store';
-import { SettingsContentSection } from './shared';
+import {
+  SettingsCardHeader,
+  SettingsDisclosure,
+  SettingsToggle,
+} from './shared';
 
 type SearchMode = 'workspace' | 'all' | 'global';
 
@@ -62,7 +68,7 @@ function cloneRuntimeConfig(runtime?: MemoryRuntimeConfig): MemoryRuntimeConfig 
   };
 }
 
-export function SettingsMemory() {
+export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const sessions = useAppStore((state) => state.sessions);
@@ -343,351 +349,74 @@ export function SettingsMemory() {
   };
 
   return (
-    <div className="space-y-6">
-      <SettingsContentSection title={t('memory.title')} description={t('memory.description')}>
-        <div className="flex flex-col gap-3 rounded-xl border border-border-muted bg-background-secondary/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-text-primary">
-                {enabled ? t('memory.enabled') : t('memory.disabled')}
-              </p>
-              <p className="mt-1 text-xs text-text-muted">{t('memory.toggleHint')}</p>
-            </div>
-            <button
-              onClick={() => {
-                void handleToggle();
-              }}
-              disabled={isBusy}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                enabled
-                  ? 'bg-accent text-white hover:opacity-90'
-                  : 'bg-surface hover:bg-surface-hover text-text-primary border border-border'
-              } disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              {enabled ? t('memory.disableAction') : t('memory.enableAction')}
-            </button>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard label={t('memory.coreCount')} value={overview?.coreCount ?? 0} />
-            <MetricCard label={t('memory.sessionCount')} value={overview?.experienceSessionCount ?? 0} />
-            <MetricCard label={t('memory.chunkCount')} value={overview?.experienceChunkCount ?? 0} />
-            <MetricCard
-              label={t('memory.workspaceCount')}
-              value={overview?.sourceWorkspaceCount ?? 0}
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InfoCard
-              label={t('memory.latestIngestion')}
-              value={
-                overview?.latestIngestionAt
-                  ? new Date(overview.latestIngestionAt).toLocaleString()
-                  : t('memory.noIngestionYet')
-              }
-            />
-            <InfoCard
-              label={t('memory.health')}
-              value={
-                overview?.failedSessionCount
-                  ? t('memory.failedSessions', { count: overview.failedSessionCount })
-                  : t('memory.healthy')
-              }
-              secondary={overview?.latestError || undefined}
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InfoCard
-              label={t('memory.storageRoot')}
-              value={overview?.storageRoot || runtimeDraft.storageRoot || 'Default userData/memory'}
-            />
-            <InfoCard
-              label={t('memory.currentWorkspace')}
-              value={currentWorkspace || t('memory.noWorkspace')}
-              secondary={
-                overview?.topSourceWorkspaces?.length
-                  ? `Top sources: ${overview.topSourceWorkspaces
-                      .slice(0, 3)
-                      .map((item) => `${item.workspaceKey} (${item.sessionCount}/${item.chunkCount})`)
-                      .join(' · ')}`
-                  : undefined
-              }
-            />
-          </div>
-        </div>
-      </SettingsContentSection>
+    <div className="space-y-4">
+      {compact ? (
+        <SettingsCardHeader title={t('memory.title')} description={t('memory.description')} />
+      ) : null}
 
-      <SettingsContentSection
-        title={t('memory.runtimeTitle')}
-        description={t('memory.runtimeDescription')}
-      >
-        <div className="space-y-4 rounded-xl border border-border-muted bg-background-secondary/60 p-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <LabeledField label={t('memory.storageRoot')}>
-              <input
-                value={runtimeDraft.storageRoot || ''}
-                onChange={(event) =>
-                  setRuntimeDraft((prev) => ({ ...prev, storageRoot: event.target.value }))
-                }
-                placeholder={overview?.storageRoot || ''}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </LabeledField>
-            <LabeledField label={t('memory.maxNavSteps')}>
-              <input
-                type="number"
-                min={0}
-                max={4}
-                value={runtimeDraft.maxNavSteps}
-                onChange={(event) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    maxNavSteps: Number(event.target.value || 0),
-                  }))
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </LabeledField>
-            <LabeledField label={t('memory.ingestionConcurrency')}>
-              <input
-                type="number"
-                min={1}
-                max={16}
-                value={runtimeDraft.ingestionConcurrency}
-                onChange={(event) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    ingestionConcurrency: Number(event.target.value || 1),
-                  }))
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </LabeledField>
-            <ToggleField
-              label={t('memory.useEmbedding')}
-              checked={runtimeDraft.useEmbedding}
-              onChange={(checked) =>
-                setRuntimeDraft((prev) => ({
-                  ...prev,
-                  useEmbedding: checked,
-                }))
-              }
-            />
-            <ToggleField
-              label={t('memory.evalEnabled')}
-              checked={runtimeDraft.evalEnabled ?? false}
-              onChange={(checked) =>
-                setRuntimeDraft((prev) => ({
-                  ...prev,
-                  evalEnabled: checked,
-                }))
-              }
-            />
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <LabeledField label={t('memory.evalArtifactsRoot')}>
-              <input
-                value={runtimeDraft.evalArtifactsRoot || ''}
-                onChange={(event) =>
-                  setRuntimeDraft((prev) => ({ ...prev, evalArtifactsRoot: event.target.value }))
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </LabeledField>
-            <LabeledField label={t('memory.evalMaxRounds')}>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={runtimeDraft.evalMaxRounds ?? 12}
-                onChange={(event) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    evalMaxRounds: Number(event.target.value || 12),
-                  }))
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </LabeledField>
-            <LabeledField label={t('memory.promptIterationRounds')}>
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={runtimeDraft.promptIterationRounds ?? 2}
-                onChange={(event) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    promptIterationRounds: Number(event.target.value || 2),
-                  }))
-                }
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </LabeledField>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3 rounded-lg border border-border-muted bg-background/80 p-3">
-              <p className="text-sm font-medium text-text-primary">
-                {t('memory.llmConfig', 'Memory LLM')}
-              </p>
-              <ToggleField
-                label={t('memory.inheritActive')}
-                checked={runtimeDraft.llm.inheritFromActive}
-                onChange={(checked) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    llm: { ...prev.llm, inheritFromActive: checked },
-                  }))
-                }
-              />
-              <LabeledField label={t('memory.modelOverride')}>
-                <input
-                  value={runtimeDraft.llm.model || ''}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      llm: { ...prev.llm, model: event.target.value },
-                    }))
-                  }
-                  placeholder={appConfig?.model || ''}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-              <LabeledField label={t('memory.baseUrlOverride')}>
-                <input
-                  value={runtimeDraft.llm.baseUrl || ''}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      llm: { ...prev.llm, baseUrl: event.target.value },
-                    }))
-                  }
-                  placeholder={appConfig?.baseUrl || ''}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-              <LabeledField label={t('memory.apiKeyOverride')}>
-                <input
-                  type="password"
-                  value={runtimeDraft.llm.apiKey || ''}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      llm: { ...prev.llm, apiKey: event.target.value },
-                    }))
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-            </div>
-            <div className="space-y-3 rounded-lg border border-border-muted bg-background/80 p-3">
-              <p className="text-sm font-medium text-text-primary">
-                {t('memory.embeddingConfig', 'Embedding')}
-              </p>
-              <ToggleField
-                label={t('memory.inheritActive')}
-                checked={runtimeDraft.embedding.inheritFromActive}
-                onChange={(checked) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    embedding: { ...prev.embedding, inheritFromActive: checked },
-                  }))
-                }
-              />
-              <LabeledField label={t('memory.modelOverride')}>
-                <input
-                  value={runtimeDraft.embedding.model || ''}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      embedding: { ...prev.embedding, model: event.target.value },
-                    }))
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-              <LabeledField label={t('memory.baseUrlOverride')}>
-                <input
-                  value={runtimeDraft.embedding.baseUrl || ''}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      embedding: { ...prev.embedding, baseUrl: event.target.value },
-                    }))
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-              <LabeledField label={t('memory.apiKeyOverride')}>
-                <input
-                  type="password"
-                  value={runtimeDraft.embedding.apiKey || ''}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      embedding: { ...prev.embedding, apiKey: event.target.value },
-                    }))
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button
-              onClick={() => {
-                void handleSaveRuntime();
-              }}
-              disabled={isBusy}
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {t('memory.saveRuntime')}
-            </button>
-          </div>
-        </div>
-      </SettingsContentSection>
+      <SettingsToggle
+        label={enabled ? t('memory.enabled') : t('memory.disabled')}
+        description={t('memory.toggleHint')}
+        enabled={enabled}
+        disabled={isBusy}
+        onToggle={() => {
+          void handleToggle();
+        }}
+      />
 
-      <SettingsContentSection
-        title={t('memory.searchTitle')}
-        description={t('memory.searchDescription')}
-      >
-        <div className="space-y-3 rounded-xl border border-border-muted bg-background-secondary/60 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard label={t('memory.coreCount')} value={overview?.coreCount ?? 0} />
+        <MetricCard label={t('memory.sessionCount')} value={overview?.experienceSessionCount ?? 0} />
+        <MetricCard label={t('memory.chunkCount')} value={overview?.experienceChunkCount ?? 0} />
+        <MetricCard label={t('memory.workspaceCount')} value={overview?.sourceWorkspaceCount ?? 0} />
+      </div>
+
+      <div className="space-y-3 pt-2 border-t border-border-subtle">
+        <SettingsCardHeader
+          title={t('memory.searchTitle')}
+          description={t('memory.searchDescription')}
+        />
+        <div className="space-y-3">
+          <div className="space-y-3">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('memory.searchPlaceholder')}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-accent"
+              className="input w-full min-w-0"
             />
-            <select
-              value={scope}
-              onChange={(event) => setScope(event.target.value as SearchMode)}
-              className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none"
-            >
-              {hasWorkspace && <option value="workspace">{t('memory.scopeWorkspace')}</option>}
-              <option value="all">{t('memory.scopeAll')}</option>
-              <option value="global">{t('memory.scopeGlobal')}</option>
-            </select>
-            <select
-              value={sourceWorkspaceFilter}
-              onChange={(event) => setSourceWorkspaceFilter(event.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none"
-            >
-              <option value="">{t('memory.allSources')}</option>
-              {overview?.topSourceWorkspaces?.map((item) => (
-                <option key={item.workspaceKey} value={item.workspaceKey}>
-                  {item.workspaceKey}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => {
-                void handleSearch();
-              }}
-              disabled={isBusy || !query.trim()}
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {t('memory.searchAction')}
-            </button>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <select
+                value={scope}
+                onChange={(event) => setScope(event.target.value as SearchMode)}
+                className="input min-w-0 w-full truncate"
+              >
+                {hasWorkspace && <option value="workspace">{t('memory.scopeWorkspace')}</option>}
+                <option value="all">{t('memory.scopeAll')}</option>
+                <option value="global">{t('memory.scopeGlobal')}</option>
+              </select>
+              <select
+                value={sourceWorkspaceFilter}
+                onChange={(event) => setSourceWorkspaceFilter(event.target.value)}
+                className="input min-w-0 w-full truncate"
+                title={sourceWorkspaceFilter || t('memory.allSources')}
+              >
+                <option value="">{t('memory.allSources')}</option>
+                {overview?.topSourceWorkspaces?.map((item) => (
+                  <option key={item.workspaceKey} value={item.workspaceKey}>
+                    {item.workspaceKey}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  void handleSearch();
+                }}
+                disabled={isBusy || !query.trim()}
+                className="btn btn-primary w-full sm:w-auto shrink-0 disabled:opacity-60"
+              >
+                {t('memory.searchAction')}
+              </button>
+            </div>
           </div>
           {hasWorkspace && (
             <p className="text-xs text-text-muted">
@@ -828,10 +557,94 @@ export function SettingsMemory() {
             </div>
           </div>
         </div>
-      </SettingsContentSection>
+      </div>
 
-      <SettingsContentSection
-        title={t('memory.filesTitle')}
+      <SettingsDisclosure
+        title={t('memory.sectionManagement')}
+        description={t('memory.maintenanceDescription')}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InfoCard
+            label={t('memory.latestIngestion')}
+            value={
+              overview?.latestIngestionAt
+                ? new Date(overview.latestIngestionAt).toLocaleString()
+                : t('memory.noIngestionYet')
+            }
+          />
+          <InfoCard
+            label={t('memory.health')}
+            value={
+              overview?.failedSessionCount
+                ? t('memory.failedSessions', { count: overview.failedSessionCount })
+                : t('memory.healthy')
+            }
+            secondary={overview?.latestError || undefined}
+          />
+          <InfoCard
+            label={t('memory.currentWorkspace')}
+            value={currentWorkspace || t('memory.noWorkspace')}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 pt-2">
+          <button
+            onClick={() => {
+              void handleRebuildWorkspace();
+            }}
+            disabled={!hasWorkspace || isBusy}
+            className="btn btn-secondary text-sm py-2 px-3 disabled:opacity-60"
+          >
+            {t('memory.rebuildWorkspace')}
+          </button>
+          <button
+            onClick={() => {
+              void handleRebuildAll();
+            }}
+            disabled={isBusy}
+            className="btn btn-secondary text-sm py-2 px-3 disabled:opacity-60"
+          >
+            {t('memory.rebuildAll')}
+          </button>
+          <button
+            onClick={() => {
+              void handleClearWorkspace();
+            }}
+            disabled={!hasWorkspace || isBusy}
+            className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm font-medium text-warning disabled:opacity-60"
+          >
+            {t('memory.clearWorkspace')}
+          </button>
+          <button
+            onClick={() => {
+              void handleClearCore();
+            }}
+            disabled={isBusy}
+            className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm font-medium text-error disabled:opacity-60"
+          >
+            {t('memory.clearCore')}
+          </button>
+        </div>
+      </SettingsDisclosure>
+
+      <SettingsDisclosure
+        title={t('memory.sectionAdvanced')}
+        description={t('memory.runtimeDescription')}
+      >
+        <MemoryRuntimePanel
+          runtimeDraft={runtimeDraft}
+          setRuntimeDraft={setRuntimeDraft}
+          overview={overview}
+          appConfig={appConfig}
+          isBusy={isBusy}
+          onSave={() => {
+            void handleSaveRuntime();
+          }}
+          t={t}
+        />
+      </SettingsDisclosure>
+
+      <SettingsDisclosure
+        title={t('memory.sectionDeveloper')}
         description={t('memory.filesDescription')}
       >
         <div className="grid gap-4 rounded-xl border border-border-muted bg-background-secondary/60 p-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
@@ -912,57 +725,156 @@ export function SettingsMemory() {
             )}
           </div>
         </div>
-      </SettingsContentSection>
-
-      <SettingsContentSection
-        title={t('memory.maintenanceTitle')}
-        description={t('memory.maintenanceDescription')}
-      >
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => {
-              void handleRebuildWorkspace();
-            }}
-            disabled={!hasWorkspace || isBusy}
-            className="rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {t('memory.rebuildWorkspace')}
-          </button>
-          <button
-            onClick={() => {
-              void handleRebuildAll();
-            }}
-            disabled={isBusy}
-            className="rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {t('memory.rebuildAll')}
-          </button>
-          <button
-            onClick={() => {
-              void handleClearWorkspace();
-            }}
-            disabled={!hasWorkspace || isBusy}
-            className="rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
-          >
-            {t('memory.clearWorkspace')}
-          </button>
-          <button
-            onClick={() => {
-              void handleClearCore();
-            }}
-            disabled={isBusy}
-            className="rounded-lg border border-rose-300/60 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
-          >
-            {t('memory.clearCore')}
-          </button>
-        </div>
-      </SettingsContentSection>
+      </SettingsDisclosure>
 
       {status && (
         <div className="rounded-lg border border-border-muted bg-background-secondary/70 px-4 py-3 text-sm text-text-secondary">
           {status}
         </div>
       )}
+    </div>
+  );
+}
+
+function MemoryRuntimePanel({
+  runtimeDraft,
+  setRuntimeDraft,
+  overview,
+  appConfig,
+  isBusy,
+  onSave,
+  t,
+}: {
+  runtimeDraft: MemoryRuntimeConfig;
+  setRuntimeDraft: React.Dispatch<React.SetStateAction<MemoryRuntimeConfig>>;
+  overview: MemoryOverview | null;
+  appConfig: AppConfig | null;
+  isBusy: boolean;
+  onSave: () => void;
+  t: TFunction;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <LabeledField label={t('memory.storageRoot')}>
+          <input
+            value={runtimeDraft.storageRoot || ''}
+            onChange={(event) =>
+              setRuntimeDraft((prev) => ({ ...prev, storageRoot: event.target.value }))
+            }
+            placeholder={overview?.storageRoot || ''}
+            className="input py-2.5 text-sm"
+          />
+        </LabeledField>
+        <LabeledField label={t('memory.maxNavSteps')}>
+          <input
+            type="number"
+            min={0}
+            max={4}
+            value={runtimeDraft.maxNavSteps}
+            onChange={(event) =>
+              setRuntimeDraft((prev) => ({
+                ...prev,
+                maxNavSteps: Number(event.target.value || 0),
+              }))
+            }
+            className="input py-2.5 text-sm"
+          />
+        </LabeledField>
+        <LabeledField label={t('memory.ingestionConcurrency')}>
+          <input
+            type="number"
+            min={1}
+            max={16}
+            value={runtimeDraft.ingestionConcurrency}
+            onChange={(event) =>
+              setRuntimeDraft((prev) => ({
+                ...prev,
+                ingestionConcurrency: Number(event.target.value || 1),
+              }))
+            }
+            className="input py-2.5 text-sm"
+          />
+        </LabeledField>
+        <ToggleField
+          label={t('memory.useEmbedding')}
+          checked={runtimeDraft.useEmbedding}
+          onChange={(checked) =>
+            setRuntimeDraft((prev) => ({ ...prev, useEmbedding: checked }))
+          }
+        />
+        <ToggleField
+          label={t('memory.evalEnabled')}
+          checked={runtimeDraft.evalEnabled ?? false}
+          onChange={(checked) =>
+            setRuntimeDraft((prev) => ({ ...prev, evalEnabled: checked }))
+          }
+        />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-3 rounded-lg border border-border-subtle bg-surface-muted/40 p-3">
+          <p className="text-sm font-medium text-text-primary">{t('memory.llmConfig', 'Memory LLM')}</p>
+          <ToggleField
+            label={t('memory.inheritActive')}
+            checked={runtimeDraft.llm.inheritFromActive}
+            onChange={(checked) =>
+              setRuntimeDraft((prev) => ({
+                ...prev,
+                llm: { ...prev.llm, inheritFromActive: checked },
+              }))
+            }
+          />
+          <LabeledField label={t('memory.modelOverride')}>
+            <input
+              value={runtimeDraft.llm.model || ''}
+              onChange={(event) =>
+                setRuntimeDraft((prev) => ({
+                  ...prev,
+                  llm: { ...prev.llm, model: event.target.value },
+                }))
+              }
+              placeholder={appConfig?.model || ''}
+              className="input py-2.5 text-sm"
+            />
+          </LabeledField>
+        </div>
+        <div className="space-y-3 rounded-lg border border-border-subtle bg-surface-muted/40 p-3">
+          <p className="text-sm font-medium text-text-primary">
+            {t('memory.embeddingConfig', 'Embedding')}
+          </p>
+          <ToggleField
+            label={t('memory.inheritActive')}
+            checked={runtimeDraft.embedding.inheritFromActive}
+            onChange={(checked) =>
+              setRuntimeDraft((prev) => ({
+                ...prev,
+                embedding: { ...prev.embedding, inheritFromActive: checked },
+              }))
+            }
+          />
+          <LabeledField label={t('memory.modelOverride')}>
+            <input
+              value={runtimeDraft.embedding.model || ''}
+              onChange={(event) =>
+                setRuntimeDraft((prev) => ({
+                  ...prev,
+                  embedding: { ...prev.embedding, model: event.target.value },
+                }))
+              }
+              className="input py-2.5 text-sm"
+            />
+          </LabeledField>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <button
+          onClick={onSave}
+          disabled={isBusy}
+          className="btn btn-primary text-sm disabled:opacity-60"
+        >
+          {t('memory.saveRuntime')}
+        </button>
+      </div>
     </div>
   );
 }

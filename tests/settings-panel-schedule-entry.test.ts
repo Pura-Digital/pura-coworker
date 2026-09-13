@@ -58,9 +58,10 @@ describe('SettingsPanel schedule tab entry', () => {
 
   it('supports daily and weekly multi-slot schedule editing', () => {
     expect(settingsPanelContent).toContain("const [scheduleMode, setScheduleMode] = useState<ScheduleFormMode>('once')");
-    expect(settingsPanelContent).toContain('<ScheduleSelectMenu');
+    expect(settingsPanelContent).toContain('<SettingsSegmentedControl');
+    expect(settingsPanelContent).toContain('scheduleModeOptions');
     expect(settingsPanelContent).toContain('<TimeMultiSelectMenu');
-    expect(settingsPanelContent).toContain("label={t('schedule.mode')}");
+    expect(settingsPanelContent).toContain('<ScheduleSelectMenu');
     expect(settingsPanelContent).toContain("label={t('schedule.weekday')}");
     expect(settingsPanelContent).toContain("label={t('schedule.times')}");
     expect(settingsPanelContent).toContain("t('schedule.previewAutoFind'");

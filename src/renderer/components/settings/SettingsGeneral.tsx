@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../../store';
+import { SettingsLogs } from './SettingsLogs';
+import { SettingsMemory } from './SettingsMemory';
+import { UI_ZOOM_PRESETS } from '../../../shared/ui-zoom';
+import {
+  SettingsPage,
+  SettingsCard,
+  SettingsCardHeader,
+  SettingsToggle,
+  SettingsSegmentedControl,
+  SettingsOptionList,
+} from './shared';
 
-export function SettingsGeneral() {
+export function SettingsGeneral({ isActive }: { isActive: boolean }) {
   const { i18n, t } = useTranslation();
   const settings = useAppStore((s) => s.settings);
   const updateSettings = useAppStore((s) => s.updateSettings);
@@ -23,65 +35,107 @@ export function SettingsGeneral() {
   }, []);
 
   const languages = [
-    { code: 'it', nativeName: 'Italiano' },
-    { code: 'en', nativeName: 'English' },
-    { code: 'zh', nativeName: '中文' },
+    { code: 'it' as const, label: 'Italiano' },
+    { code: 'en' as const, label: 'English' },
+    { code: 'zh' as const, label: '中文' },
   ];
 
   const themeOptions = [
-    { value: 'light' as const, label: t('general.themeLight') },
-    { value: 'dark' as const, label: t('general.themeDark') },
-    { value: 'system' as const, label: t('general.themeSystem', 'System') },
+    {
+      value: 'light' as const,
+      label: (
+        <span className="inline-flex items-center gap-1.5">
+          <Sun className="w-3.5 h-3.5" />
+          {t('general.themeLight')}
+        </span>
+      ),
+    },
+    {
+      value: 'dark' as const,
+      label: (
+        <span className="inline-flex items-center gap-1.5">
+          <Moon className="w-3.5 h-3.5" />
+          {t('general.themeDark')}
+        </span>
+      ),
+    },
+    {
+      value: 'system' as const,
+      label: (
+        <span className="inline-flex items-center gap-1.5">
+          <Monitor className="w-3.5 h-3.5" />
+          {t('general.themeSystem', 'System')}
+        </span>
+      ),
+    },
   ];
 
+  const zoomOptions = UI_ZOOM_PRESETS.map((preset) => ({
+    value: String(preset.value),
+    label: preset.label,
+  }));
+
   return (
-    <div className="space-y-6">
-      {/* Theme */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">{t('general.appearance')}</h4>
-        <div className="flex gap-2">
-          {themeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => updateSettings({ theme: opt.value })}
-              className={`flex-1 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                settings.theme === opt.value
-                  ? 'border-accent bg-accent/5 text-text-primary'
-                  : 'border-border bg-surface hover:border-accent/50 text-text-secondary'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+    <SettingsPage>
+      <SettingsCard>
+        <SettingsCardHeader title={t('general.appearance')} description={t('general.appearanceDesc')} />
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-text-muted">{t('general.theme')}</p>
+            <SettingsSegmentedControl
+              options={themeOptions}
+              value={settings.theme}
+              onChange={(value) => updateSettings({ theme: value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-text-muted">{t('general.zoom')}</p>
+            <SettingsSegmentedControl
+              options={zoomOptions}
+              value={String(settings.uiZoom)}
+              onChange={(value) => updateSettings({ uiZoom: Number(value) })}
+            />
+            <p className="text-xs leading-5 text-text-muted">{t('general.zoomDesc')}</p>
+          </div>
         </div>
-      </div>
+      </SettingsCard>
 
-      {/* Language */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">{t('general.language')}</h4>
-        <div className="flex gap-2">
-          {languages.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => i18n.changeLanguage(lang.code)}
-              className={`flex-1 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                currentLang === lang.code
-                  ? 'border-accent bg-accent/5 text-text-primary'
-                  : 'border-border bg-surface hover:border-accent/50 text-text-secondary'
-              }`}
-            >
-              {lang.nativeName}
-            </button>
-          ))}
+      <SettingsCard>
+        <SettingsCardHeader title={t('general.language')} />
+        <SettingsOptionList
+          options={languages.map((lang) => ({ value: lang.code, label: lang.label }))}
+          value={currentLang}
+          onChange={(code) => i18n.changeLanguage(code)}
+        />
+      </SettingsCard>
+
+      <SettingsCard>
+        <SettingsCardHeader title={t('general.system')} />
+        <div className="space-y-4">
+          <SettingsToggle
+            label={t('general.alwaysOn')}
+            description={t('general.alwaysOnDesc')}
+            enabled={settings.alwaysOn}
+            onToggle={() => updateSettings({ alwaysOn: !settings.alwaysOn })}
+          />
+          <SettingsToggle
+            label={t('general.launchAtStartup')}
+            description={t('general.launchAtStartupDesc')}
+            enabled={settings.launchAtStartup}
+            onToggle={() => updateSettings({ launchAtStartup: !settings.launchAtStartup })}
+          />
         </div>
-      </div>
+      </SettingsCard>
 
-      {/* About */}
+      <SettingsCard>
+        <SettingsMemory compact />
+      </SettingsCard>
+
+      <SettingsLogs isActive={isActive} />
+
       {appVer && (
-        <div className="pt-4 border-t border-border">
-          <p className="text-xs text-text-muted">Aiden v{appVer} - Pura Digital</p>
-        </div>
+        <p className="text-xs text-text-muted text-center pt-2">Aiden v{appVer} — Pura Digital</p>
       )}
-    </div>
+    </SettingsPage>
   );
 }

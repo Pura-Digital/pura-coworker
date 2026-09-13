@@ -75,6 +75,23 @@ export function getScheduleModeOptions(
   ];
 }
 
+export {
+  SettingsPage,
+  SettingsCard,
+  SettingsCardHeader,
+  SettingsRow,
+  SettingsField,
+  SettingsToggle,
+  SettingsSegmentedControl,
+  SettingsOptionList,
+  SettingsAlert,
+  SettingsSubNav,
+  SettingsDisclosure,
+  SettingsStickyFooter,
+} from './settings-ui';
+
+import { SettingsCard, SettingsCardHeader } from './settings-ui';
+
 // ==================== Shared UI Component ====================
 
 export function SettingsContentSection({
@@ -87,12 +104,9 @@ export function SettingsContentSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3 py-5 border-b border-border-muted">
-      <div className="space-y-1">
-        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
-        {description && <p className="text-xs leading-5 text-text-muted">{description}</p>}
-      </div>
+    <SettingsCard>
+      <SettingsCardHeader title={title} description={description} />
       <div className="space-y-3">{children}</div>
-    </section>
+    </SettingsCard>
   );
 }

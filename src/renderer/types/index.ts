@@ -578,6 +578,9 @@ export type ServerEvent =
 // Settings types
 export interface Settings {
   theme: AppTheme;
+  uiZoom: number;
+  alwaysOn: boolean;
+  launchAtStartup: boolean;
   apiKey?: string;
   defaultTools: string[];
   permissionRules: PermissionRule[];
@@ -684,6 +687,9 @@ export interface AppConfig {
   defaultWorkdir?: string;
   globalSkillsPath?: string;
   theme?: AppTheme;
+  uiZoom?: number;
+  alwaysOn?: boolean;
+  launchAtStartup?: boolean;
   sandboxEnabled?: boolean;
   memoryEnabled?: boolean;
   memoryRuntime?: MemoryRuntimeConfig;

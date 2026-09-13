@@ -29,7 +29,6 @@ import { PathResolver } from '../sandbox/path-resolver';
 import {
   SandboxAdapter,
   getSandboxAdapter,
-  initializeSandbox,
   reinitializeSandbox,
 } from '../sandbox/sandbox-adapter';
 import { SandboxSync } from '../sandbox/sandbox-sync';
@@ -269,6 +268,41 @@ export class SessionManager {
     return [{ virtual: WORKSPACE_MOUNT_VIRTUAL_PATH, real: cwd }];
   }
 
+  private resolveProjectWorkDir(projectId?: string, fallbackCwd?: string): string | undefined {
+    if (!projectId) {
+      return fallbackCwd;
+    }
+    const project = tryGetProjectManager()?.getProject(projectId);
+    return project?.workDir || fallbackCwd;
+  }
+
+  /**
+   * Keep project-linked sessions on the project's current workDir.
+   * Needed when a project is deleted/recreated or its folder changes.
+   */
+  private syncSessionWorkspaceFromProject(session: Session): Session {
+    if (!session.projectId) {
+      return session;
+    }
+    const project = tryGetProjectManager()?.getProject(session.projectId);
+    if (!project?.workDir || project.workDir === session.cwd) {
+      return session;
+    }
+
+    log(
+      '[SessionManager] Syncing session cwd from project workDir:',
+      session.id,
+      '->',
+      project.workDir
+    );
+    this.updateSessionCwd(session.id, project.workDir);
+    return {
+      ...session,
+      cwd: project.workDir,
+      mountedPaths: this.buildMountedPaths(project.workDir),
+    };
+  }
+
   private createSession(
     title: string,
     cwd?: string,
@@ -279,7 +313,7 @@ export class SessionManager {
     const now = Date.now();
     // Prefer frontend-provided cwd; fallback to env vars if provided
     const envCwd = process.env.COWORK_WORKDIR || process.env.WORKDIR || process.env.DEFAULT_CWD;
-    const effectiveCwd = cwd || envCwd;
+    const effectiveCwd = this.resolveProjectWorkDir(projectId, cwd || envCwd);
     const resolvedMemoryEnabled =
       typeof memoryEnabled === 'boolean' ? memoryEnabled : configStore.get('memoryEnabled') !== false;
     return {
@@ -418,7 +452,7 @@ export class SessionManager {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    this.enqueuePrompt(session, prompt, content);
+    this.enqueuePrompt(this.syncSessionWorkspaceFromProject(session), prompt, content);
   }
 
   async generateSessionTitleFromPrompt(prompt: string): Promise<string> {
@@ -445,8 +479,15 @@ export class SessionManager {
    * Ensure sandbox is initialized for the session's workspace
    */
   private async ensureSandboxInitialized(session: Session): Promise<void> {
+    session = this.syncSessionWorkspaceFromProject(session);
+
     if (!session.cwd) {
       log('[SessionManager] No workspace directory, skipping sandbox init');
+      return;
+    }
+
+    if (!fs.existsSync(session.cwd)) {
+      logWarn('[SessionManager] Workspace does not exist, skipping sandbox init:', session.cwd);
       return;
     }
 
@@ -462,11 +503,15 @@ export class SessionManager {
       return;
     }
 
-    // Initialize sandbox with workspace
-    const initPromise = initializeSandbox({
-      workspacePath: session.cwd,
-      mainWindow: null, // Will show dialogs globally
-    }).then(() => {
+    const needsReinitialize =
+      this.sandboxAdapter.initialized &&
+      this.sandboxAdapter.workspacePath !== session.cwd;
+
+    // Initialize sandbox with workspace (reinitialize when switching workspaces)
+    const initPromise = (needsReinitialize
+      ? this.sandboxAdapter.reinitialize({ workspacePath: session.cwd, mainWindow: null })
+      : this.sandboxAdapter.initialize({ workspacePath: session.cwd, mainWindow: null })
+    ).then(() => {
       /* void */
     });
 
@@ -619,6 +664,7 @@ export class SessionManager {
     prompt: string,
     content?: ContentBlock[]
   ): Promise<void> {
+    session = this.syncSessionWorkspaceFromProject(session);
     const traceId = generateTraceId();
     return runWithLogContext({ sessionId: session.id, traceId }, async () => {
       logCtx('[SessionManager] Processing prompt for session:', session.id, 'traceId:', traceId);
@@ -1015,6 +1061,29 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
         this.promptQueues.delete(session.id);
       }
       this.updateSessionStatus(session.id, 'idle');
+
+      // Prompts can be enqueued while processQueue is still winding down (e.g. user
+      // stops then immediately sends again). activeSessions blocked a new processor,
+      // so restart here once the current run has fully exited.
+      const pendingQueue = this.promptQueues.get(session.id);
+      if (pendingQueue && pendingQueue.length > 0) {
+        const latestSession = this.loadSession(session.id);
+        if (latestSession) {
+          log(
+            '[SessionManager] Restarting queue with prompts enqueued during wind-down:',
+            session.id
+          );
+          this.processQueue(latestSession).catch((err) => {
+            logError('[SessionManager] Queue restart error:', err);
+            this.sendToRenderer({
+              type: 'error',
+              payload: {
+                message: `Failed to process message: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            });
+          });
+        }
+      }
 
       // Trigger post-session MEMORY.md update for project sessions
       const completedSession = this.loadSession(session.id);

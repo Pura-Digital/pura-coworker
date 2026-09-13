@@ -24,7 +24,7 @@ describe('SettingsPanel skills plugin browse entry', () => {
   });
 
   it('functional: includes skills storage controls', () => {
-    expect(settingsPanelContent).toContain("t('skills.storagePathTitle')");
+    expect(settingsPanelContent).toContain("t('skills.advancedStorage')");
     expect(settingsPanelContent).toContain("t('skills.selectStoragePath')");
     expect(settingsPanelContent).toContain("t('skills.openStoragePath')");
     expect(settingsPanelContent).toContain("t('skills.refreshSkills')");

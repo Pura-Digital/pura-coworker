@@ -10,9 +10,12 @@ describe('theme settings persistence', () => {
   it('persists theme updates in the main process and applies them to native window state', () => {
     const source = fs.readFileSync(mainIndexPath, 'utf8');
 
-    expect(source).toContain("const DARK_BG = '#171614';");
+    expect(source).toContain("const DARK_BG = '#060b17';");
     expect(source).toContain("const LIGHT_BG = '#f5f3ee';");
-    expect(source).toContain("configStore.update({ theme: nextTheme });");
+    expect(source).toContain('updates.theme = nextTheme;');
+    expect(source).toContain('toElectronZoomFactor');
+    expect(source).toContain('mainWindow.webContents.setZoomFactor(factor);');
+    expect(source).toContain('configStore.update(updates);');
     expect(source).toContain('nativeTheme.themeSource = theme;');
     expect(source).toContain('mainWindow.setBackgroundColor(');
     expect(source).toContain("getSavedThemePreference() === 'system'");
@@ -24,7 +27,10 @@ describe('theme settings persistence', () => {
     const source = fs.readFileSync(useIPCPath, 'utf8');
 
     expect(source).toContain('const applyConfigSnapshot = (config: AppConfig, isConfigured: boolean) => {');
-    expect(source).toContain("store.setSettings({ theme: config.theme || 'light' });");
+    expect(source).toContain("theme: config.theme || 'light'");
+    expect(source).toContain('uiZoom: config.uiZoom ?? 1');
+    expect(source).toContain('alwaysOn: config.alwaysOn ?? false');
+    expect(source).toContain('launchAtStartup: config.launchAtStartup ?? false');
     expect(source).toContain('window.electronAPI.config.get()');
     expect(source).toContain('window.electronAPI.getSystemTheme()');
   });

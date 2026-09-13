@@ -43,6 +43,12 @@ import { WSLBridge } from './sandbox/wsl-bridge';
 import { LimaBridge } from './sandbox/lima-bridge';
 import { getSandboxBootstrap } from './sandbox/sandbox-bootstrap';
 import { autoUpdaterManager } from './update/auto-updater-manager';
+import {
+  handleSessionStatusChange,
+  resetPowerSaveState,
+  setAlwaysOnEnabled,
+} from './utils/power-save-manager';
+import { normalizeDisplayScale, toElectronZoomFactor } from '../shared/ui-zoom';
 import type { MCPServerConfig } from './mcp/mcp-manager';
 import type {
   ClientEvent,
@@ -240,7 +246,7 @@ if (!hasSingleInstanceLock) {
 
 // Tray instance (kept alive to prevent GC)
 let tray: Tray | null = null;
-const DARK_BG = '#171614';
+const DARK_BG = '#060b17';
 const LIGHT_BG = '#f5f3ee';
 
 function createUpdateMenuItem(): Electron.MenuItemConstructorOptions {
@@ -455,6 +461,32 @@ function applyNativeThemePreference(theme: AppTheme): void {
   nativeTheme.themeSource = theme;
 }
 
+function applyLaunchAtStartup(enabled: boolean): void {
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    openAsHidden: false,
+  });
+}
+
+function getConfiguredDisplayScale(): number {
+  return normalizeDisplayScale(configStore.get('uiZoom'), 1);
+}
+
+function applyConfiguredUiZoom(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  const factor = toElectronZoomFactor(getConfiguredDisplayScale());
+  mainWindow.webContents.setZoomFactor(factor);
+}
+
+function applyUiZoom(displayScale: number): void {
+  const normalized = normalizeDisplayScale(displayScale, 1);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.setZoomFactor(toElectronZoomFactor(normalized));
+  }
+}
+
 function createWindow() {
   const savedTheme = getSavedThemePreference();
   applyNativeThemePreference(savedTheme);
@@ -619,7 +651,12 @@ function createWindow() {
   mainWindow.on('leave-full-screen', pushWindowChromeState);
 
   // Notify renderer about config status after window is ready
+  mainWindow.webContents.on('dom-ready', () => {
+    applyConfiguredUiZoom();
+  });
+
   mainWindow.webContents.on('did-finish-load', () => {
+    applyConfiguredUiZoom();
     const isConfigured = configStore.isConfigured();
     log('[Config] Notifying renderer, isConfigured:', isConfigured);
     sendToRenderer({
@@ -864,6 +901,10 @@ function sendToRenderer(event: ServerEvent) {
     }
   }
 
+  if (event.type === 'session.status' && payload?.status) {
+    handleSessionStatusChange(payload.status as string);
+  }
+
   // Deliver to local UI
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('server-event', event);
@@ -894,6 +935,8 @@ app
     // Apply dev logs setting from config
     const enableDevLogs = configStore.get('enableDevLogs');
     setDevLogsEnabled(enableDevLogs);
+    setAlwaysOnEnabled(configStore.get('alwaysOn') === true);
+    applyLaunchAtStartup(configStore.get('launchAtStartup') === true);
 
     // Log environment variables for debugging
     log('=== Aiden Starting ===');
@@ -1212,6 +1255,7 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
 
 // Handle app quit - before-quit (for macOS Cmd+Q and other quit methods)
 app.on('before-quit', async (event) => {
+  resetPowerSaveState();
   if (!isCleaningUp) {
     // In dev mode, exit quickly — no need for async sandbox cleanup
     if (process.env.VITE_DEV_SERVER_URL) {
@@ -3042,19 +3086,41 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       return { success: false, path: '', error: 'User cancelled' };
     }
 
-    case 'settings.update':
+    case 'settings.update': {
+      const updates: Partial<AppConfig> = {};
+
       if (
         event.payload.theme === 'dark' ||
         event.payload.theme === 'light' ||
         event.payload.theme === 'system'
       ) {
         const nextTheme = event.payload.theme as AppTheme;
-        configStore.update({ theme: nextTheme });
+        updates.theme = nextTheme;
         applyNativeThemePreference(nextTheme);
         if (mainWindow && !mainWindow.isDestroyed()) {
           const effectiveTheme = resolveEffectiveTheme(nextTheme);
           mainWindow.setBackgroundColor(effectiveTheme === 'dark' ? DARK_BG : LIGHT_BG);
         }
+      }
+
+      if (typeof event.payload.alwaysOn === 'boolean') {
+        updates.alwaysOn = event.payload.alwaysOn;
+        setAlwaysOnEnabled(event.payload.alwaysOn);
+      }
+
+      if (typeof event.payload.launchAtStartup === 'boolean') {
+        updates.launchAtStartup = event.payload.launchAtStartup;
+        applyLaunchAtStartup(event.payload.launchAtStartup);
+      }
+
+      if (event.payload.uiZoom !== undefined) {
+        const nextZoom = normalizeDisplayScale(event.payload.uiZoom, 1);
+        updates.uiZoom = nextZoom;
+        applyUiZoom(nextZoom);
+      }
+
+      if (Object.keys(updates).length > 0) {
+        configStore.update(updates);
         sendToRenderer({
           type: 'config.status',
           payload: {
@@ -3064,6 +3130,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         });
       }
       return null;
+    }
 
     default:
       logWarn('Unknown event type:', event);

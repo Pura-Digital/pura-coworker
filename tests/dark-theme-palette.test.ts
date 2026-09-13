@@ -5,11 +5,11 @@ import path from 'node:path';
 const stylesPath = path.resolve(process.cwd(), 'src/renderer/styles/globals.css');
 
 describe('dark theme palette', () => {
-  it('uses the Aiden deep-blue palette for the default theme', () => {
+  it('uses a near-black cool palette for the default theme', () => {
     const source = fs.readFileSync(stylesPath, 'utf8');
-    expect(source).toContain('Aiden deep-blue palette');
-    expect(source).toContain('--color-background: #071427;');
-    expect(source).toContain('--color-surface: #122742;');
+    expect(source).toContain('deep blue-black');
+    expect(source).toContain('--color-background: #060b17;');
+    expect(source).toContain('--color-surface: #0f1729;');
     expect(source).toContain('--color-text-primary: #eaf2ff;');
   });
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, CheckCircle, ChevronDown, Plus, X, Check } from 'lucide-react';
+import { ChevronDown, Plus, X, Check } from 'lucide-react';
 import type {
   ScheduleConfig,
   ScheduleTask,
@@ -12,7 +12,18 @@ import type {
 } from '../../types';
 import { useAppStore } from '../../store';
 import { formatAppDateTime, joinAppList } from '../../utils/i18n-format';
-import { renderLocalizedBannerMessage, getWeekdayOptions, getScheduleModeOptions } from './shared';
+import {
+  renderLocalizedBannerMessage,
+  getWeekdayOptions,
+  getScheduleModeOptions,
+  SettingsPage,
+  SettingsCard,
+  SettingsCardHeader,
+  SettingsAlert,
+  SettingsToggle,
+  SettingsDisclosure,
+  SettingsSegmentedControl,
+} from './shared';
 import type { LocalizedBanner, ScheduleFormMode } from './shared';
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
@@ -354,24 +365,17 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
   }
 
   return (
-    <div className="space-y-4">
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {renderLocalizedBannerMessage(error, t)}
-        </div>
-      )}
+    <SettingsPage>
+      {error && <SettingsAlert variant="error">{renderLocalizedBannerMessage(error, t)}</SettingsAlert>}
       {success && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-success/10 text-success text-sm">
-          <CheckCircle className="w-4 h-4 flex-shrink-0" />
-          {renderLocalizedBannerMessage(success, t)}
-        </div>
+        <SettingsAlert variant="success">{renderLocalizedBannerMessage(success, t)}</SettingsAlert>
       )}
 
-      <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {editingId ? t('schedule.editTitle') : t('schedule.createTitle')}
-        </h4>
+      <SettingsCard>
+        <SettingsCardHeader
+          title={editingId ? t('schedule.editTitle') : t('schedule.sectionCreate')}
+          description={editingId ? t('schedule.editTitle') : t('schedule.createTitle')}
+        />
         <div className="rounded-lg border border-border bg-background px-3 py-2">
           <div className="text-xs text-text-muted mb-1">{t('schedule.autoTitleLabel')}</div>
           <div className="text-sm text-text-primary break-all">{previewTitle}</div>
@@ -388,40 +392,29 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={t('schedule.promptPlaceholder')}
           rows={3}
-          className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm"
+          className="input text-sm min-h-[5rem]"
         />
         <input
           value={cwd}
           onChange={(e) => setCwd(e.target.value)}
           placeholder={t('schedule.cwdPlaceholder')}
-          className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm"
+          className="input text-sm"
         />
-        <div className="rounded-lg border border-border bg-background p-3 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-medium text-text-primary">
-                {t('schedule.executionTime')}
-              </div>
-              <div className="text-xs text-text-muted">{t('schedule.executionTimeHint')}</div>
-            </div>
-            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm text-text-secondary">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-              />
-              {t('schedule.enabled')}
-            </label>
-          </div>
+        <div className="space-y-4 pt-2 border-t border-border-subtle">
+          <SettingsToggle
+            label={t('schedule.enabled')}
+            description={t('schedule.executionTimeHint')}
+            enabled={enabled}
+            onToggle={() => setEnabled(!enabled)}
+          />
+          <SettingsSegmentedControl
+            options={scheduleModeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+            value={scheduleMode}
+            onChange={(value) => setScheduleMode(value as ScheduleFormMode)}
+          />
           <div
-            className={`grid gap-2 ${scheduleMode === 'weekly' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
+            className={`grid gap-2 ${scheduleMode === 'weekly' ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}
           >
-            <ScheduleSelectMenu
-              label={t('schedule.mode')}
-              options={scheduleModeOptions}
-              value={scheduleMode}
-              onChange={(value) => setScheduleMode(value as ScheduleFormMode)}
-            />
             {scheduleMode === 'weekly' && (
               <ScheduleSelectMenu
                 label={t('schedule.weekday')}
@@ -448,9 +441,7 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
             )}
           </div>
           {scheduleMode === 'legacy-interval' && (
-            <div className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-              {t('schedule.legacyIntervalNotice')}
-            </div>
+            <SettingsAlert variant="warning">{t('schedule.legacyIntervalNotice')}</SettingsAlert>
           )}
           {(scheduleMode === 'once' || scheduleMode === 'legacy-interval') && (
             <div className="space-y-2">
@@ -493,30 +484,22 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
           {scheduleMode === 'weekly' && (
             <div className="text-xs text-text-muted">{t('schedule.weeklyHint')}</div>
           )}
-          <div className="text-xs text-text-muted">{schedulePreview}</div>
+          <p className="text-xs text-text-muted rounded-lg bg-surface-muted/50 px-3 py-2">{schedulePreview}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={submitTask}
-            disabled={isLoading}
-            className="px-3 py-2 rounded-lg bg-accent text-white text-sm disabled:opacity-50"
-          >
+        <div className="flex items-center gap-2 pt-2">
+          <button onClick={submitTask} disabled={isLoading} className="btn btn-primary text-sm">
             {editingId ? t('schedule.saveChanges') : t('schedule.createTask')}
           </button>
           {editingId && (
-            <button
-              onClick={clearForm}
-              disabled={isLoading}
-              className="px-3 py-2 rounded-lg bg-surface-hover text-text-secondary text-sm disabled:opacity-50"
-            >
+            <button onClick={clearForm} disabled={isLoading} className="btn btn-secondary text-sm">
               {t('schedule.cancelEdit')}
             </button>
           )}
         </div>
-      </div>
+      </SettingsCard>
 
-      <div className="space-y-2">
-        <div className="text-xs text-text-muted">{t('schedule.listHint')}</div>
+      <SettingsCard>
+        <SettingsCardHeader title={t('schedule.sectionTasks')} description={t('schedule.listHint')} />
         {tasks.length === 0 ? (
           <div className="text-sm text-text-muted text-center py-6 border border-dashed border-border rounded-lg">
             {t('schedule.empty')}
@@ -551,38 +534,42 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
                         {task.enabled ? t('schedule.taskEnabled') : t('schedule.taskDisabled')}
                       </span>
                     </div>
-                    <div className="text-xs text-text-muted">
+                    <p className="text-xs text-text-muted">
                       {task.nextRunAt === null
                         ? t('schedule.nextRunNone')
                         : t('schedule.nextRun', { value: formatTime(task.nextRunAt) })}
-                    </div>
-                    <div className="text-xs text-text-muted">
-                      {t('schedule.strategy', {
-                        value: formatScheduleRule(task, t, weekdayOptions),
-                      })}
-                    </div>
-                    <div className="text-xs text-text-muted">
-                      {task.lastRunAt === null
-                        ? t('schedule.lastRunNever')
-                        : t('schedule.lastRun', { value: formatTime(task.lastRunAt) })}
-                    </div>
-                    {task.lastRunSessionId && (
-                      <div className="text-xs text-text-muted break-all">
-                        {t('schedule.recentSession', { value: task.lastRunSessionId })}
+                      {' · '}
+                      {formatScheduleRule(task, t, weekdayOptions)}
+                    </p>
+                    <SettingsDisclosure title={t('schedule.showDetails')}>
+                      <div className="space-y-1 text-xs text-text-muted">
+                        <p>
+                          {t('schedule.strategy', {
+                            value: formatScheduleRule(task, t, weekdayOptions),
+                          })}
+                        </p>
+                        <p>
+                          {task.lastRunAt === null
+                            ? t('schedule.lastRunNever')
+                            : t('schedule.lastRun', { value: formatTime(task.lastRunAt) })}
+                        </p>
+                        {task.lastRunSessionId && (
+                          <p className="break-all">
+                            {t('schedule.recentSession', { value: task.lastRunSessionId })}
+                          </p>
+                        )}
+                        <p>{t('schedule.sessionStatus', { value: lastRunStatusLabel })}</p>
+                        <p className="truncate" title={task.cwd}>
+                          {t('schedule.cwd', { value: task.cwd })}
+                        </p>
+                        {task.lastError && (
+                          <p className="text-error break-all">
+                            {t('schedule.lastError', { value: task.lastError })}
+                          </p>
+                        )}
                       </div>
-                    )}
-                    <div className="text-xs text-text-muted">
-                      {t('schedule.sessionStatus', { value: lastRunStatusLabel })}
-                    </div>
-                    <div className="text-xs text-text-muted truncate" title={task.cwd}>
-                      {t('schedule.cwd', { value: task.cwd })}
-                    </div>
-                    {task.lastError && (
-                      <div className="text-xs text-error break-all">
-                        {t('schedule.lastError', { value: task.lastError })}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    </SettingsDisclosure>
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
                       <button
                         onClick={() => toggleTask(task)}
                         disabled={isLoading}
@@ -634,8 +621,8 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
             </div>
           ))
         )}
-      </div>
-    </div>
+      </SettingsCard>
+    </SettingsPage>
   );
 }
 

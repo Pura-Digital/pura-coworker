@@ -21,12 +21,15 @@ const EXEC_TIMEOUT_MS = 3000;
 const VALID_TABS = new Set([
   'api',
   'sandbox',
-  'connectors',
-  'skills',
+  'customize',
   'schedule',
   'remote',
-  'logs',
   'general',
+  // Legacy tab aliases
+  'connectors',
+  'skills',
+  'memory',
+  'logs',
 ]);
 
 let server: http.Server | null = null;
