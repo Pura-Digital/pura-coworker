@@ -248,6 +248,7 @@
     "refreshModels": "刷新模型",
     "refreshingModels": "刷新中...",
     "refreshModelsFailed": "刷新模型失败，请检查 URL 或服务状态",
+    "noModelsDiscovered": "端点未返回任何模型，请手动输入模型 ID。",
     "manualModel": "手动输入",
     "useDetectedModels": "使用探测列表",
     "discoverLocalOllama": "发现本地 Ollama",

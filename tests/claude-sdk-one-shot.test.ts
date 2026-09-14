@@ -511,6 +511,27 @@ describe('probeWithClaudeSdk', () => {
     expect(result.errorType).toBe('unauthorized');
   });
 
+  it('formats Gemini 404 provider payloads as model-not-found errors', async () => {
+    mocks.completeSimple.mockResolvedValue({
+      content: [],
+      stopReason: 'error',
+      errorMessage: '{"error":{"message":"","code":404,"status":"Not Found"}}',
+    });
+
+    const result = await probeWithClaudeSdk(
+      { provider: 'gemini', apiKey: 'AIza-test', model: 'gemini-3.8-flash' },
+      createConfig({
+        provider: 'custom',
+        customProtocol: 'gemini',
+        apiKey: 'AIza-test',
+        model: 'gemini-3.8-flash',
+      })
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain('Model not found (HTTP 404)');
+  });
+
   it('falls back to generic unknown error for unrecognized provider error', async () => {
     mocks.completeSimple.mockResolvedValue({
       content: [],

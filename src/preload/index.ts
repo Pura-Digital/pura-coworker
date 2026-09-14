@@ -187,6 +187,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       provider: AppConfig['provider'];
       apiKey: string;
       baseUrl?: string;
+      customProtocol?: AppConfig['customProtocol'];
     }): Promise<ProviderModelInfo[]> => ipcRenderer.invoke('config.listModels', payload),
     listOpenAICompatibleModels: (payload: {
       baseUrl: string;
@@ -541,6 +542,7 @@ declare global {
           provider: AppConfig['provider'];
           apiKey: string;
           baseUrl?: string;
+          customProtocol?: AppConfig['customProtocol'];
         }) => Promise<ProviderModelInfo[]>;
         listOpenAICompatibleModels: (payload: {
           baseUrl: string;

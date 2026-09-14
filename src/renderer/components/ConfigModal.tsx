@@ -105,6 +105,7 @@ export function ConfigModal({
     refreshModelOptions,
     discoverLocalOllama,
     shouldShowOllamaManualModelToggle,
+    supportsModelDiscovery,
   } = useApiConfigState({
     enabled: isOpen,
     initialConfig,
@@ -253,24 +254,6 @@ export function ConfigModal({
             </div>
           </div>
 
-          {/* API Key */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
-              <Key className="w-4 h-4" />
-              {t('api.apiKey')}
-            </label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
-              className="w-full px-4 py-3 rounded-xl bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
-            />
-            {currentPreset?.keyHint && (
-              <p className="text-xs text-text-muted">{currentPreset.keyHint}</p>
-            )}
-          </div>
-
           {/* Custom Protocol */}
           {provider === 'custom' && !isPuraMode && (
             <div className="space-y-2">
@@ -360,6 +343,24 @@ export function ConfigModal({
             </div>
           )}
 
+          {/* API Key */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+              <Key className="w-4 h-4" />
+              {t('api.apiKey')}
+            </label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
+              className="w-full px-4 py-3 rounded-xl bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
+            />
+            {currentPreset?.keyHint && (
+              <p className="text-xs text-text-muted">{currentPreset.keyHint}</p>
+            )}
+          </div>
+
           {/* Model Selection */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -368,7 +369,7 @@ export function ConfigModal({
                 {t('api.model')}
               </label>
               <div className="flex items-center gap-2">
-                {isOllamaMode && (
+                {supportsModelDiscovery && (
                   <button
                     type="button"
                     onClick={() => {

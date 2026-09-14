@@ -198,9 +198,7 @@ describe('api config state helpers', () => {
     const snapshot = buildApiConfigSnapshot(config, FALLBACK_PROVIDER_PRESETS);
     expect(snapshot.profiles.openai.apiKey).toBe('sk-openai');
     expect(snapshot.profiles.openrouter.baseUrl).toBe(FALLBACK_PROVIDER_PRESETS.openrouter.baseUrl);
-    expect(snapshot.profiles['custom:anthropic'].model).toBe(
-      FALLBACK_PROVIDER_PRESETS.custom.models[0]?.id
-    );
+    expect(snapshot.profiles['custom:anthropic'].model).toBe('');
     expect(snapshot.profiles['custom:anthropic'].useCustomModel).toBe(true);
     expect(snapshot.profiles['custom:anthropic'].customModel).toBe('');
   });
@@ -278,38 +276,22 @@ describe('api config state helpers', () => {
 
     const snapshot = buildApiConfigSnapshot(config, FALLBACK_PROVIDER_PRESETS);
     expect(snapshot.profiles['custom:openai'].useCustomModel).toBe(true);
-    expect(snapshot.profiles['custom:openai'].customModel).toBe('');
+    expect(snapshot.profiles['custom:openai'].customModel).toBe('gpt-5.4');
     expect(snapshot.profiles['custom:openai'].model).toBe('gpt-5.4');
   });
 
-  it('exposes updated preset lists and custom guidance', () => {
-    expect(FALLBACK_PROVIDER_PRESETS.openai.models.map((item) => item.id)).toContain('gpt-5.4');
-    expect(FALLBACK_PROVIDER_PRESETS.openai.models.map((item) => item.id)).toContain(
-      'gpt-5.3-codex'
-    );
-    expect(FALLBACK_PROVIDER_PRESETS.openai.models.map((item) => item.id)).not.toContain('gpt-5.2');
-    expect(FALLBACK_PROVIDER_PRESETS.anthropic.models.map((item) => item.id)).toContain(
-      'claude-sonnet-4-6'
-    );
-    expect(FALLBACK_PROVIDER_PRESETS.gemini.models.map((item) => item.id)).toContain(
-      'gemini-3.1-pro-preview'
-    );
-    expect(FALLBACK_PROVIDER_PRESETS.custom.models.map((item) => item.id)).toContain(
-      'kimi-k2-thinking'
-    );
-    expect(FALLBACK_PROVIDER_PRESETS.custom.models.map((item) => item.id)).toContain('glm-5');
-    expect(FALLBACK_PROVIDER_PRESETS.custom.models.map((item) => item.id)).toContain(
-      'MiniMax-M2.5'
-    );
-    expect(FALLBACK_PROVIDER_PRESETS.custom.models.map((item) => item.id)).toContain(
-      'grok-code-fast-1'
-    );
-    expect(FALLBACK_PROVIDER_PRESETS.custom.models.map((item) => item.id)).toContain(
-      'mistral-large-latest'
-    );
+  it('keeps provider presets metadata-only and exposes custom guidance', () => {
+    for (const [key, preset] of Object.entries(FALLBACK_PROVIDER_PRESETS)) {
+      expect(preset.models).toEqual([]);
+      if (key !== 'custom') {
+        expect(preset.baseUrl).toBeTruthy();
+      }
+      expect(preset.keyPlaceholder).toBeTruthy();
+    }
 
     expect(getModelInputGuidance('custom', 'openai').placeholder).toContain('deepseek-chat');
     expect(getModelInputGuidance('custom', 'openai').placeholder).not.toContain('kimi');
+    expect(getModelInputGuidance('custom', 'gemini').placeholder).toContain('gemini-2.0-flash');
     expect(getModelInputGuidance('custom', 'openai').hint).toContain(
       'selected protocol or endpoint'
     );

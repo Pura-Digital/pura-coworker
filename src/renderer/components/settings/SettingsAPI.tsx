@@ -103,6 +103,7 @@ export function SettingsAPI() {
     handleDiagnose,
     handleDeepDiagnose,
     shouldShowOllamaManualModelToggle,
+    supportsModelDiscovery,
   } = useApiConfigState();
 
   if (isLoadingConfig) {
@@ -179,22 +180,6 @@ export function SettingsAPI() {
 
       <SettingsCard>
         <SettingsCardHeader title={t('api.sectionConnection')} icon={Key} />
-        <SettingsField label={t('api.apiKey')} description={t('api.apiKeyDescription')}>
-          <input
-            id="api-key-input"
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
-            className="input"
-          />
-          {(isPuraMode ? 'platform.puradigital.it' : currentPreset?.keyHint) && (
-            <p className="text-xs text-text-muted mt-1">
-              {isPuraMode ? 'platform.puradigital.it' : currentPreset?.keyHint}
-            </p>
-          )}
-        </SettingsField>
-
         {provider === 'custom' && !isPuraMode && (
           <SettingsField label={t('api.protocol')} description={t('api.selectProtocol')}>
             <SettingsSegmentedControl
@@ -259,6 +244,22 @@ export function SettingsAPI() {
             )}
           </SettingsField>
         )}
+
+        <SettingsField label={t('api.apiKey')} description={t('api.apiKeyDescription')}>
+          <input
+            id="api-key-input"
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
+            className="input"
+          />
+          {(isPuraMode ? 'platform.puradigital.it' : currentPreset?.keyHint) && (
+            <p className="text-xs text-text-muted mt-1">
+              {isPuraMode ? 'platform.puradigital.it' : currentPreset?.keyHint}
+            </p>
+          )}
+        </SettingsField>
       </SettingsCard>
 
       <SettingsCard>
@@ -267,7 +268,7 @@ export function SettingsAPI() {
           icon={Cpu}
           action={
             <div className="flex items-center gap-1 flex-wrap justify-end">
-            {isOllamaMode && (
+            {supportsModelDiscovery && (
               <button
                 type="button"
                 onClick={() => {

@@ -48,6 +48,16 @@ vi.mock('@anthropic-ai/sdk', () => ({
   Anthropic: vi.fn(),
 }));
 
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: vi.fn().mockImplementation(function GoogleGenAI() {
+    return {
+      models: {
+        get: vi.fn().mockResolvedValue({ name: 'models/gemini-2.0-flash' }),
+      },
+    };
+  }),
+}));
+
 vi.mock('../src/main/config/config-store', () => ({
   PROVIDER_PRESETS: {
     openai: { baseUrl: 'https://api.openai.com/v1' },
@@ -80,12 +90,14 @@ vi.mock('../src/main/utils/logger', () => ({
 }));
 
 import { discoverLocalOllama, runDiagnostics } from '../src/main/config/api-diagnostics';
+import { resetGeminiModelCache } from '../src/main/config/gemini-models';
 import { resetOllamaModelIndexCache } from '../src/main/config/ollama-api';
 
 describe('runDiagnostics TLS step', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
+    resetGeminiModelCache();
     resetOllamaModelIndexCache();
     mocks.dnsLookup.mockReset();
     mocks.tcpConnect.mockReset();
@@ -242,6 +254,42 @@ describe('runDiagnostics TLS step', () => {
       }),
       expect.any(Object)
     );
+  });
+
+  it('fast Gemini diagnostics validate the model against the provider catalog without live inference', async () => {
+    mocks.fetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          models: [
+            {
+              name: 'models/gemini-2.0-flash',
+              displayName: 'Gemini 2.0 Flash',
+              supportedGenerationMethods: ['generateContent'],
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const result = await runDiagnostics({
+      provider: 'custom',
+      customProtocol: 'gemini',
+      apiKey: 'AIza-test',
+      baseUrl: 'https://generativelanguage.googleapis.com',
+      model: 'gemini-3.8-flash',
+      verificationLevel: 'fast',
+    });
+
+    expect(result.overallOk).toBe(false);
+    expect(result.failedAt).toBe('model');
+    expect(mocks.probeWithClaudeSdk).not.toHaveBeenCalled();
+    const modelStep = result.steps.find((step) => step.name === 'model');
+    expect(modelStep?.error).toContain('gemini-3.8-flash');
+    expect(modelStep?.fix).toBe('ollama_model_not_listed:gemini-3.8-flash');
   });
 
   it('model step reports failure from probeWithClaudeSdk', async () => {

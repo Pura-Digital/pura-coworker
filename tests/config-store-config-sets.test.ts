@@ -171,7 +171,7 @@ describe('ConfigStore config sets', () => {
     expect(blankSet?.provider).toBe('gemini');
     expect(blankSet?.profiles.gemini?.apiKey).toBe('');
     expect(blankSet?.profiles.gemini?.baseUrl).toBe('https://generativelanguage.googleapis.com');
-    expect(blankSet?.profiles.gemini?.model).toBe('gemini-2.5-flash');
+    expect(blankSet?.profiles.gemini?.model).toBe('');
   });
 
   it('persists theme preference across config mutations', () => {

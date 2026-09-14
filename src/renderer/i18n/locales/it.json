@@ -248,6 +248,7 @@
     "refreshModels": "Aggiorna modelli",
     "refreshingModels": "Refreshing...",
     "refreshModelsFailed": "Impossibile aggiornare i modelli. Controlla l'URL o lo stato del servizio.",
+    "noModelsDiscovered": "L'endpoint non ha restituito modelli. Inserisci l'ID del modello manualmente.",
     "manualModel": "Modello manuale",
     "useDetectedModels": "Utilizza modelli rilevati",
     "discoverLocalOllama": "Trova Ollama locale",

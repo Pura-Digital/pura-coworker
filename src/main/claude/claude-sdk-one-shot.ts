@@ -136,8 +136,42 @@ function buildProbeConfig(input: ApiTestInput, config: AppConfig): AppConfig {
   };
 }
 
+function formatProviderErrorMessage(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return 'Provider returned an error';
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      error?: { message?: string; code?: number; status?: string };
+      message?: string;
+      code?: number;
+      status?: string;
+    };
+    const nested = parsed.error;
+    const code = nested?.code ?? parsed.code;
+    const status = nested?.status ?? parsed.status;
+    const message = nested?.message ?? parsed.message;
+
+    if (code === 404 || status === 'Not Found') {
+      return message?.trim()
+        ? `Model not found (HTTP 404): ${message.trim()}`
+        : 'Model not found (HTTP 404). Verify the model ID against your provider catalog.';
+    }
+
+    if (message?.trim()) {
+      return message.trim();
+    }
+  } catch {
+    // Keep the raw provider payload when it is not JSON.
+  }
+
+  return trimmed;
+}
+
 function mapPiAiError(errorText: string, durationMs: number, provider?: string): ApiTestResult {
-  const details = errorText.trim();
+  const details = formatProviderErrorMessage(errorText);
   const lowered = details.toLowerCase();
 
   if (AUTH_ERROR_RE.test(lowered)) {

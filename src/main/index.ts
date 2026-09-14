@@ -33,9 +33,9 @@ import {
   type CreateConfigSetPayload,
 } from './config/config-store';
 import { runConfigApiTest } from './config/config-test-routing';
-import { listOllamaModels } from './config/ollama-api';
 import { listOpenAICompatibleModels } from './config/openai-compat-models';
 import { listPuraDigitalModels } from './config/pura-digital-models';
+import { listProviderModels } from './config/provider-models';
 import { mcpConfigStore } from './mcp/mcp-config-store';
 import { getSandboxAdapter, shutdownSandbox } from './sandbox/sandbox-adapter';
 import { SandboxSync } from './sandbox/sandbox-sync';
@@ -1764,12 +1764,19 @@ ipcMain.handle(
   'config.listModels',
   async (
     _event,
-    payload: { provider: AppConfig['provider']; apiKey: string; baseUrl?: string }
-  ): Promise<ProviderModelInfo[]> => {
-    if (payload.provider !== 'ollama') {
-      return [];
+    payload: {
+      provider: AppConfig['provider'];
+      apiKey: string;
+      baseUrl?: string;
+      customProtocol?: AppConfig['customProtocol'];
     }
-    return listOllamaModels(payload);
+  ): Promise<ProviderModelInfo[]> => {
+    try {
+      return await listProviderModels(payload);
+    } catch (error) {
+      logError('[Config] listModels failed:', error);
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   }
 );
 

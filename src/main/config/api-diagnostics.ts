@@ -33,6 +33,8 @@ import type {
 import { log, logWarn } from '../utils/logger';
 import { probeWithClaudeSdk } from '../claude/claude-sdk-one-shot';
 import { fetchOllamaModelIndex } from './ollama-api';
+import { listGeminiModels } from './gemini-models';
+import type { ProviderModelInfo } from '../../renderer/types';
 
 const STEP_NAMES: DiagnosticStepName[] = ['dns', 'tcp', 'tls', 'auth', 'model'];
 const TCP_TIMEOUT_MS = 5000;
@@ -455,6 +457,33 @@ async function stepAuth(input: DiagnosticInput, step: DiagnosticStep): Promise<v
   step.latencyMs = Date.now() - start;
 }
 
+function applyListedModelFastCheck(
+  step: DiagnosticStep,
+  models: ProviderModelInfo[],
+  modelId: string,
+  start: number
+): boolean {
+  if (!models.length) {
+    step.status = 'fail';
+    step.error = 'No models returned by endpoint';
+    step.fix = 'ollama_no_models_loaded';
+    step.latencyMs = Date.now() - start;
+    return false;
+  }
+
+  if (!models.some((item) => item.id === modelId)) {
+    step.status = 'fail';
+    step.error = `Model ${modelId} is not in the endpoint model list`;
+    step.fix = `ollama_model_not_listed:${modelId}`;
+    step.latencyMs = Date.now() - start;
+    return false;
+  }
+
+  step.status = 'ok';
+  step.latencyMs = Date.now() - start;
+  return true;
+}
+
 async function stepModel(input: DiagnosticInput, step: DiagnosticStep): Promise<void> {
   if (!input.model) {
     step.status = 'skip';
@@ -465,32 +494,23 @@ async function stepModel(input: DiagnosticInput, step: DiagnosticStep): Promise<
   const start = Date.now();
   try {
     const verificationLevel: DiagnosticVerificationLevel = input.verificationLevel ?? 'deep';
+    const modelId = input.model.trim();
+
     if (input.provider === 'ollama' && verificationLevel === 'fast') {
       const result = await fetchOllamaModelIndex({
         baseUrl: input.baseUrl,
         apiKey: input.apiKey,
       });
-      const modelId = input.model.trim();
-      const exists = result.models.some((item) => item.id === modelId);
+      applyListedModelFastCheck(step, result.models, modelId, start);
+      return;
+    }
 
-      if (!result.models.length) {
-        step.status = 'fail';
-        step.error = 'No models returned by endpoint';
-        step.fix = 'ollama_no_models_loaded';
-        step.latencyMs = Date.now() - start;
-        return;
-      }
-
-      if (!exists) {
-        step.status = 'fail';
-        step.error = `Model ${modelId} is not in the endpoint model list`;
-        step.fix = `ollama_model_not_listed:${modelId}`;
-        step.latencyMs = Date.now() - start;
-        return;
-      }
-
-      step.status = 'ok';
-      step.latencyMs = Date.now() - start;
+    if (isGeminiProtocol(input) && verificationLevel === 'fast') {
+      const models = await listGeminiModels({
+        apiKey: input.apiKey,
+        baseUrl: input.baseUrl,
+      });
+      applyListedModelFastCheck(step, models, modelId, start);
       return;
     }
 
@@ -631,7 +651,11 @@ async function runDiagnosticsImpl(input: DiagnosticInput): Promise<DiagnosticRes
     verificationLevel,
   };
 
-  if (overallOk && input.provider === 'ollama' && verificationLevel === 'fast') {
+  if (
+    overallOk &&
+    (input.provider === 'ollama' || isGeminiProtocol(input)) &&
+    verificationLevel === 'fast'
+  ) {
     result.advisoryCode = 'not_deep_verified';
     result.advisoryText =
       'Endpoint is reachable and the selected model is listed, but no live inference was performed.';

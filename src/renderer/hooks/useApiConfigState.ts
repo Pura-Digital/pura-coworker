@@ -17,6 +17,10 @@ import { isLoopbackBaseUrl } from '../../shared/network/loopback';
 import { DEFAULT_OLLAMA_BASE_URL, normalizeOllamaBaseUrl } from '../../shared/ollama-base-url';
 import { API_PROVIDER_PRESETS, getModelInputGuidance } from '../../shared/api-model-presets';
 import {
+  OFFICIAL_CUSTOM_OPENAI_BASE_URL,
+  normalizeLegacyCustomProfileDefaults,
+} from '../../shared/custom-profile-defaults';
+import {
   PURA_DIGITAL_BASE_URL,
   isPuraDigitalActive,
   isPuraDigitalBaseUrl,
@@ -103,7 +107,7 @@ function isCustomProtocol(value: unknown): value is CustomProtocolType {
 
 export function profileKeyFromProvider(
   provider: ProviderType,
-  customProtocol: CustomProtocolType = 'anthropic'
+  customProtocol: CustomProtocolType = 'openai'
 ): ProviderProfileKey {
   if (provider !== 'custom') {
     return provider;
@@ -175,7 +179,7 @@ function modelPresetForProfile(profileKey: ProviderProfileKey, presets: Provider
     return presets.gemini;
   }
   if (profileKey === 'custom:anthropic') {
-    return presets.custom;
+    return presets.anthropic;
   }
   return presets[profileKey];
 }
@@ -185,13 +189,12 @@ function defaultProfileForKey(
   presets: ProviderPresets
 ): UIProviderProfile {
   const preset = modelPresetForProfile(profileKey, presets);
-  const prefersCustomInput = profileKey.startsWith('custom:');
   return {
     apiKey: '',
     baseUrl: preset.baseUrl,
-    model: profileKey === 'ollama' ? '' : preset.models[0]?.id || '',
+    model: '',
     customModel: '',
-    useCustomModel: prefersCustomInput,
+    useCustomModel: true,
     contextWindow: '',
     maxTokens: '',
   };
@@ -251,18 +254,16 @@ function normalizeProfile(
     };
   }
 
-  const modelValue = profile?.model?.trim() || fallback.model;
-  const rawBaseUrl = profile?.baseUrl?.trim() || fallback.baseUrl;
-  const hasPresetModel = modelPresetForProfile(profileKey, presets).models.some(
-    (item) => item.id === modelValue
-  );
+  const migratedProfile = normalizeLegacyCustomProfileDefaults(profileKey, profile);
+  const modelValue = migratedProfile?.model?.trim() || '';
+  const rawBaseUrl = migratedProfile?.baseUrl?.trim() || fallback.baseUrl;
   return {
-    apiKey: profile?.apiKey || '',
+    apiKey: migratedProfile?.apiKey || '',
     baseUrl:
       profileKey === 'ollama' ? normalizeOllamaBaseUrl(rawBaseUrl) || fallback.baseUrl : rawBaseUrl,
-    model: hasPresetModel ? modelValue : fallback.model,
-    customModel: hasPresetModel ? '' : modelValue,
-    useCustomModel: !hasPresetModel,
+    model: modelValue,
+    customModel: modelValue,
+    useCustomModel: true,
     contextWindow: profile?.contextWindow ? String(profile.contextWindow) : '',
     maxTokens: profile?.maxTokens ? String(profile.maxTokens) : '',
   };
@@ -276,11 +277,11 @@ export function buildApiConfigSnapshot(
   const provider = migratedToOllama ? 'ollama' : config?.provider || 'openrouter';
   const customProtocol: CustomProtocolType = migratedToOllama
     ? 'openai'
-    : config?.customProtocol === 'openai'
-      ? 'openai'
+    : config?.customProtocol === 'anthropic'
+      ? 'anthropic'
       : config?.customProtocol === 'gemini'
         ? 'gemini'
-        : 'anthropic';
+        : 'openai';
   const derivedProfileKey = profileKeyFromProvider(provider, customProtocol);
   const activeProfileKey = migratedToOllama
     ? 'ollama'
@@ -531,16 +532,13 @@ function providerTabLabel(
 }
 
 function buildSetupModelState(
-  setup: CommonProviderSetup,
-  profileKey: ProviderProfileKey,
-  presets: ProviderPresets
+  setup: CommonProviderSetup
 ): Pick<UIProviderProfile, 'model' | 'customModel' | 'useCustomModel'> {
-  const preset = modelPresetForProfile(profileKey, presets);
-  const hasPresetModel = preset.models.some((item) => item.id === setup.exampleModel);
+  const exampleModel = setup.exampleModel.trim();
   return {
-    model: hasPresetModel ? setup.exampleModel : preset.models[0]?.id || setup.exampleModel,
-    customModel: hasPresetModel ? '' : setup.exampleModel,
-    useCustomModel: !hasPresetModel,
+    model: exampleModel,
+    customModel: exampleModel,
+    useCustomModel: true,
   };
 }
 
@@ -818,11 +816,11 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const initialBootstrap = initialBootstrapRef.current;
 
   const initialLastCustomProtocol: CustomProtocolType =
-    initialConfig?.customProtocol === 'openai'
-      ? 'openai'
+    initialConfig?.customProtocol === 'anthropic'
+      ? 'anthropic'
       : initialConfig?.customProtocol === 'gemini'
         ? 'gemini'
-        : 'anthropic';
+        : 'openai';
 
   const [state, dispatch] = useReducer(
     apiConfigReducer,
@@ -936,18 +934,9 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     profiles[activeProfileKey] || defaultProfileForKey(activeProfileKey, presets);
   const modelPreset = modelPresetForProfile(activeProfileKey, presets);
   const currentPreset = modelPreset;
-  const hasDiscoveredOllamaModels =
-    provider === 'ollama' &&
-    Object.prototype.hasOwnProperty.call(discoveredModels, activeProfileKey);
   const isPuraMode = isPuraDigitalActive(provider, customProtocol, currentProfile.baseUrl);
-  const modelOptions =
-    provider === 'ollama'
-      ? discoveredModels[activeProfileKey] || []
-      : isPuraMode
-        ? discoveredModels[activeProfileKey] || []
-        : hasDiscoveredOllamaModels
-          ? discoveredModels[activeProfileKey] || []
-          : modelPreset.models;
+  const modelOptions = discoveredModels[activeProfileKey] || [];
+  const supportsModelDiscovery = isElectron && !isPuraMode;
   const modelInputGuidance = getModelInputGuidance(provider, customProtocol);
 
   const currentConfigSet = useMemo(
@@ -967,11 +956,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const model = currentProfile.model;
   const customModel = currentProfile.customModel;
   const useCustomModel = currentProfile.useCustomModel;
-  const shouldShowOllamaManualModelToggle =
-    (provider !== 'ollama' && !isPuraMode) ||
-    useCustomModel ||
-    Boolean(error) ||
-    modelOptions.length === 0;
+  const shouldShowOllamaManualModelToggle = modelOptions.length > 0;
   const contextWindow = currentProfile.contextWindow;
   const maxTokens = currentProfile.maxTokens;
   const detectedProviderSetup = useMemo(
@@ -1137,11 +1122,11 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       const resolvedLastCustomProtocol: CustomProtocolType =
         activeMeta.provider === 'custom'
           ? activeMeta.customProtocol
-          : config?.customProtocol === 'openai'
-            ? 'openai'
+          : config?.customProtocol === 'anthropic'
+            ? 'anthropic'
             : config?.customProtocol === 'gemini'
               ? 'gemini'
-              : 'anthropic';
+              : 'openai';
 
       dispatch({
         type: 'APPLY_LOADED_STATE',
@@ -1191,13 +1176,26 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     [lastCustomProtocol]
   );
 
-  const changeProtocol = useCallback((newProtocol: CustomProtocolType) => {
-    dispatch({ type: 'SET_LAST_CUSTOM_PROTOCOL', payload: newProtocol });
-    dispatch({
-      type: 'SET_ACTIVE_PROFILE_KEY',
-      payload: profileKeyFromProvider('custom', newProtocol),
-    });
-  }, []);
+  const changeProtocol = useCallback(
+    (newProtocol: CustomProtocolType) => {
+      const nextProfileKey = profileKeyFromProvider('custom', newProtocol);
+      dispatch({ type: 'SET_LAST_CUSTOM_PROTOCOL', payload: newProtocol });
+      dispatch({
+        type: 'UPDATE_PROFILE_FN',
+        profileKey: nextProfileKey,
+        updater: (current) =>
+          normalizeLegacyCustomProfileDefaults(nextProfileKey, {
+            ...current,
+            baseUrl:
+              current.baseUrl?.trim() ||
+              modelPresetForProfile(nextProfileKey, presets).baseUrl ||
+              (newProtocol === 'openai' ? OFFICIAL_CUSTOM_OPENAI_BASE_URL : ''),
+          }),
+      });
+      dispatch({ type: 'SET_ACTIVE_PROFILE_KEY', payload: nextProfileKey });
+    },
+    [presets]
+  );
 
   const setApiKey = useCallback(
     (value: string) => {
@@ -1250,7 +1248,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
 
       const nextProvider = setup.applyProvider;
       const nextProfileKey = profileKeyFromProvider(nextProvider, setup.recommendedProtocol);
-      const nextModelState = buildSetupModelState(setup, nextProfileKey, presets);
+      const nextModelState = buildSetupModelState(setup);
 
       if (nextProvider === 'custom') {
         dispatch({ type: 'SET_LAST_CUSTOM_PROTOCOL', payload: setup.recommendedProtocol });
@@ -1351,32 +1349,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [activeProfileKey, baseUrl, provider]);
 
   useEffect(() => {
-    if (provider !== 'ollama') {
-      return;
-    }
-    // Drop stale discovered model list when baseUrl changes
     dispatch({ type: 'DELETE_DISCOVERED_MODELS', profileKey: activeProfileKey });
-
-    // If the current model came from discovered models and is not in presets,
-    // reset to an endpoint-selected model once discovery runs again.
-    const preset = modelPresetForProfile(activeProfileKey, presets);
-    dispatch({
-      type: 'UPDATE_PROFILE_FN',
-      profileKey: activeProfileKey,
-      updater: (current) => {
-        if (current && !current.useCustomModel && current.model) {
-          const inPreset = preset.models.some((m) => m.id === current.model);
-          if (!inPreset) {
-            return {
-              ...current,
-              model: provider === 'ollama' ? '' : preset.models[0]?.id || '',
-            };
-          }
-        }
-        return current;
-      },
-    });
-  }, [activeProfileKey, baseUrl, provider, presets]);
+  }, [activeProfileKey, baseUrl, provider, customProtocol]);
 
   // Drop discovered Pura models if the user navigates away from the Pura host.
   // The discovered list belongs to the LiteLLM gateway and is not portable to
@@ -1516,11 +1490,17 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [handleDiagnose]);
 
   const refreshModelOptions = useCallback(async () => {
-    if (!isElectron || provider !== 'ollama') {
+    if (!isElectron || isPuraDigitalActive(provider, customProtocol, baseUrl)) {
+      return [];
+    }
+
+    if (requiresApiKey && !apiKey.trim()) {
+      showErrorKey('api.testError.missing_key');
       return [];
     }
 
     const requestedProfileKey = activeProfileKey;
+    const requestedProvider = provider;
     const requestedBaseUrl = baseUrl.trim();
     const requestId = ++ollamaRefreshRequestIdRef.current;
 
@@ -1531,12 +1511,13 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         provider,
         apiKey: apiKey.trim(),
         baseUrl: requestedBaseUrl || undefined,
+        customProtocol,
       });
 
       const latestTarget = latestOllamaTargetRef.current;
       if (
         requestId !== ollamaRefreshRequestIdRef.current ||
-        latestTarget.provider !== 'ollama' ||
+        latestTarget.provider !== requestedProvider ||
         latestTarget.activeProfileKey !== requestedProfileKey ||
         latestTarget.baseUrl !== requestedBaseUrl
       ) {
@@ -1560,16 +1541,21 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
           return {
             ...current,
             model: shouldAutoSelectModel ? models[0]!.id : current.model,
+            customModel: shouldAutoSelectModel ? models[0]!.id : current.customModel,
             useCustomModel: shouldAutoSelectModel ? false : current.useCustomModel,
           };
         },
       });
+
+      if (models.length === 0) {
+        showErrorKey('api.noModelsDiscovered');
+      }
       return models;
     } catch (refreshError) {
       const latestTarget = latestOllamaTargetRef.current;
       if (
         requestId !== ollamaRefreshRequestIdRef.current ||
-        latestTarget.provider !== 'ollama' ||
+        latestTarget.provider !== requestedProvider ||
         latestTarget.activeProfileKey !== requestedProfileKey ||
         latestTarget.baseUrl !== requestedBaseUrl
       ) {
@@ -1587,7 +1573,17 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         dispatch({ type: 'SET_IS_REFRESHING_MODELS', payload: false });
       }
     }
-  }, [activeProfileKey, apiKey, baseUrl, provider, clearError, showErrorKey, showErrorText]);
+  }, [
+    activeProfileKey,
+    apiKey,
+    baseUrl,
+    customProtocol,
+    provider,
+    requiresApiKey,
+    clearError,
+    showErrorKey,
+    showErrorText,
+  ]);
 
   const applyPuraDigitalSetup = useCallback(() => {
     const targetProfileKey: ProviderProfileKey = 'custom:openai';
@@ -1602,7 +1598,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         // since the previous custom:openai model rarely matches the gateway.
         model: '',
         customModel: '',
-        useCustomModel: false,
+        useCustomModel: true,
       }),
     });
     dispatch({ type: 'DELETE_DISCOVERED_MODELS', profileKey: targetProfileKey });
@@ -1619,7 +1615,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         updater: (current) => ({
           ...current,
           apiKey: '',
-          baseUrl: '',
+          baseUrl: OFFICIAL_CUSTOM_OPENAI_BASE_URL,
           model: '',
           customModel: '',
           useCustomModel: true,
@@ -1834,17 +1830,27 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     ]
   );
 
-  // Auto-refresh model list when Ollama baseUrl changes (debounced).
-  // Only fires for URLs that look plausible (start with http(s):// and have a host).
+  // Auto-refresh model list when connection details change (debounced).
   useEffect(() => {
-    if (provider !== 'ollama') return;
+    if (!supportsModelDiscovery) return;
+    if (requiresApiKey && !apiKey.trim()) return;
     const trimmed = baseUrl.trim();
-    if (!trimmed || !/^https?:\/\/.{3,}/i.test(trimmed)) return;
+    if ((provider === 'custom' || provider === 'ollama') && (!trimmed || !/^https?:\/\/.{3,}/i.test(trimmed))) {
+      return;
+    }
     const timer = setTimeout(() => {
       void refreshModelOptions();
     }, 800);
     return () => clearTimeout(timer);
-  }, [provider, baseUrl, refreshModelOptions]);
+  }, [
+    apiKey,
+    baseUrl,
+    customProtocol,
+    provider,
+    refreshModelOptions,
+    requiresApiKey,
+    supportsModelDiscovery,
+  ]);
 
   const handleSave = useCallback(
     async (options?: { silentSuccess?: boolean }) => {
@@ -2215,6 +2221,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isOllamaMode: provider === 'ollama',
     isPuraMode,
     isDiscoveringPuraModels,
+    supportsModelDiscovery,
     shouldShowOllamaManualModelToggle,
     requiresApiKey,
     detectedProviderSetup,

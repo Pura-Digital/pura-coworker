@@ -248,6 +248,7 @@
     "refreshModels": "Refresh Models",
     "refreshingModels": "Refreshing...",
     "refreshModelsFailed": "Failed to refresh models. Check the URL or service status.",
+    "noModelsDiscovered": "No models were returned by the endpoint. Enter the model ID manually.",
     "manualModel": "Manual Model",
     "useDetectedModels": "Use Detected Models",
     "discoverLocalOllama": "Find Local Ollama",

@@ -17,6 +17,7 @@ import {
   createEncryptedStoreWithKeyRotation,
   getLegacyDerivedKeyHexes,
 } from '../utils/store-encryption';
+import { normalizeLegacyCustomProfileDefaults } from '../../shared/custom-profile-defaults';
 import {
   isOpenAIProvider,
   isOllamaLegacyCustomOpenAIConfig,
@@ -29,7 +30,7 @@ import {
   shouldAllowEmptyGeminiApiKey,
   shouldUseAnthropicAuthToken,
 } from './auth-utils';
-import { API_PROVIDER_PRESETS, PI_AI_CURATED_PRESETS } from '../../shared/api-model-presets';
+import { API_PROVIDER_PRESETS } from '../../shared/api-model-presets';
 import { migrateLegacyUiZoom, normalizeDisplayScale } from '../../shared/ui-zoom';
 
 /**
@@ -214,12 +215,12 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
   gemini: {
     apiKey: '',
     baseUrl: 'https://generativelanguage.googleapis.com',
-    model: 'gemini-2.5-flash',
+    model: '',
   },
   'custom:anthropic': {
     apiKey: '',
-    baseUrl: 'https://open.bigmodel.cn/api/anthropic',
-    model: 'glm-5',
+    baseUrl: 'https://api.anthropic.com',
+    model: '',
   },
   'custom:openai': {
     apiKey: '',
@@ -229,7 +230,7 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
   'custom:gemini': {
     apiKey: '',
     baseUrl: 'https://generativelanguage.googleapis.com',
-    model: 'gemini-2.5-flash',
+    model: '',
   },
 };
 
@@ -301,55 +302,9 @@ const defaultConfig: AppConfig = {
 };
 
 export const PROVIDER_PRESETS = API_PROVIDER_PRESETS;
-const PI_AI_CURATED: Record<string, { piProvider: string; pick: string[] }> = PI_AI_CURATED_PRESETS;
 
-// Cached dynamic presets — populated once by async import.
-let cachedDynamicPresets: typeof PROVIDER_PRESETS | null = null;
-
-/**
- * Build model presets dynamically from pi-ai registry.
- * Returns PROVIDER_PRESETS with models arrays replaced by registry data where available.
- * Uses async import() because pi-ai is ESM-only.
- */
 export async function getPiAiModelPresets(): Promise<typeof PROVIDER_PRESETS> {
-  if (cachedDynamicPresets) return cachedDynamicPresets;
-
-  try {
-    const { getModels } = (await import('@mariozechner/pi-ai')) as {
-      getModels: (provider: string) => Array<{ id: string; name: string }> | undefined;
-    };
-
-    const result = { ...PROVIDER_PRESETS } as Record<
-      string,
-      (typeof PROVIDER_PRESETS)[keyof typeof PROVIDER_PRESETS]
-    >;
-
-    for (const [providerKey, curated] of Object.entries(PI_AI_CURATED)) {
-      const preset = PROVIDER_PRESETS[providerKey as keyof typeof PROVIDER_PRESETS];
-      if (!preset) continue;
-
-      const registryModels = getModels(curated.piProvider);
-      if (!registryModels || registryModels.length === 0) continue;
-
-      const registryIds = new Set(registryModels.map((m) => m.id));
-      const picked = curated.pick
-        .filter((id) => registryIds.has(id))
-        .map((id) => {
-          const reg = registryModels.find((m) => m.id === id);
-          return { id, name: reg?.name || id };
-        });
-
-      if (picked.length > 0) {
-        result[providerKey] = { ...preset, models: picked };
-      }
-    }
-
-    cachedDynamicPresets = result as unknown as typeof PROVIDER_PRESETS;
-    return cachedDynamicPresets;
-  } catch (err) {
-    logWarn('[ConfigStore] Failed to load pi-ai model presets, using hardcoded fallback:', err);
-    return PROVIDER_PRESETS;
-  }
+  return PROVIDER_PRESETS;
 }
 
 const PROFILE_KEYS: ProviderProfileKey[] = [
@@ -456,7 +411,7 @@ function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
 
 function profileKeyFromProvider(
   provider: ProviderType,
-  customProtocol: CustomProtocolType = 'anthropic'
+  customProtocol: CustomProtocolType = 'openai'
 ): ProviderProfileKey {
   if (provider !== 'custom') {
     return provider;
@@ -609,6 +564,22 @@ export class ConfigStore {
     // Fix flat baseUrl for openrouter
     if (config.baseUrl === 'https://openrouter.ai/api' && config.provider === 'openrouter') {
       config.baseUrl = 'https://openrouter.ai/api/v1';
+    }
+
+    this.normalizeLegacyCustomProfiles(config);
+  }
+
+  private normalizeLegacyCustomProfiles(config: AppConfig): void {
+    for (const key of ['custom:anthropic', 'custom:openai'] as const) {
+      const profile = config.profiles?.[key];
+      if (!profile) {
+        continue;
+      }
+      const normalized = normalizeLegacyCustomProfileDefaults(key, profile);
+      profile.baseUrl = normalized.baseUrl;
+      if (typeof normalized.model === 'string') {
+        profile.model = normalized.model;
+      }
     }
   }
 

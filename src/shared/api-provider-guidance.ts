@@ -120,7 +120,7 @@ export const COMMON_PROVIDER_SETUPS: CommonProviderSetup[] = [
     applyProvider: 'custom',
     recommendedProtocol: 'gemini',
     recommendedBaseUrl: 'https://generativelanguage.googleapis.com',
-    exampleModel: 'gemini-2.5-flash',
+    exampleModel: 'gemini-2.0-flash',
     matcher: {
       hosts: ['generativelanguage.googleapis.com'],
     },
@@ -145,8 +145,8 @@ export const COMMON_PROVIDER_SETUPS: CommonProviderSetup[] = [
     noteKey: 'api.guidance.setups.genericOpenAI.note',
     applyProvider: 'custom',
     recommendedProtocol: 'openai',
-    recommendedBaseUrl: 'https://your-provider.example/v1',
-    exampleModel: 'deepseek-chat',
+    recommendedBaseUrl: 'https://api.openai.com/v1',
+    exampleModel: 'gpt-4o-mini',
   },
 ];
 
