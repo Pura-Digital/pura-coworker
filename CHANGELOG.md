@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.3] - 2026-09-14
+
+### Added
+
+- Google GenAI provider support with dedicated Gemini model catalog and validation
+- Shared provider model registry for Anthropic, Gemini, and custom OpenAI-compatible APIs
+- Model validation and diagnostics improvements in API settings
+
+### Changed
+
+- API config state and model presets refactored around provider-specific model modules
+- Config modal and Settings API updated for multi-provider model selection
+
 ## [3.4.2] - 2026-09-13
 
 ### Added
