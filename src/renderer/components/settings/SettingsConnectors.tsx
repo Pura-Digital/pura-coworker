@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import type { MCPServerConfig, MCPServerStatus, MCPToolInfo, MCPPreset } from './shared';
 import {
-  SettingsAlert,
+  SettingsFeedbackToast,
   SettingsCard,
   SettingsDisclosure,
 } from './shared';
@@ -317,7 +317,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="space-y-3">
-      {error && <SettingsAlert variant="error">{error}</SettingsAlert>}
+      <SettingsFeedbackToast error={error} />
 
       {/* List header + add menu */}
       {!editingServer && (

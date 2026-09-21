@@ -16,6 +16,7 @@ import { useAppStore } from '../../store';
 import {
   SettingsCardHeader,
   SettingsDisclosure,
+  SettingsFeedbackToast,
   SettingsToggle,
 } from './shared';
 
@@ -93,7 +94,24 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
     cloneRuntimeConfig(appConfig?.memoryRuntime)
   );
   const [isBusy, setIsBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const clearFeedback = () => {
+    setError(null);
+    setSuccess(null);
+  };
+
+  const showError = (message: string) => {
+    setSuccess(null);
+    setError(message);
+  };
+
+  const showSuccess = (message: string) => {
+    setError(null);
+    setSuccess(message);
+    setTimeout(() => setSuccess(null), 4000);
+  };
 
   const enabled = overview?.enabled ?? appConfig?.memoryEnabled ?? true;
 
@@ -147,7 +165,7 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
         }
       } catch (error) {
         if (!cancelled) {
-          setStatus(error instanceof Error ? error.message : String(error));
+          showError(error instanceof Error ? error.message : String(error));
         }
       }
     };
@@ -159,13 +177,13 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
 
   const handleToggle = async () => {
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       await window.electronAPI.memory.setEnabled(!enabled);
       await refreshOverview();
-      setStatus(!enabled ? t('memory.enabledStatus') : t('memory.disabledStatus'));
+      showSuccess(!enabled ? t('memory.enabledStatus') : t('memory.disabledStatus'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -180,7 +198,7 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
       return;
     }
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       const nextResults = await window.electronAPI.memory.search({
         query: trimmed,
@@ -201,7 +219,7 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
         setSelected(null);
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -209,13 +227,13 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
 
   const handleSelectResult = async (id: string) => {
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       const detail = await window.electronAPI.memory.read(id);
       setSelected(detail);
       setInspectedSession(null);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -223,12 +241,12 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
 
   const handleInspectSession = async (sessionId: string, workspaceKey?: string) => {
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       const detail = await window.electronAPI.memory.inspectSession(sessionId, workspaceKey);
       setInspectedSession(detail);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -236,13 +254,13 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
 
   const handleSelectFile = async (filePath: string) => {
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       const nextContent = await window.electronAPI.memory.readFile(filePath);
       setSelectedFilePath(filePath);
       setFileContent(nextContent);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -250,15 +268,15 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
 
   const handleSaveRuntime = async () => {
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       await window.electronAPI.config.save({
         memoryRuntime: runtimeDraft,
       });
       await refreshOverview();
-      setStatus(t('memory.runtimeSaved'));
+      showSuccess(t('memory.runtimeSaved'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -272,13 +290,13 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
       return;
     }
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       await window.electronAPI.memory.rebuildWorkspace(currentWorkspace);
       await Promise.all([refreshOverview(), refreshFiles()]);
-      setStatus(t('memory.rebuildSuccess'));
+      showSuccess(t('memory.rebuildSuccess'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -289,18 +307,18 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
       return;
     }
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       const result = await window.electronAPI.memory.rebuildAll();
       await Promise.all([refreshOverview(), refreshFiles()]);
-      setStatus(
+      showSuccess(
         t('memory.rebuildAllSuccess', {
           sessionCount: result.sessionCount,
           workspaceCount: result.workspaceCount,
         })
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -314,16 +332,16 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
       return;
     }
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       await window.electronAPI.memory.clearWorkspace(currentWorkspace);
       setResults([]);
       setSelected(null);
       setInspectedSession(null);
       await Promise.all([refreshOverview(), refreshFiles()]);
-      setStatus(t('memory.clearWorkspaceSuccess'));
+      showSuccess(t('memory.clearWorkspaceSuccess'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -334,15 +352,15 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
       return;
     }
     setIsBusy(true);
-    setStatus(null);
+    clearFeedback();
     try {
       await window.electronAPI.memory.clearCoreMemory();
       setResults([]);
       setSelected(null);
       await Promise.all([refreshOverview(), refreshFiles()]);
-      setStatus(t('memory.clearCoreSuccess'));
+      showSuccess(t('memory.clearCoreSuccess'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
@@ -350,6 +368,8 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
 
   return (
     <div className="space-y-4">
+      <SettingsFeedbackToast error={error} success={success} />
+
       {compact ? (
         <SettingsCardHeader title={t('memory.title')} description={t('memory.description')} />
       ) : null}
@@ -727,11 +747,6 @@ export function SettingsMemory({ compact = false }: { compact?: boolean } = {}) 
         </div>
       </SettingsDisclosure>
 
-      {status && (
-        <div className="rounded-lg border border-border-muted bg-background-secondary/70 px-4 py-3 text-sm text-text-secondary">
-          {status}
-        </div>
-      )}
     </div>
   );
 }

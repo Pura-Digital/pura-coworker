@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveMessageEndPayload, toUserFacingErrorText } from '../src/main/claude/agent-runner-message-end';
+import {
+  getTerminalErrorFooter,
+  isRecoverableTerminalError,
+  resolveMessageEndPayload,
+  toUserFacingErrorText,
+} from '../src/main/claude/agent-runner-message-end';
 
 describe('resolveMessageEndPayload', () => {
   it('falls back to accumulated streamed text when message_end content is empty', () => {
@@ -113,21 +118,34 @@ describe('toUserFacingErrorText', () => {
     );
   });
 
-  it('maps 5xx server errors to upstream service hint', () => {
+  it('maps 5xx server errors to recovery hint without misleading retry copy', () => {
     const result = toUserFacingErrorText('HTTP 502: Bad Gateway');
-    expect(result).toContain('Upstream service error');
+    expect(result).toContain('The model request failed upstream');
+    expect(result).toContain('context was preserved');
+    expect(result).not.toContain('retry automatically');
     expect(result).toContain('Original error:');
     expect(result).toContain('502');
   });
 
-  it('maps "server error" to upstream service hint', () => {
+  it('maps "server error" to recovery hint', () => {
     const result = toUserFacingErrorText('internal server error');
-    expect(result).toContain('Upstream service error');
+    expect(result).toContain('The model request failed upstream');
+    expect(result).not.toContain('retry automatically');
   });
 
-  it('maps "overloaded" to upstream service hint', () => {
+  it('maps "overloaded" to recovery hint', () => {
     const result = toUserFacingErrorText('overloaded_error');
-    expect(result).toContain('Upstream service error');
+    expect(result).toContain('The model request failed upstream');
+    expect(result).not.toContain('retry automatically');
+  });
+
+  it('maps Ollama missing user query to a specific recovery message', () => {
+    const rawError = '500 no user query found in messages';
+    const result = toUserFacingErrorText(rawError);
+    expect(result).toContain('did not include a user message');
+    expect(result).toContain('reset automatically');
+    expect(isRecoverableTerminalError(rawError)).toBe(true);
+    expect(getTerminalErrorFooter(rawError)).toContain('Send your next message to continue');
   });
 
   it('maps "terminated" to network connection hint', () => {

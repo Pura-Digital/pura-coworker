@@ -101,6 +101,9 @@ website/.vitepress/cache/
 # Temp directories
 .tmp/
 
+# Aiden session recovery snapshots (workspace-local, per chat session)
+.aiden/session-recovery/
+
 # Screenshots (debug/review)
 *.png
 !src/renderer/assets/*.png

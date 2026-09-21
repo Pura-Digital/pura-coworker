@@ -209,6 +209,49 @@ export function SettingsOptionList<T extends string>({
 
 // ==================== Feedback ====================
 
+const feedbackToastTone = {
+  error: {
+    border: 'border-error/30',
+    text: 'text-error',
+    icon: AlertCircle,
+  },
+  success: {
+    border: 'border-success/30',
+    text: 'text-success',
+    icon: CheckCircle,
+  },
+} as const;
+
+export function SettingsFeedbackToast({
+  error,
+  success,
+}: {
+  error?: string | null;
+  success?: string | null;
+}) {
+  const message = error || success;
+  if (!message) {
+    return null;
+  }
+
+  const variant = error ? 'error' : 'success';
+  const tone = feedbackToastTone[variant];
+  const Icon = tone.icon;
+
+  return (
+    <div
+      className={`fixed right-6 bottom-6 z-[80] max-w-md rounded-lg border bg-surface px-4 py-3 shadow-elevated ${tone.border}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className={`flex items-start gap-2 text-sm ${tone.text}`}>
+        <Icon className="w-4 h-4 mt-0.5 shrink-0" />
+        <span>{message}</span>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsAlert({
   variant,
   children,

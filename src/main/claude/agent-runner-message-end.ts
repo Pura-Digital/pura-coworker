@@ -19,10 +19,57 @@ interface ResolvedMessageEndPayload {
   shouldEmitMessage: boolean;
 }
 
+export const RECOVERABLE_TERMINAL_ERROR_FOOTER =
+  'Session context was preserved. Send your next message to continue.';
+
+export function isRecoverableTerminalError(errorText: string): boolean {
+  const lower = errorText.toLowerCase();
+  if (lower.includes('first_response_timeout')) {
+    return true;
+  }
+  if (lower.includes('request timed out') || lower.includes('timed out')) {
+    return true;
+  }
+  if (lower.includes('no user query found in messages')) {
+    return true;
+  }
+  if (lower.includes('ollama_empty_during_load')) {
+    return true;
+  }
+  if (lower.includes('empty_success_result')) {
+    return true;
+  }
+  if (/\b(5\d{2})\b/.test(errorText)) {
+    return true;
+  }
+  if (
+    lower.includes('server error') ||
+    lower.includes('internal error') ||
+    lower.includes('service unavailable') ||
+    lower.includes('overloaded')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function getTerminalErrorFooter(errorText: string): string {
+  if (/\b4\d{2}\b/.test(errorText)) {
+    return 'Please check your configuration and retry.';
+  }
+  if (isRecoverableTerminalError(errorText)) {
+    return RECOVERABLE_TERMINAL_ERROR_FOOTER;
+  }
+  return 'Please retry or check your model configuration.';
+}
+
 export function toUserFacingErrorText(errorText: string): string {
   const lower = errorText.toLowerCase();
   if (lower.includes('first_response_timeout')) {
     return 'Model response timed out: no upstream response received for a long time. Retry later or check model/gateway load.';
+  }
+  if (lower.includes('no user query found in messages')) {
+    return 'The model request was rejected because the conversation payload did not include a user message. This can happen during long tool-heavy sessions. The agent session was reset automatically and your recent context was preserved.';
   }
   if (lower.includes('ollama_empty_during_load')) {
     return 'The Ollama model returned an empty response, often during cold start while the model is loading into memory. Wait a moment and try again, or preload the model with `ollama run <model>`.';
@@ -58,7 +105,7 @@ export function toUserFacingErrorText(errorText: string): string {
     lower.includes('service unavailable') ||
     lower.includes('overloaded')
   ) {
-    return `Upstream service error. The model service may be overloaded or temporarily unavailable. The SDK will retry automatically.\nOriginal error: ${errorText}`;
+    return `The model request failed upstream. The agent session was reset automatically and your recent context was preserved.\nOriginal error: ${errorText}`;
   }
   if (
     lower.includes('terminated') ||

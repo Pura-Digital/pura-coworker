@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  CheckCircle,
   Package,
   Trash2,
   Plus,
@@ -17,7 +16,7 @@ import {
 import type { Skill, PluginCatalogItemV2, InstalledPlugin, PluginComponentKind } from '../../types';
 import { useAppStore } from '../../store';
 import {
-  SettingsAlert,
+  SettingsFeedbackToast,
   SettingsCard,
   SettingsDisclosure,
 } from './shared';
@@ -406,15 +405,15 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const builtinSkills = skills.filter((skill) => skill.type === 'builtin');
   const userSkills = skills.filter((skill) => skill.type !== 'builtin');
   const enabledSkillCount = skills.filter((skill) => skill.enabled).length;
+  const successMessage =
+    (success ? (success.key ? t(success.key) : success.text) : null) || pluginToastMessage || null;
 
   return (
     <div className="space-y-3">
-      {error && (
-        <SettingsAlert variant="error">{error.key ? t(error.key) : error.text}</SettingsAlert>
-      )}
-      {success && (
-        <SettingsAlert variant="success">{success.key ? t(success.key) : success.text}</SettingsAlert>
-      )}
+      <SettingsFeedbackToast
+        error={error ? (error.key ? t(error.key) : error.text) : null}
+        success={successMessage}
+      />
 
       <div className="flex items-center justify-end gap-2">
         <button
@@ -546,14 +545,6 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         />
       )}
 
-      {pluginToastMessage && (
-        <div className="fixed right-6 bottom-6 z-[80] max-w-md rounded-lg border border-success/30 bg-surface px-4 py-3 shadow-elevated">
-          <div className="flex items-start gap-2 text-success text-sm">
-            <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{pluginToastMessage}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

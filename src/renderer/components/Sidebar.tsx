@@ -39,6 +39,7 @@ export function Sidebar() {
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const isConfigured = useAppStore((s) => s.isConfigured);
+  const appConfig = useAppStore((s) => s.appConfig);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
@@ -57,6 +58,14 @@ export function Sidebar() {
   const [configureProject, setConfigureProject] = useState<Project | null>(null);
 
   const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
+  const activeConfigSetName = useMemo(() => {
+    if (!appConfig?.configSets?.length || !appConfig.activeConfigSetId) {
+      return null;
+    }
+    return (
+      appConfig.configSets.find((set) => set.id === appConfig.activeConfigSetId)?.name ?? null
+    );
+  }, [appConfig]);
   // Sessions shown in the main date-grouped list (no project)
   const standaloneSessionsRaw = useMemo(
     () => sessions.filter((s) => !s.projectId),
@@ -529,8 +538,27 @@ export function Sidebar() {
                 <div className="text-[13px] font-medium text-text-primary">
                   {t('sidebar.settings')}
                 </div>
-                <div className="text-[11px] text-text-muted truncate">
-                  {isConfigured ? t('sidebar.apiConfigured') : t('sidebar.apiNotConfigured')}
+                <div
+                  className="group relative inline-flex max-w-full items-center gap-1.5"
+                  title={isConfigured && activeConfigSetName ? activeConfigSetName : undefined}
+                >
+                  <span className="text-[11px] text-text-muted truncate">
+                    {isConfigured ? t('sidebar.apiConfigured') : t('sidebar.apiNotConfigured')}
+                  </span>
+                  {isConfigured && (
+                    <span
+                      className="inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-success shadow-[0_0_0_2px_rgba(34,197,94,0.18)]"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {isConfigured && activeConfigSetName && (
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-full left-0 z-10 mb-1.5 whitespace-nowrap rounded-md border border-border-muted bg-background px-2 py-1 text-[11px] text-text-primary opacity-0 shadow-elevated transition-opacity group-hover:opacity-100"
+                    >
+                      {activeConfigSetName}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>

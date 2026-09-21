@@ -20,6 +20,7 @@ import {
   SettingsCard,
   SettingsCardHeader,
   SettingsAlert,
+  SettingsFeedbackToast,
   SettingsToggle,
   SettingsDisclosure,
   SettingsSegmentedControl,
@@ -366,10 +367,10 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
 
   return (
     <SettingsPage>
-      {error && <SettingsAlert variant="error">{renderLocalizedBannerMessage(error, t)}</SettingsAlert>}
-      {success && (
-        <SettingsAlert variant="success">{renderLocalizedBannerMessage(success, t)}</SettingsAlert>
-      )}
+      <SettingsFeedbackToast
+        error={error ? renderLocalizedBannerMessage(error, t) : null}
+        success={success ? renderLocalizedBannerMessage(success, t) : null}
+      />
 
       <SettingsCard>
         <SettingsCardHeader

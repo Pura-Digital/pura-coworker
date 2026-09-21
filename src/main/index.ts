@@ -1059,7 +1059,7 @@ app
       }
     });
 
-    // Auto-updater: check on startup in production, manual download via UI/menu
+    // Auto-updater: check on startup + every 3h in production, manual download via UI/menu
     void autoUpdaterManager.initialize(isDev);
 
     startNavServer(() => mainWindow);

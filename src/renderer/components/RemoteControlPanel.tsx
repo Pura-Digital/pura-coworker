@@ -28,7 +28,7 @@ import {
   SettingsPage,
   SettingsCard,
   SettingsCardHeader,
-  SettingsAlert,
+  SettingsFeedbackToast,
   SettingsStickyFooter,
   SettingsDisclosure,
 } from './settings/shared';
@@ -251,16 +251,10 @@ export function RemoteControlPanel({ isActive }: { isActive: boolean }) {
 
   return (
     <SettingsPage>
-      {error && (
-        <SettingsAlert variant="error">
-          {error.key ? t(error.key) : error.text}
-        </SettingsAlert>
-      )}
-      {success && (
-        <SettingsAlert variant="success">
-          {success.key ? t(success.key) : success.text}
-        </SettingsAlert>
-      )}
+      <SettingsFeedbackToast
+        error={error ? (error.key ? t(error.key) : error.text) : null}
+        success={success ? (success.key ? t(success.key) : success.text) : null}
+      />
 
       <GatewayControlCard
         status={status}

@@ -90,6 +90,7 @@ export {
   SettingsSegmentedControl,
   SettingsOptionList,
   SettingsAlert,
+  SettingsFeedbackToast,
   SettingsSubNav,
   SettingsDisclosure,
   SettingsStickyFooter,

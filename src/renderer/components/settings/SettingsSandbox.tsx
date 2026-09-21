@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shield, AlertCircle, CheckCircle, Settings, Loader2 } from 'lucide-react';
-import { renderLocalizedBannerMessage } from './shared';
+import { renderLocalizedBannerMessage, SettingsFeedbackToast } from './shared';
 import type { LocalizedBanner } from './shared';
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
@@ -295,19 +295,10 @@ export function SettingsSandbox() {
 
   return (
     <div className="space-y-4">
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {renderLocalizedBannerMessage(error, t)}
-        </div>
-      )}
-      {success && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-success/10 text-success text-sm">
-          <CheckCircle className="w-4 h-4 flex-shrink-0" />
-          {renderLocalizedBannerMessage(success, t)}
-        </div>
-      )}
+      <SettingsFeedbackToast
+        error={error ? renderLocalizedBannerMessage(error, t) : null}
+        success={success ? renderLocalizedBannerMessage(success, t) : null}
+      />
 
       {/* Sandbox overview */}
       <div className="p-6 rounded-lg bg-surface border border-border text-center space-y-4">

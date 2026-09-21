@@ -66,12 +66,23 @@ describe('ClaudeAgentRunner pi-coding-agent integration', () => {
   });
 
   it('reuses the shared user-facing error helper', () => {
-    expect(agentRunnerContent).toContain(
-      "import { resolveMessageEndPayload, toUserFacingErrorText } from './agent-runner-message-end'"
-    );
+    expect(agentRunnerContent).toContain("from './agent-runner-message-end'");
+    expect(agentRunnerContent).toContain('getTerminalErrorFooter');
+    expect(agentRunnerContent).toContain('recoverSdkSessionAfterTerminalError');
     expect(agentRunnerContent).toContain(
       'const errorText = toUserFacingErrorText(toErrorText(error));'
     );
+  });
+
+  it('wires Ollama payload guard and automatic session recovery', () => {
+    expect(agentRunnerContent).toContain("from './ollama-payload-guard'");
+    expect(agentRunnerContent).toContain('ensureUserMessageInChatPayload');
+    expect(agentRunnerContent).toContain("from './session-recovery-context'");
+    expect(agentRunnerContent).toContain('readRecoveryContext');
+    expect(agentRunnerContent).toContain('writeRecoveryContext');
+    expect(agentRunnerContent).toContain('clearRecoveryContext');
+    expect(agentRunnerContent).toContain('<session_recovery>');
+    expect(agentRunnerContent).toContain('this.clearSdkSession(sessionId)');
   });
 
   it('uses pi DefaultResourceLoader with additionalSkillPaths and appendSystemPrompt', () => {

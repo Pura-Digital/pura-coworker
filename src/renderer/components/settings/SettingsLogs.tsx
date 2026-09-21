@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertCircle,
-  CheckCircle,
   Loader2,
   Save,
   Globe,
@@ -10,7 +9,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { formatAppDateTime } from '../../utils/i18n-format';
-import { SettingsContentSection } from './shared';
+import { SettingsContentSection, SettingsFeedbackToast } from './shared';
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
 
@@ -152,19 +151,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="space-y-4">
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-success/10 text-success text-sm">
-          <CheckCircle className="w-4 h-4 flex-shrink-0" />
-          {success}
-        </div>
-      )}
+      <SettingsFeedbackToast error={error} success={success} />
 
       {/* Developer Logs Toggle */}
       <section className="rounded-lg border border-border-subtle bg-background px-4 py-4">

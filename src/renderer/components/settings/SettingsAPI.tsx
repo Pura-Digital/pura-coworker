@@ -22,7 +22,7 @@ import {
   SettingsField,
   SettingsToggle,
   SettingsSegmentedControl,
-  SettingsAlert,
+  SettingsFeedbackToast,
   SettingsDisclosure,
   SettingsStickyFooter,
 } from './shared';
@@ -119,8 +119,7 @@ export function SettingsAPI() {
 
   return (
     <SettingsPage>
-      {error && <SettingsAlert variant="error">{error}</SettingsAlert>}
-      {successMessage && <SettingsAlert variant="success">{successMessage}</SettingsAlert>}
+      <SettingsFeedbackToast error={error} success={successMessage} />
 
       <SettingsCard>
         <ApiConfigSetManager

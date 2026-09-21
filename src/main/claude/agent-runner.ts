@@ -58,7 +58,18 @@ import { applyBffWebEnvToProcess, getBffEnvForSpawn, resolveBffWebEnv } from '..
 import { formatBffConfiguredHint } from '../tools/web-client';
 import { buildWebCustomTools } from '../tools/web-custom-tools';
 import { normalizeOpenAICompatibleBaseUrl } from '../config/auth-utils';
-import { resolveMessageEndPayload, toUserFacingErrorText } from './agent-runner-message-end';
+import {
+  getTerminalErrorFooter,
+  isRecoverableTerminalError,
+  resolveMessageEndPayload,
+  toUserFacingErrorText,
+} from './agent-runner-message-end';
+import { ensureUserMessageInChatPayload } from './ollama-payload-guard';
+import {
+  clearRecoveryContext,
+  readRecoveryContext,
+  writeRecoveryContext,
+} from './session-recovery-context';
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
@@ -449,6 +460,7 @@ export class ClaudeAgentRunner {
   private extensionManager?: AgentRuntimeExtensionManager;
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
+  private compactionSummaryBySession: Map<string, string> = new Map();
   private static readonly MAX_CACHED_SESSIONS = 50;
 
   // Per-instance caches — invalidated when the underlying config changes.
@@ -468,8 +480,49 @@ export class ClaudeAgentRunner {
         logWarn('[ClaudeAgentRunner] dispose error:', e);
       }
       this.piSessions.delete(sessionId);
+      this.compactionSummaryBySession.delete(sessionId);
       log('[ClaudeAgentRunner] Disposed pi session for:', sessionId);
     }
+  }
+
+  private extractCompactionSummaryFromEvent(event: unknown): string | undefined {
+    if (!event || typeof event !== 'object') {
+      return undefined;
+    }
+    const record = event as Record<string, unknown>;
+    for (const key of ['summary', 'compactedSummary', 'compactionSummary', 'result']) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+    return undefined;
+  }
+
+  private recoverSdkSessionAfterTerminalError(options: {
+    sessionId: string;
+    cwd: string;
+    errorText: string;
+    messages: Message[];
+  }): void {
+    const { sessionId, cwd, errorText, messages } = options;
+    if (!isRecoverableTerminalError(errorText)) {
+      return;
+    }
+
+    const compactionSummary = this.compactionSummaryBySession.get(sessionId);
+    try {
+      const filePath = writeRecoveryContext(cwd, sessionId, {
+        error: errorText,
+        messages,
+        compactionSummary,
+      });
+      log('[ClaudeAgentRunner] Session recovery context written:', filePath ?? '(skipped)');
+    } catch (error) {
+      logWarn('[ClaudeAgentRunner] Failed to write session recovery context:', error);
+    }
+
+    this.clearSdkSession(sessionId);
   }
 
   clearAllSdkSessions(): void {
@@ -964,6 +1017,7 @@ ${hints.join('\n')}
 
     const thinkingStepId = uuidv4();
     let abortedByTimeout = false;
+    let effectiveCwd = session.cwd || process.cwd();
 
     try {
       this.pathResolver.registerSession(session.id, session.mountedPaths);
@@ -1453,8 +1507,8 @@ ${hints.join('\n')}
 
       // pi-coding-agent handles path sandboxing via its own tools
       const imageCapable = true; // pi-ai models generally support images; let the model handle unsupported cases
-      const effectiveCwd =
-        useSandboxIsolation && sandboxPath ? sandboxPath : workingDir || process.cwd();
+      effectiveCwd =
+        useSandboxIsolation && sandboxPath ? sandboxPath : workingDir || effectiveCwd;
 
       // Use app-specific Claude config directory to avoid conflicts with user settings
       // SDK uses CLAUDE_CONFIG_DIR to locate skills
@@ -1601,6 +1655,12 @@ ${hints.join('\n')}
 
       let contextualPrompt = prompt;
       if (!cachedSession) {
+        const recoveryContext = readRecoveryContext(effectiveCwd, session.id);
+        if (recoveryContext) {
+          contextualPrompt = `<session_recovery>\n${recoveryContext}\n</session_recovery>\n\n${contextualPrompt}`;
+          log('[ClaudeAgentRunner] Cold start: injected session recovery context for:', session.id);
+        }
+
         // Cold start: inject recent history into prompt if available
         const conversationMessages = existingMessages.filter(
           (msg) => msg.role === 'user' || msg.role === 'assistant'
@@ -2072,7 +2132,8 @@ Tool routing:
                 ? await originalOnPayload.call(agent, payload, modelArg)
                 : payload;
               if (result === undefined) result = payload;
-              return { ...result, num_ctx: ollamaNumCtx.value };
+              const withNumCtx = { ...result, num_ctx: ollamaNumCtx.value };
+              return ensureUserMessageInChatPayload(withNumCtx);
             };
             this.piSessions.get(session.id)!.ollamaNumCtx = ollamaNumCtx;
             log(
@@ -2327,6 +2388,12 @@ Tool routing:
               }
               if (resolvedPayload.errorText) {
                 terminalErrorText = resolvedPayload.errorText;
+                this.recoverSdkSessionAfterTerminalError({
+                  sessionId: session.id,
+                  cwd: effectiveCwd,
+                  errorText: resolvedPayload.errorText,
+                  messages: existingMessages,
+                });
                 if (!hasEmittedError) {
                   hasEmittedError = true;
                   this.sendMessage(session.id, {
@@ -2336,11 +2403,7 @@ Tool routing:
                     content: [
                       {
                         type: 'text',
-                        text: `**Error**: ${resolvedPayload.errorText}\n\n${
-                          /\b4\d{2}\b/.test(resolvedPayload.errorText)
-                            ? '_Please check your configuration and retry._'
-                            : '_Agent is retrying automatically, please wait..._'
-                        }`,
+                        text: `**Error**: ${resolvedPayload.errorText}\n\n_${getTerminalErrorFooter(resolvedPayload.errorText)}_`,
                       },
                     ],
                     timestamp: Date.now(),
@@ -2461,6 +2524,12 @@ Tool routing:
             }
 
             case 'auto_compaction_start': {
+              if (provider === 'ollama') {
+                log(
+                  '[ClaudeAgentRunner] Ollama auto-compaction started',
+                  safeStringify({ sessionId: session.id, reason: event.reason })
+                );
+              }
               log('[ClaudeAgentRunner] Auto-compaction started, reason:', event.reason);
               compactionStepId = `compaction-${Date.now()}`;
               this.sendTraceStep(session.id, {
@@ -2480,6 +2549,11 @@ Tool routing:
                 : event.errorMessage
                   ? `Context compaction failed: ${event.errorMessage}`
                   : 'Context compaction completed';
+              const compactionSummary = this.extractCompactionSummaryFromEvent(event);
+              if (compactionSummary && status === 'completed') {
+                this.compactionSummaryBySession.set(session.id, compactionSummary);
+                log('[ClaudeAgentRunner] Captured compaction summary for session:', session.id);
+              }
               log(
                 '[ClaudeAgentRunner] Auto-compaction ended:',
                 title,
@@ -2563,11 +2637,24 @@ Tool routing:
       // If the SDK swallowed the AbortError and returned void, detect timeout here
       if (controller.signal.aborted && abortedByTimeout) {
         logCtx('[ClaudeAgentRunner] Aborted due to timeout (detected after prompt returned)');
+        const timeoutErrorText =
+          'Request timed out: No response received for a long time. The operation was aborted.';
+        this.recoverSdkSessionAfterTerminalError({
+          sessionId: session.id,
+          cwd: effectiveCwd,
+          errorText: timeoutErrorText,
+          messages: existingMessages,
+        });
         const errorMsg: Message = {
           id: uuidv4(),
           sessionId: session.id,
           role: 'assistant',
-          content: [{ type: 'text', text: '**Request timed out**: No response received for a long time. The operation was aborted.' }],
+          content: [
+            {
+              type: 'text',
+              text: `**Error**: ${timeoutErrorText}\n\n_${getTerminalErrorFooter(timeoutErrorText)}_`,
+            },
+          ],
           timestamp: Date.now(),
         };
         this.sendMessage(session.id, errorMsg);
@@ -2582,15 +2669,32 @@ Tool routing:
         status: terminalErrorText ? 'error' : 'completed',
         title: terminalErrorText ? 'Request failed' : 'Task completed',
       });
+      if (!terminalErrorText) {
+        clearRecoveryContext(effectiveCwd, session.id);
+        this.compactionSummaryBySession.delete(session.id);
+      }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         if (abortedByTimeout) {
           logCtx('[ClaudeAgentRunner] Aborted due to timeout');
+          const timeoutErrorText =
+            'Request timed out: No response received for a long time. The operation was aborted.';
+          this.recoverSdkSessionAfterTerminalError({
+            sessionId: session.id,
+            cwd: effectiveCwd,
+            errorText: timeoutErrorText,
+            messages: existingMessages,
+          });
           const errorMsg: Message = {
             id: uuidv4(),
             sessionId: session.id,
             role: 'assistant',
-            content: [{ type: 'text', text: '**Request timed out**: No response received for a long time. The operation was aborted.' }],
+            content: [
+              {
+                type: 'text',
+                text: `**Error**: ${timeoutErrorText}\n\n_${getTerminalErrorFooter(timeoutErrorText)}_`,
+              },
+            ],
             timestamp: Date.now(),
           };
           this.sendMessage(session.id, errorMsg);
@@ -2609,11 +2713,22 @@ Tool routing:
         logCtxError('[ClaudeAgentRunner] Error:', error);
 
         const errorText = toUserFacingErrorText(toErrorText(error));
+        this.recoverSdkSessionAfterTerminalError({
+          sessionId: session.id,
+          cwd: effectiveCwd,
+          errorText,
+          messages: existingMessages,
+        });
         const errorMsg: Message = {
           id: uuidv4(),
           sessionId: session.id,
           role: 'assistant',
-          content: [{ type: 'text', text: `**Error**: ${errorText}` }],
+          content: [
+            {
+              type: 'text',
+              text: `**Error**: ${errorText}\n\n_${getTerminalErrorFooter(errorText)}_`,
+            },
+          ],
           timestamp: Date.now(),
         };
         this.sendMessage(session.id, errorMsg);

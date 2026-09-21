@@ -7,12 +7,23 @@ import { log, logError, logWarn } from '../utils/logger';
 
 type MenuRefreshHandler = () => void;
 
+/** Background update check interval (3 hours). */
+export const UPDATE_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
+
+const SKIP_BACKGROUND_CHECK_PHASES = new Set<UpdaterSnapshot['phase']>([
+  'checking',
+  'downloading',
+  'downloaded',
+  'available',
+]);
+
 export class AutoUpdaterManager {
   private sendToRenderer: (event: ServerEvent) => void = () => {};
   private refreshMenus: MenuRefreshHandler = () => {};
   private snapshot: UpdaterSnapshot = { ...INITIAL_UPDATER_SNAPSHOT };
   private initialized = false;
   private userInitiatedCheck = false;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   configure(options: {
     sendToRenderer: (event: ServerEvent) => void;
@@ -131,6 +142,7 @@ export class AutoUpdaterManager {
 
     this.initialized = true;
     void this.checkForUpdates();
+    this.startPolling();
   }
 
   handleMenuAction(): void {
@@ -186,6 +198,27 @@ export class AutoUpdaterManager {
       return;
     }
     autoUpdater.quitAndInstall(false, true);
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+    this.pollTimer = setInterval(() => {
+      void this.checkForUpdatesIfIdle();
+    }, UPDATE_CHECK_INTERVAL_MS);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  private async checkForUpdatesIfIdle(): Promise<void> {
+    if (!this.initialized || SKIP_BACKGROUND_CHECK_PHASES.has(this.snapshot.phase)) {
+      return;
+    }
+    await this.checkForUpdates();
   }
 
   private setSnapshot(partial: Partial<UpdaterSnapshot>): void {
