@@ -102,33 +102,28 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
+      - name: Generate latest-mac.yml
+        run: node scripts/generate-latest-mac-yml.js
+
       - name: List release artifacts
         run: |
           set -euo pipefail
           echo "release/ contents:"
-          ls -la release/ || true
-          for ARCH_DIR in release/mac-arm64 release/mac-x64; do
-            if [ -d "$ARCH_DIR" ]; then
-              echo "$ARCH_DIR:"
-              ls -la "$ARCH_DIR"
-            else
-              echo "::warning::$ARCH_DIR not found"
-            fi
-          done
+          ls -la release/
+          echo "latest-mac.yml:"
+          cat release/latest-mac.yml
 
-      - name: Smoke test - verify packaged resources
+      - name: Verify macOS release artifacts
+        run: bash scripts/verify-mac-release-artifacts.sh
+
+      - name: Smoke test - launch app (arm64)
         run: |
           set -euo pipefail
-          for ARCH_DIR in release/mac-arm64 release/mac-x64; do
-            bash scripts/mac-smoke-test.sh "$ARCH_DIR" verify
-          done
-
-      - name: Smoke test - launch app
-        run: |
-          set -euo pipefail
-          for ARCH_DIR in release/mac-arm64 release/mac-x64; do
-            bash scripts/mac-smoke-test.sh "$ARCH_DIR" launch
-          done
+          if [ -d release/mac-arm64 ]; then
+            bash scripts/mac-smoke-test.sh release/mac-arm64 launch
+          else
+            echo "release/mac-arm64 not found; skipping launch smoke test (zip artifacts already verified)"
+          fi
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v2

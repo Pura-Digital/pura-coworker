@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Settings plugin marketplace tests updated for renamed i18n keys after skills UI refactor
 - macOS release CI now passes explicit `--arm64 --x64` flags so Intel artifacts are produced on Apple Silicon runners
+- macOS release pipeline now generates `latest-mac.yml` explicitly and validates zip artifacts before upload
 
 ## [3.4.4] - 2026-09-21
 
