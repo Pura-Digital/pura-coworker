@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.4] - 2026-09-21
+
+### Added
+
+- macOS Intel (x64) installers alongside existing Apple Silicon (arm64) builds
+- MCP OAuth authentication flow with deep-link callback and secure token storage
+- MCP Marketplace and Plugin Marketplace modals in connector settings
+- MCP registry client for discovering and installing registry-hosted servers
+
+### Changed
+
+- Settings connectors and skills UI refreshed with marketplace-driven MCP setup
+- macOS release CI prepares Node, Python, and GUI tools for both arm64 and x64
+- Contact and security policy emails updated to the puradigital.it domain
+
+### Fixed
+
+- TypeScript errors in MCP marketplace path picker and registry remote selection
+- `npx` wrapper mis-detection for `darwin-x64` Node bundles during download
+- `cliclick` x64 bundling on modern macOS SDKs via Homebrew bottles and deployment-target fallback
+
 ## [3.4.3] - 2026-09-14
 
 ### Added
