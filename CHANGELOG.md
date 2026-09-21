@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.6] - 2026-09-21
+
+### Added
+
+- Session recovery context for terminal errors, preserving session state across recoverable failures
+- Ollama payload guard to prevent oversized requests from reaching local models
+- Auto-updater background polling every 3 hours while the app is running
+
+### Changed
+
+- Settings screens now use unified feedback toasts instead of browser alerts
+- Sidebar shows active configuration set names with tooltips
+
+### Fixed
+
+- Improved error handling and user-facing messages in Claude agent runner
+
 ## [3.4.5] - 2026-09-21
 
 ### Fixed
