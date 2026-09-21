@@ -12,14 +12,25 @@
  * Dependencies: config-store (via mcp-config-store)
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import {
+  UnauthorizedError,
+  type OAuthClientProvider,
+} from '@modelcontextprotocol/sdk/client/auth.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { app, BrowserWindow } from 'electron';
 
 import path from 'path';
+import { getErrorMessage, isMcpTokenAuthErrorMessage } from '../../shared/mcp-auth-errors';
+import { isGuiOperateServerName } from '../../shared/mcp-display-names';
+import type { McpConnectionStatus, McpOAuthConfig } from '../../shared/mcp-oauth';
 import { log, logError, logWarn, logCtx, logCtxError, logTiming } from '../utils/logger';
 import { getDefaultShell } from '../utils/shell-resolver';
+import { McpAuthRequiredError, isMcpAuthRequiredError } from './mcp-oauth-errors';
+import { getMcpOAuthService } from './mcp-oauth-service';
+import { parseMcpOAuthCallbackUrl } from './mcp-oauth-deep-link';
+import { getMcpOAuthStore } from './mcp-oauth-store';
 
 /**
  * MCP Server Configuration
@@ -35,6 +46,9 @@ export interface MCPServerConfig {
   url?: string; // For SSE / Streamable HTTP: server URL
   headers?: Record<string, string>; // For SSE / Streamable HTTP: HTTP headers
   enabled: boolean;
+  /** When set to 'oauth', remote transports use MCP OAuth instead of static headers. */
+  authType?: 'oauth';
+  oauth?: McpOAuthConfig;
 }
 
 /**
@@ -143,7 +157,8 @@ export class MCPManager {
   // Guards against concurrent reconnect/update operations on the same server
   private reconnectingServers: Set<string> = new Set();
   // Tracks per-server connection status for UI display
-  private connectionStatus = new Map<string, 'connecting' | 'connected' | 'failed'>();
+  private connectionStatus = new Map<string, McpConnectionStatus>();
+  private oauthService = getMcpOAuthService();
 
   /**
    * Get bundled Node.js path
@@ -443,6 +458,8 @@ export class MCPManager {
           url: c.url,
           env: c.env,
           headers: c.headers,
+          authType: c.authType,
+          oauth: c.oauth,
         }))
       );
       if (fingerprint === this.lastConfigFingerprint) {
@@ -643,9 +660,128 @@ export class MCPManager {
       await this.connectServerInternal(config);
       this.connectionStatus.set(config.id, 'connected');
     } catch (error) {
+      if (isMcpAuthRequiredError(error)) {
+        this.connectionStatus.set(config.id, 'auth-required');
+        return;
+      }
       this.connectionStatus.set(config.id, 'failed');
       throw error;
     }
+  }
+
+  private usesOAuth(config: MCPServerConfig): boolean {
+    return config.authType === 'oauth' && (config.type === 'sse' || config.type === 'streamable-http');
+  }
+
+  private buildRemoteTransportOptions(config: MCPServerConfig): {
+    authProvider?: OAuthClientProvider;
+    requestInit?: RequestInit;
+  } {
+    if (this.usesOAuth(config)) {
+      return {
+        authProvider: this.oauthService.getProvider(config.id, config),
+      };
+    }
+    if (config.headers && Object.keys(config.headers).length > 0) {
+      return { requestInit: { headers: config.headers } };
+    }
+    return {};
+  }
+
+  private isOAuthUnauthorizedError(error: unknown): boolean {
+    return error instanceof UnauthorizedError || isMcpTokenAuthErrorMessage(getErrorMessage(error));
+  }
+
+  private async handleOAuthUnauthorized(
+    config: MCPServerConfig,
+    options?: { invalidateTokens?: boolean }
+  ): Promise<never> {
+    if (options?.invalidateTokens) {
+      getMcpOAuthStore().invalidate(config.id, 'tokens');
+    }
+
+    log(`[MCPManager] OAuth required for ${config.name}; preparing authorization flow`);
+    const result = await this.oauthService.prepareAuth(config);
+    if (result.status === 'authorized') {
+      throw new Error('OAuth prepare returned authorized but connection was unauthorized');
+    }
+    if (result.status === 'error') {
+      throw new Error(result.error);
+    }
+    throw new McpAuthRequiredError(config.id, config.name);
+  }
+
+  private async handleOAuthAuthFailure(
+    config: MCPServerConfig,
+    transport: { close: () => Promise<void> }
+  ): Promise<never> {
+    try {
+      await transport.close();
+    } catch {
+      /* ignore close error */
+    }
+    return this.handleOAuthUnauthorized(config, { invalidateTokens: true });
+  }
+
+  async handleOAuthCallbackUrl(callbackUrl: string): Promise<boolean> {
+    const params = parseMcpOAuthCallbackUrl(callbackUrl);
+    if (!params?.state) {
+      logWarn('[MCPManager] OAuth callback missing state');
+      return false;
+    }
+
+    const serverId = getMcpOAuthStore().getServerIdByState(params.state);
+    if (!serverId) {
+      logWarn('[MCPManager] OAuth callback state not found');
+      return false;
+    }
+
+    const config = this.serverConfigs.get(serverId);
+    if (!config || !this.usesOAuth(config)) {
+      logWarn(`[MCPManager] OAuth callback for unknown or non-OAuth server: ${serverId}`);
+      return false;
+    }
+
+    this.connectionStatus.set(serverId, 'authenticating');
+    const exchange = await this.oauthService.handleCallbackUrl(callbackUrl, config);
+    if (!exchange.success) {
+      this.connectionStatus.set(serverId, 'auth-required');
+      logWarn(`[MCPManager] OAuth callback failed: ${exchange.error}`);
+      return false;
+    }
+
+    try {
+      await this.reconnectServer(serverId);
+      return true;
+    } catch (error) {
+      logError(`[MCPManager] Reconnect after OAuth failed for ${config.name}:`, error);
+      this.connectionStatus.set(serverId, 'failed');
+      return false;
+    }
+  }
+
+  async startOAuthBrowser(serverId: string): Promise<{ success: boolean; error?: string }> {
+    const config = this.serverConfigs.get(serverId);
+    if (!config || !this.usesOAuth(config)) {
+      return { success: false, error: 'Server is not configured for OAuth' };
+    }
+
+    const prepared = await this.oauthService.prepareAuth(config);
+    if (prepared.status === 'error') {
+      return { success: false, error: prepared.error };
+    }
+    if (prepared.status === 'authorized') {
+      await this.reconnectServer(serverId);
+      return { success: true };
+    }
+
+    return this.oauthService.startOAuth(serverId);
+  }
+
+  async disconnectOAuth(serverId: string): Promise<void> {
+    await this.oauthService.disconnectOAuth(serverId);
+    await this.disconnectServer(serverId);
+    this.connectionStatus.set(serverId, 'auth-required');
   }
 
   /**
@@ -668,8 +804,7 @@ export class MCPManager {
 
       // Auto-migrate old configs: if using 'npx -y tsx' with built-in MCP servers, switch to 'node'
       const isBuiltinServer =
-        config.name === 'GUI_Operate' ||
-        config.name === 'GUI Operate' ||
+        isGuiOperateServerName(config.name) ||
         config.name === 'Software_Development' ||
         config.name === 'Software Development';
       const isOldConfig =
@@ -848,8 +983,8 @@ export class MCPManager {
         throw new Error(`SSE server ${config.name} has a malformed URL: "${config.url}"`);
       }
 
-      // Create SSE transport — headers must be passed via requestInit, not as a raw dict
-      transport = new SSEClientTransport(sseUrl, { requestInit: { headers: config.headers } });
+      const remoteOptions = this.buildRemoteTransportOptions(config);
+      transport = new SSEClientTransport(sseUrl, remoteOptions);
     } else if (config.type === 'streamable-http') {
       if (!config.url) {
         throw new Error(`Streamable HTTP server ${config.name} requires a URL`);
@@ -866,12 +1001,8 @@ export class MCPManager {
         );
       }
 
-      // Create Streamable HTTP transport
-      const requestInit: RequestInit = {};
-      if (config.headers && Object.keys(config.headers).length > 0) {
-        requestInit.headers = config.headers;
-      }
-      transport = new StreamableHTTPClientTransport(httpUrl, { requestInit });
+      const remoteOptions = this.buildRemoteTransportOptions(config);
+      transport = new StreamableHTTPClientTransport(httpUrl, remoteOptions);
     } else {
       throw new Error(`Unsupported transport type: ${config.type}`);
     }
@@ -970,6 +1101,10 @@ export class MCPManager {
         }
       }
     } catch (error: unknown) {
+      if (this.usesOAuth(config) && this.isOAuthUnauthorizedError(error)) {
+        await this.handleOAuthAuthFailure(config, transport);
+      }
+
       logError(`[MCPManager] Client.connect() failed:`, error);
       const connErr = error as { code?: unknown; name?: unknown; message?: unknown };
       logError(
@@ -1505,19 +1640,36 @@ export class MCPManager {
         }
 
         const lowerErrorMsg = errorMsg.toLowerCase();
+        const tokenAuthError = isMcpTokenAuthErrorMessage(errorMsg);
+        const serverConfig = this.serverConfigs.get(currentTool.serverId);
         const shouldReconnect =
           lowerErrorMsg.includes('mcp server not connected') ||
           lowerErrorMsg.includes('not connected') ||
-          lowerErrorMsg.includes('connection closed');
+          lowerErrorMsg.includes('connection closed') ||
+          tokenAuthError;
 
         if (shouldReconnect) {
-          log(
-            `[MCPManager] Reconnectable MCP error detected for ${currentTool.serverName}; attempting reconnect...`
-          );
+          if (tokenAuthError && serverConfig && this.usesOAuth(serverConfig)) {
+            log(
+              `[MCPManager] OAuth token expired for ${currentTool.serverName}; clearing tokens and reconnecting...`
+            );
+            getMcpOAuthStore().invalidate(serverConfig.id, 'tokens');
+          } else {
+            log(
+              `[MCPManager] Reconnectable MCP error detected for ${currentTool.serverName}; attempting reconnect...`
+            );
+          }
+
           const reconnected = await this.reconnectServer(currentTool.serverId);
           if (reconnected) {
             continue;
           }
+
+          if (tokenAuthError && serverConfig && this.usesOAuth(serverConfig)) {
+            this.connectionStatus.set(serverConfig.id, 'auth-required');
+            throw new McpAuthRequiredError(serverConfig.id, serverConfig.name);
+          }
+
           logWarn(
             `[MCPManager] Reconnect attempt failed for ${currentTool.serverName}, will retry after backoff`
           );
@@ -1536,6 +1688,18 @@ export class MCPManager {
         // For non-retryable errors, exit retry loop immediately
         break;
       }
+    }
+
+    const lastErrorMessage = getErrorMessage(lastError);
+    const failedServerConfig = this.serverConfigs.get(tool.serverId);
+    if (
+      isMcpTokenAuthErrorMessage(lastErrorMessage) &&
+      failedServerConfig &&
+      this.usesOAuth(failedServerConfig)
+    ) {
+      getMcpOAuthStore().invalidate(failedServerConfig.id, 'tokens');
+      this.connectionStatus.set(failedServerConfig.id, 'auth-required');
+      throw new McpAuthRequiredError(failedServerConfig.id, failedServerConfig.name);
     }
 
     throw lastError;
@@ -1561,6 +1725,12 @@ export class MCPManager {
     try {
       await this.disconnectServer(serverId);
       await this.connectServer(config);
+      if (this.connectionStatus.get(serverId) !== 'connected') {
+        logWarn(
+          `[MCPManager] Reconnect for ${config.name} did not reach connected state (${this.connectionStatus.get(serverId)})`
+        );
+        return false;
+      }
       await this.refreshTools();
       log(`[MCPManager] Reconnected server ${config.name} (${serverId})`);
       return true;
@@ -1579,14 +1749,14 @@ export class MCPManager {
     id: string;
     name: string;
     connected: boolean;
-    status: 'connecting' | 'connected' | 'failed' | 'disabled';
+    status: McpConnectionStatus;
     toolCount: number;
   }> {
     const status: Array<{
       id: string;
       name: string;
       connected: boolean;
-      status: 'connecting' | 'connected' | 'failed' | 'disabled';
+      status: McpConnectionStatus;
       toolCount: number;
     }> = [];
 
@@ -1597,7 +1767,7 @@ export class MCPManager {
       ).length;
 
       // Derive status: use connectionStatus map if available, otherwise infer from enabled/connected
-      let serverStatus: 'connecting' | 'connected' | 'failed' | 'disabled';
+      let serverStatus: McpConnectionStatus;
       const trackedStatus = this.connectionStatus.get(serverId);
       if (!config.enabled) {
         serverStatus = 'disabled';
@@ -1710,7 +1880,8 @@ function isReconnectableErrorText(text: string): boolean {
   return (
     normalized === 'not connected' ||
     normalized.includes('mcp server not connected') ||
-    normalized.includes('connection closed')
+    normalized.includes('connection closed') ||
+    isMcpTokenAuthErrorMessage(text)
   );
 }
 
@@ -1732,7 +1903,7 @@ function shouldHotReloadGuiVisionServer(
   if (actualToolName !== 'gui_verify_vision') {
     return false;
   }
-  if (!serverName.toLowerCase().includes('gui')) {
+  if (!isGuiOperateServerName(serverName)) {
     return false;
   }
 

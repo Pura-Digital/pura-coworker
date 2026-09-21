@@ -8,10 +8,10 @@ import {
 describe('mcp-preset-url', () => {
   it('substitutes placeholders in preset URLs', () => {
     expect(
-      resolvePresetUrl('https://mcp.archiveye.ai/user/{ARCHIVEYE_API_KEY}/mcp', {
-        ARCHIVEYE_API_KEY: 'secret-key',
+      resolvePresetUrl('https://mcp.example/user/{API_KEY}/mcp', {
+        API_KEY: 'secret-key',
       })
-    ).toBe('https://mcp.archiveye.ai/user/secret-key/mcp');
+    ).toBe('https://mcp.example/user/secret-key/mcp');
   });
 
   it('encodes special characters in URL segments', () => {
@@ -23,8 +23,8 @@ describe('mcp-preset-url', () => {
   });
 
   it('masks unresolved placeholders for display', () => {
-    expect(maskPresetUrl('https://mcp.archiveye.ai/user/{ARCHIVEYE_API_KEY}/mcp')).toBe(
-      'https://mcp.archiveye.ai/user/***/mcp'
+    expect(maskPresetUrl('https://mcp.example/user/{API_KEY}/mcp')).toBe(
+      'https://mcp.example/user/***/mcp'
     );
   });
 

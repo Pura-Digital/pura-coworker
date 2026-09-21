@@ -33,6 +33,8 @@ import type {
   McpTool,
   McpServerStatus,
   McpPresetsMap,
+  McpRegistryBrowseRequest,
+  McpRegistryBrowseResponse,
   RemoteConfig,
   GatewayConfig,
   TelegramChannelConfig,
@@ -230,13 +232,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getServers: (): Promise<McpServerConfig[]> => ipcRenderer.invoke('mcp.getServers'),
     getServer: (serverId: string): Promise<McpServerConfig | undefined> =>
       ipcRenderer.invoke('mcp.getServer', serverId),
-    saveServer: (config: McpServerConfig): Promise<{ success: boolean; error?: string }> =>
+    saveServer: (
+      config: McpServerConfig
+    ): Promise<{ success: boolean; error?: string; authRequired?: boolean }> =>
       ipcRenderer.invoke('mcp.saveServer', config),
     deleteServer: (serverId: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('mcp.deleteServer', serverId),
     getTools: (): Promise<McpTool[]> => ipcRenderer.invoke('mcp.getTools'),
     getServerStatus: (): Promise<McpServerStatus[]> => ipcRenderer.invoke('mcp.getServerStatus'),
     getPresets: (): Promise<McpPresetsMap> => ipcRenderer.invoke('mcp.getPresets'),
+    browseRegistry: (request?: McpRegistryBrowseRequest): Promise<McpRegistryBrowseResponse> =>
+      ipcRenderer.invoke('mcp.browseRegistry', request),
+    startOAuth: (serverId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('mcp.startOAuth', serverId),
+    disconnectOAuth: (serverId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('mcp.disconnectOAuth', serverId),
   },
 
   // Skills methods
@@ -565,11 +575,18 @@ declare global {
       mcp: {
         getServers: () => Promise<McpServerConfig[]>;
         getServer: (serverId: string) => Promise<McpServerConfig | undefined>;
-        saveServer: (config: McpServerConfig) => Promise<{ success: boolean; error?: string }>;
+        saveServer: (
+          config: McpServerConfig
+        ) => Promise<{ success: boolean; error?: string; authRequired?: boolean }>;
         deleteServer: (serverId: string) => Promise<{ success: boolean }>;
         getTools: () => Promise<McpTool[]>;
         getServerStatus: () => Promise<McpServerStatus[]>;
         getPresets: () => Promise<McpPresetsMap>;
+        browseRegistry: (
+          request?: McpRegistryBrowseRequest
+        ) => Promise<McpRegistryBrowseResponse>;
+        startOAuth: (serverId: string) => Promise<{ success: boolean; error?: string }>;
+        disconnectOAuth: (serverId: string) => Promise<{ success: boolean; error?: string }>;
       };
       skills: {
         getAll: () => Promise<Skill[]>;

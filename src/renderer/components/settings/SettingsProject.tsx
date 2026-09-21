@@ -16,6 +16,7 @@ import {
 import { useAppStore } from '../../store';
 import type { Project, ProjectConfigMode, McpServerConfigRef } from '../../types';
 import type { McpServerConfig } from '../../../shared/ipc-types';
+import { formatMcpServerDisplayName } from '../../../shared/mcp-display-names';
 
 interface SettingsProjectProps {
   project: Project;
@@ -304,7 +305,7 @@ export function SettingsProject({ project, onClose }: SettingsProjectProps) {
                         <Plug className="w-4 h-4 text-accent flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="text-[13px] font-medium text-text-primary truncate">
-                            {server.name}
+                            {formatMcpServerDisplayName(server.name)}
                           </div>
                           <div className="text-[11px] text-text-muted">
                             {server.type} {server.command ?? server.url ?? ''}

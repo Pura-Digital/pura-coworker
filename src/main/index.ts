@@ -37,6 +37,7 @@ import { listOpenAICompatibleModels } from './config/openai-compat-models';
 import { listPuraDigitalModels } from './config/pura-digital-models';
 import { listProviderModels } from './config/provider-models';
 import { mcpConfigStore } from './mcp/mcp-config-store';
+import { browseMcpRegistry } from './mcp/mcp-registry-client';
 import { getSandboxAdapter, shutdownSandbox } from './sandbox/sandbox-adapter';
 import { SandboxSync } from './sandbox/sandbox-sync';
 import { WSLBridge } from './sandbox/wsl-bridge';
@@ -50,6 +51,15 @@ import {
 } from './utils/power-save-manager';
 import { normalizeDisplayScale, toElectronZoomFactor } from '../shared/ui-zoom';
 import type { MCPServerConfig } from './mcp/mcp-manager';
+import { isMcpAuthRequiredError } from './mcp/mcp-oauth-errors';
+import {
+  captureSecondInstanceMcpOAuthCallback,
+  captureStartupMcpOAuthCallback,
+  processMcpOAuthCallbacks,
+  registerMcpOAuthProtocolHandlers,
+  setMcpOAuthManagerResolver,
+} from './mcp/mcp-oauth-lifecycle';
+import { getMcpOAuthService } from './mcp/mcp-oauth-service';
 import type {
   ClientEvent,
   ServerEvent,
@@ -215,12 +225,16 @@ if (isDev) {
   );
 }
 
+registerMcpOAuthProtocolHandlers();
+captureStartupMcpOAuthCallback(process.argv);
+
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   logWarn('[App] Another instance is already running, quitting this instance');
   app.quit();
 } else if (!isDev) {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    captureSecondInstanceMcpOAuthCallback(argv);
     const existingWindow =
       mainWindow && !mainWindow.isDestroyed()
         ? mainWindow
@@ -976,6 +990,8 @@ app
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
     sessionManager = new SessionManager(db, sendToRenderer, pluginRuntimeService, extensionManager);
+    setMcpOAuthManagerResolver(() => sessionManager?.getMCPManager() ?? null);
+    await processMcpOAuthCallbacks();
     skillsManager = new SkillsManager(db, {
       getConfiguredGlobalSkillsPath: () => configStore.get('globalSkillsPath') || '',
       setConfiguredGlobalSkillsPath: (nextPath: string) => {
@@ -1841,12 +1857,14 @@ ipcMain.handle('mcp.saveServer', async (_event, config: MCPServerConfig) => {
       log(`[MCP] Server ${config.name} updated successfully`);
     } catch (err) {
       logError('[MCP] Failed to update server:', err);
-      // Roll back: save the config with enabled=false so a broken connector
-      // is not retried on next app startup
-      if (config.enabled) {
+      // Roll back unless OAuth authorization is pending (not a hard failure)
+      if (config.enabled && !isMcpAuthRequiredError(err)) {
         mcpConfigStore.saveServer({ ...config, enabled: false });
       }
       const errorMessage = err instanceof Error ? err.message : String(err);
+      if (isMcpAuthRequiredError(err)) {
+        return { success: true, authRequired: true };
+      }
       return { success: false, error: errorMessage };
     }
   }
@@ -1854,6 +1872,10 @@ ipcMain.handle('mcp.saveServer', async (_event, config: MCPServerConfig) => {
 });
 
 ipcMain.handle('mcp.deleteServer', async (_event, serverId: string) => {
+  const existing = mcpConfigStore.getServer(serverId);
+  if (existing?.authType === 'oauth') {
+    await getMcpOAuthService().disconnectOAuth(serverId);
+  }
   mcpConfigStore.deleteServer(serverId);
   // Remove and disconnect only this specific server
   if (sessionManager) {
@@ -1901,6 +1923,73 @@ ipcMain.handle('mcp.getPresets', () => {
   } catch (error) {
     logError('[MCP] Error getting presets:', error);
     return {};
+  }
+});
+
+ipcMain.handle('mcp.browseRegistry', async (_event, request) => {
+  try {
+    const result = await browseMcpRegistry({
+      cursor: request?.cursor,
+      search: request?.search,
+      limit: request?.limit,
+      extendSearch: request?.extendSearch,
+      remoteSearch: request?.remoteSearch,
+    });
+    return {
+      success: true,
+      items: result.items,
+      newItems: result.newItems,
+      nextCursor: result.nextCursor,
+      extended: result.extended,
+    };
+  } catch (error) {
+    logError('[MCP] Error browsing registry:', error);
+    return {
+      success: false,
+      items: [],
+      nextCursor: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+ipcMain.handle('mcp.startOAuth', async (_event, serverId: string) => {
+  try {
+    if (!sessionManager) {
+      return { success: false, error: 'Session manager not ready' };
+    }
+    const config = mcpConfigStore.getServer(serverId);
+    if (!config || config.authType !== 'oauth') {
+      return { success: false, error: 'Server is not configured for OAuth' };
+    }
+    return await sessionManager.getMCPManager().startOAuthBrowser(serverId);
+  } catch (error) {
+    logError('[MCP] startOAuth failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+ipcMain.handle('mcp.disconnectOAuth', async (_event, serverId: string) => {
+  try {
+    if (!sessionManager) {
+      return { success: false, error: 'Session manager not ready' };
+    }
+    const config = mcpConfigStore.getServer(serverId);
+    if (!config || config.authType !== 'oauth') {
+      return { success: false, error: 'Server is not configured for OAuth' };
+    }
+    await sessionManager.getMCPManager().disconnectOAuth(serverId);
+    sessionManager.invalidateMcpServersCache();
+    return { success: true };
+  } catch (error) {
+    logError('[MCP] disconnectOAuth failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 });
 
@@ -2338,7 +2427,7 @@ ipcMain.handle('logs.export', async () => {
     // Show save dialog
     const result = await dialog.showSaveDialog(mainWindow!, {
       title: 'Export Logs',
-      defaultPath: `opencowork-logs-${new Date().toISOString().split('T')[0]}.zip`,
+      defaultPath: `aiden-logs-${new Date().toISOString().split('T')[0]}.zip`,
       filters: [
         { name: 'ZIP Archive', extensions: ['zip'] },
         { name: 'All Files', extensions: ['*'] },

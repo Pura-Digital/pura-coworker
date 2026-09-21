@@ -22,6 +22,9 @@ const PLATFORMS = {
 const BASE_URL = 'https://nodejs.org/dist';
 const OUTPUT_DIR = path.join(__dirname, '..', 'resources', 'node');
 const DOWNLOAD_ALL_PLATFORMS = process.env.COLAV_DOWNLOAD_ALL_NODE_BINARIES === '1';
+const args = process.argv.slice(2);
+const DOWNLOAD_ALL_DARWIN_ARCHES =
+  process.env.COLAV_DOWNLOAD_ALL_DARWIN_ARCHES === '1' || args.includes('--all-darwin');
 const WINDOWS_UNLINK_RETRY_COUNT = 8;
 const WINDOWS_UNLINK_RETRY_DELAY_MS = 500;
 
@@ -32,7 +35,7 @@ const WINDOWS_UNLINK_RETRY_DELAY_MS = 500;
  * bundled node to run npm's real npx-cli.js directly.
  * Safe to call multiple times (idempotent).
  */
-function applyNpxFix(extractDir) {
+function applyNpxFix(extractDir, platform) {
   const npxBinPath = path.join(extractDir, 'bin', 'npx');
   const realNpxCli = path.join(extractDir, 'lib', 'node_modules', 'npm', 'bin', 'npx-cli.js');
 
@@ -57,7 +60,7 @@ function applyNpxFix(extractDir) {
   // Use a shell wrapper that resolves the bundled node via dirname,
   // then executes npx-cli.js with it. This avoids shebang issues
   // where #!/usr/bin/env node picks up the system node.
-  const isWindows = extractDir.includes('win32') || extractDir.includes('win-x');
+  const isWindows = platform === 'win32';
   if (isWindows) {
     // Windows: create a .cmd wrapper
     const cmdPath = npxBinPath + '.cmd';
@@ -158,7 +161,7 @@ async function downloadAndExtract(platform, arch) {
   if (fs.existsSync(extractDir)) {
     console.log(`Already exists: ${extractDir}`);
     // Still apply npx fix in case it was cached without it
-    applyNpxFix(extractDir);
+    applyNpxFix(extractDir, platform);
     return;
   }
 
@@ -229,7 +232,7 @@ async function downloadAndExtract(platform, arch) {
       }
     }
 
-    applyNpxFix(extractDir);
+    applyNpxFix(extractDir, platform);
 
     console.log(`✓ Extracted: ${platform}-${arch}`);
   } catch (error) {
@@ -252,14 +255,23 @@ async function main() {
     ? Object.entries(PLATFORMS)
     : [[process.platform, PLATFORMS[process.platform] || {}]];
 
-  if (!DOWNLOAD_ALL_PLATFORMS) {
+  if (DOWNLOAD_ALL_PLATFORMS) {
+    console.log('Downloading all configured platform binaries');
+  } else if (DOWNLOAD_ALL_DARWIN_ARCHES && process.platform === 'darwin') {
+    console.log('Downloading all macOS architectures: arm64, x64');
+  } else {
     console.log(`Current platform only: ${process.platform}-${process.arch}`);
   }
 
   for (const [platform, arches] of platformsToDownload) {
-    const archList = DOWNLOAD_ALL_PLATFORMS
-      ? Object.keys(arches)
-      : [process.arch];
+    let archList;
+    if (DOWNLOAD_ALL_PLATFORMS) {
+      archList = Object.keys(arches);
+    } else if (DOWNLOAD_ALL_DARWIN_ARCHES && platform === 'darwin') {
+      archList = Object.keys(arches);
+    } else {
+      archList = [process.arch];
+    }
 
     for (const arch of archList) {
       downloads.push(downloadAndExtract(platform, arch));

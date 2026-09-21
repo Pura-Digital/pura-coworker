@@ -27,6 +27,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { PathResolver } from '../sandbox/path-resolver';
 import { MCPManager } from '../mcp/mcp-manager';
 import { mcpConfigStore } from '../mcp/mcp-config-store';
+import { formatMcpReconnectUserMessage, isMcpTokenAuthErrorMessage } from '../../shared/mcp-auth-errors';
+import { isGuiOperateServerName } from '../../shared/mcp-display-names';
+import { isMcpAuthRequiredError } from '../mcp/mcp-oauth-errors';
 import {
   log,
   logWarn,
@@ -302,7 +305,14 @@ function buildMcpCustomTools(mcpManager: MCPManager): ToolDefinition[] {
           };
         } catch (err: unknown) {
           logError(`[ClaudeAgentRunner] MCP tool ${mcpTool.name} failed:`, err);
-          throw err instanceof Error ? err : new Error(String(err));
+          if (isMcpAuthRequiredError(err)) {
+            throw err;
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          if (isMcpTokenAuthErrorMessage(message)) {
+            throw new Error(formatMcpReconnectUserMessage(mcpTool.serverName));
+          }
+          throw err instanceof Error ? err : new Error(message);
         }
       },
     };
@@ -1750,7 +1760,7 @@ ${hints.join('\n')}
                     config.name === 'Software Development'
                   ) {
                     presetKey = 'software-development';
-                  } else if (config.name === 'GUI_Operate' || config.name === 'GUI Operate') {
+                  } else if (isGuiOperateServerName(config.name)) {
                     presetKey = 'gui-operate';
                   }
 

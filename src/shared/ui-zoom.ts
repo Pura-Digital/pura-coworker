@@ -1,5 +1,5 @@
 /** Electron zoom at our standard UI density (100% in settings). */
-export const UI_ZOOM_BASE = 0.8;
+export const UI_ZOOM_BASE = 0.9;
 
 export const UI_ZOOM_MIN_DISPLAY = 0.8;
 export const UI_ZOOM_MAX_DISPLAY = 1.5;
@@ -44,7 +44,7 @@ export function migrateLegacyUiZoom(value: unknown): number {
     return normalizeDisplayScale(parsed, 1);
   }
 
-  // Old "100%" was browser-native zoom; our standard UI is 80% Electron zoom.
+  // Old "100%" was browser-native zoom; our standard UI is 90% Electron zoom.
   if (rounded === 1) {
     return 1;
   }

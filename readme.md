@@ -113,7 +113,8 @@ Get the latest version from our [Releases Page](https://github.com/OpenCoworkAI/
 | Platform                  | File Type |
 | ------------------------- | --------- |
 | **Windows**               | `.exe`    |
-| **macOS** (Apple Silicon) | `.dmg`    |
+| **macOS** (Apple Silicon) | `-mac-arm64.dmg` |
+| **macOS** (Intel)         | `-mac-x64.dmg`   |
 
 ### Option 3: Build from Source
 

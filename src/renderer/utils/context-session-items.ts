@@ -1,3 +1,4 @@
+import { formatMcpServerDisplayName } from '../../shared/mcp-display-names';
 import type { ContentBlock, MCPServerInfo, Message, TraceStep } from '../types';
 
 export type CalledMcpConnector = {
@@ -16,7 +17,7 @@ function normalizeMcpServerKey(name: string): string {
 }
 
 function humanizeMcpServerKey(key: string): string {
-  return key.replace(/_/g, ' ').trim();
+  return formatMcpServerDisplayName(key.replace(/_/g, ' ').trim());
 }
 
 function extractMcpServerKey(toolName: string | undefined): string | null {
@@ -140,7 +141,7 @@ export function getCalledMcpConnectors(
   return Array.from(counts.entries())
     .map(([key, callCount]) => ({
       key,
-      name: serverByKey.get(key) ?? humanizeMcpServerKey(key),
+      name: formatMcpServerDisplayName(serverByKey.get(key) ?? humanizeMcpServerKey(key)),
       callCount,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));

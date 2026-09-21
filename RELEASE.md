@@ -46,7 +46,7 @@ gh run watch   # oppure apri Actions su GitHub
 Workflow: `.github/workflows/release.yml`
 
 Build:
-- **macOS** → `Aiden-x.y.z-mac-arm64.dmg`, `.zip`, `latest-mac.yml`, `.blockmap`
+- **macOS** → `Aiden-x.y.z-mac-arm64.dmg`, `Aiden-x.y.z-mac-x64.dmg`, `.zip` (per arch), `latest-mac.yml`, `.blockmap`
 - **Windows** → `Aiden-x.y.z-win-x64.exe`, `latest.yml`, `.blockmap`
 
 ### 5. Verifica release
@@ -78,15 +78,23 @@ npm run build          # macOS: richiede CSC_* per firma (vedi sotto)
 ```
 
 Output in `release/`:
-- `Aiden-x.y.z-mac-arm64.dmg`
-- `Aiden-x.y.z-mac-arm64.zip`
+- `Aiden-x.y.z-mac-arm64.dmg` (Apple Silicon)
+- `Aiden-x.y.z-mac-x64.dmg` (Intel)
+- `Aiden-x.y.z-mac-arm64.zip` / `Aiden-x.y.z-mac-x64.zip`
 
 Installazione manuale:
 
 ```bash
+# Apple Silicon
 open release/Aiden-3.4.2-mac-arm64.dmg
 # oppure
 cp -R release/mac-arm64/Aiden.app /Applications/
+
+# Intel Mac
+open release/Aiden-3.4.2-mac-x64.dmg
+# oppure
+cp -R release/mac-x64/Aiden.app /Applications/
+
 xattr -cr /Applications/Aiden.app
 ```
 

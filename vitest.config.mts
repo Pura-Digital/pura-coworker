@@ -12,7 +12,7 @@ export default defineConfig({
     },
     server: {
       deps: {
-        inline: ['electron-store'],
+        inline: ['electron-store', /@modelcontextprotocol\/sdk/],
       },
     },
     include: ['src/**/*.{test,spec}.{js,ts}', 'tests/**/*.{test,spec}.{js,ts}'],

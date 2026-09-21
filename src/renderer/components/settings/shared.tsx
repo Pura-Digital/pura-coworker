@@ -1,6 +1,7 @@
 // Shared types, constants, and components used across settings tab files.
 
 import type { TFunction } from 'i18next';
+import type { McpConnectionStatus, McpOAuthConfig } from '../../../shared/mcp-oauth';
 import type { ScheduleWeekday } from '../../types';
 
 // ==================== Shared Types ====================
@@ -15,13 +16,15 @@ export interface MCPServerConfig {
   url?: string;
   headers?: Record<string, string>;
   enabled: boolean;
+  authType?: 'oauth';
+  oauth?: McpOAuthConfig;
 }
 
 export interface MCPServerStatus {
   id: string;
   name: string;
   connected: boolean;
-  status: 'connecting' | 'connected' | 'failed' | 'disabled';
+  status: McpConnectionStatus;
   toolCount: number;
 }
 
@@ -39,6 +42,8 @@ export interface MCPPreset {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  authType?: 'oauth';
+  oauth?: McpOAuthConfig;
   requiresEnv?: string[];
   envDescription?: Record<string, string>;
 }

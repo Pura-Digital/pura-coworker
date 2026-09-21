@@ -2,6 +2,11 @@ appId: com.puradigital.aiden
 productName: Aiden
 copyright: Copyright © 2026 Pura Digital Team
 
+protocols:
+  - name: Aiden OAuth
+    schemes:
+      - com.puradigital.aiden
+
 directories:
   output: release
   buildResources: resources
@@ -91,12 +96,15 @@ mac:
     - target: dmg
       arch:
         - arm64
+        - x64
     - target: zip
       arch:
         - arm64
+        - x64
     - target: dir
       arch:
         - arm64
+        - x64
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
   notarize: false
   hardenedRuntime: true

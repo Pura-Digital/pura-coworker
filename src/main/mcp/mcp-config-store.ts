@@ -20,10 +20,10 @@ export const MCP_SERVER_PRESETS: Record<
   archiveye: {
     name: 'Archiveye',
     type: 'streamable-http',
-    url: 'https://mcp.archiveye.ai/user/{ARCHIVEYE_API_KEY}/mcp',
-    requiresEnv: ['ARCHIVEYE_API_KEY'],
-    envDescription: {
-      ARCHIVEYE_API_KEY: 'Archiveye API key (from your Archiveye account settings)',
+    url: 'https://mcp.archiveye.ai/user/mcp',
+    authType: 'oauth',
+    oauth: {
+      registrationStrategy: 'auto',
     },
   },
   chrome: {
@@ -32,36 +32,8 @@ export const MCP_SERVER_PRESETS: Record<
     command: 'npx',
     args: ['-y', 'chrome-devtools-mcp@latest', '--browser-url', 'http://localhost:9222'],
   },
-  notion: {
-    name: 'Notion',
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@notionhq/notion-mcp-server'],
-    env: {
-      NOTION_TOKEN: '',
-    },
-    requiresEnv: ['NOTION_TOKEN'],
-    envDescription: {
-      NOTION_TOKEN: 'Notion Internal Integration Token (get from notion.so/profile/integrations)',
-    },
-  },
-  'software-development': {
-    name: 'Software_Development',
-    type: 'stdio',
-    command: 'node',
-    args: ['{SOFTWARE_DEV_SERVER_PATH}'], // Path will be resolved at runtime (compiled JS in production)
-    env: {
-      WORKSPACE_DIR: '',
-      TEST_ENV: 'development',
-    },
-    requiresEnv: [],
-    envDescription: {
-      WORKSPACE_DIR: 'Workspace directory for code development (optional)',
-      TEST_ENV: 'Test environment: development, staging, or production (optional)',
-    },
-  },
   'gui-operate': {
-    name: 'GUI_Operate',
+    name: 'Computer Use',
     type: 'stdio',
     command: 'node',
     args: ['{GUI_OPERATE_SERVER_PATH}'], // Path will be resolved at runtime (compiled JS in production)
@@ -211,13 +183,6 @@ class MCPConfigStore {
   }
 
   /**
-   * Get the path to the Software Development MCP server file
-   */
-  private getSoftwareDevServerPath(): string | null {
-    return this.getMcpServerPath('software-dev-server-example.ts');
-  }
-
-  /**
    * Get the path to the GUI Operate MCP server file
    */
   private getGuiOperateServerPath(): string | null {
@@ -240,10 +205,6 @@ class MCPConfigStore {
       resolvedPreset = {
         ...preset,
         args: preset.args.map((arg) => {
-          // Software Development server path
-          if (arg === '{SOFTWARE_DEV_SERVER_PATH}') {
-            return this.getSoftwareDevServerPath() || arg;
-          }
           // GUI Operate server path
           if (arg === '{GUI_OPERATE_SERVER_PATH}') {
             return this.getGuiOperateServerPath() || arg;

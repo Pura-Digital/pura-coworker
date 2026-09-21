@@ -1,11 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
+  default: {},
   app: {
     isPackaged: false,
     getPath: () => '/tmp',
     getVersion: () => '0.0.0',
   },
+  shell: {
+    openExternal: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('../src/main/mcp/mcp-oauth-service', () => ({
+  getMcpOAuthService: () => ({
+    getProvider: vi.fn(),
+    prepareAuth: vi.fn(),
+    startOAuth: vi.fn(),
+    handleCallbackUrl: vi.fn(),
+    disconnectOAuth: vi.fn(),
+    hasValidTokens: vi.fn().mockReturnValue(false),
+  }),
+}));
+
+vi.mock('../src/main/mcp/mcp-oauth-store', () => ({
+  getMcpOAuthStore: () => ({
+    getServerIdByState: vi.fn(),
+    getDiscovery: vi.fn(),
+  }),
 }));
 
 import { mergeShellEnvForMcp } from '../src/main/mcp/mcp-manager';

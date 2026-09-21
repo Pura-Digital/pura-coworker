@@ -8,6 +8,9 @@
  *    the originating module lives in `main/` (not importable from renderer/preload).
  */
 
+import type { McpConnectionStatus, McpOAuthConfig } from './mcp-oauth';
+import type { McpMarketplaceItem } from './mcp-registry';
+
 // ---------------------------------------------------------------------------
 // MCP
 // ---------------------------------------------------------------------------
@@ -24,6 +27,9 @@ export interface McpServerConfig {
   url?: string;
   headers?: Record<string, string>;
   enabled: boolean;
+  /** When set to 'oauth', remote transports use MCP OAuth instead of static headers. */
+  authType?: 'oauth';
+  oauth?: McpOAuthConfig;
 }
 
 /** Tool exposed by an MCP server (mirrors MCPTool in mcp-manager.ts). */
@@ -44,7 +50,7 @@ export interface McpServerStatus {
   id: string;
   name: string;
   connected: boolean;
-  status: 'connecting' | 'connected' | 'failed' | 'disabled';
+  status: McpConnectionStatus;
   toolCount: number;
 }
 
@@ -59,6 +65,25 @@ export type McpPresetsMap = Record<
     envDescription?: Record<string, string>;
   }
 >;
+
+export type McpRegistryBrowseRequest = {
+  cursor?: string;
+  search?: string;
+  limit?: number;
+  /** Fetch more pages from the registry API when local results are empty. */
+  extendSearch?: boolean;
+  /** Query the registry API directly (search param) and merge results. */
+  remoteSearch?: boolean;
+};
+
+export type McpRegistryBrowseResponse = {
+  success: boolean;
+  items: McpMarketplaceItem[];
+  newItems?: McpMarketplaceItem[];
+  nextCursor: string | null;
+  extended?: boolean;
+  error?: string;
+};
 
 // ---------------------------------------------------------------------------
 // Remote

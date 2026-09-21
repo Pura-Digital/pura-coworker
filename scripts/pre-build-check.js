@@ -182,10 +182,32 @@ function runChecks(rootDir, platform, arch) {
  */
 function main() {
   const PROJECT_ROOT = path.join(__dirname, '..');
+  const args = process.argv.slice(2);
+  const checkAllDarwinArches =
+    process.env.COLAV_PREBUILD_ALL_DARWIN_ARCHES === '1' || args.includes('--all-darwin');
 
   console.log('\nRunning pre-build checks...\n');
 
-  const { passed, warnings, failed, hasFatal } = runChecks(PROJECT_ROOT, process.platform);
+  const arches =
+    process.platform === 'darwin' && checkAllDarwinArches
+      ? ['arm64', 'x64']
+      : [process.arch === 'arm64' ? 'arm64' : 'x64'];
+
+  let passed = 0;
+  let warnings = 0;
+  let failed = 0;
+  let hasFatal = false;
+
+  for (const arch of arches) {
+    if (arches.length > 1) {
+      console.log(`\n--- macOS ${arch} ---\n`);
+    }
+    const result = runChecks(PROJECT_ROOT, process.platform, arch);
+    passed += result.passed;
+    warnings += result.warnings;
+    failed += result.failed;
+    hasFatal = hasFatal || result.hasFatal;
+  }
 
   console.log(
     `\nPre-build check: ${passed} passed, ${warnings} warnings, ${failed} failed`

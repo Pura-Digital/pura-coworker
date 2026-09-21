@@ -10,6 +10,7 @@ import {
 import type { ToolUseContent, ToolResultContent, ContentBlock, Message } from '../../types';
 import { AskUserQuestionBlock } from './AskUserQuestionBlock';
 import { TodoWriteBlock } from './TodoWriteBlock';
+import { formatMcpServerDisplayName } from '../../../shared/mcp-display-names';
 import { getToolIcon, getToolLabel } from './toolHelpers';
 
 // Only allow safe image MIME types for data: URI rendering
@@ -163,7 +164,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         {/* MCP badge */}
         {isMCPTool && mcpServerName && (
           <span className="px-1.5 py-0.5 text-[10px] rounded-md bg-mcp/15 text-mcp flex-shrink-0 font-medium">
-            {mcpServerName}
+            {formatMcpServerDisplayName(mcpServerName)}
           </span>
         )}
 

@@ -118,7 +118,7 @@ export interface AppConfig {
   // UI theme preference
   theme: AppTheme;
 
-  // UI display scale (1 = standard Aiden density, rendered at 80% Electron zoom)
+  // UI display scale (1 = standard Aiden density, rendered at 90% Electron zoom)
   uiZoom: number;
 
   // Prevent system sleep while Aiden is actively working
