@@ -31,7 +31,8 @@ const RESET = '\x1b[0m';
  * @param {string} arch - Node.js process.arch value
  * @returns {CheckSpec[]}
  */
-function buildCheckList(platform, arch) {
+function buildCheckList(platform, arch, options = {}) {
+  const strictDarwinResources = options.strictDarwinResources === true;
   /** @type {CheckSpec[]} */
   const checks = [
     // Common checks (all platforms, FATAL)
@@ -85,13 +86,13 @@ function buildCheckList(platform, arch) {
         label: `Python runtime for macOS ${arch} (GUI automation)`,
         relPath: `resources/python/darwin-${arch}`,
         type: 'dir',
-        severity: 'warn',
+        severity: strictDarwinResources ? 'fatal' : 'warn',
       },
       {
         label: `CLI tools for macOS ${arch} (cliclick)`,
-        relPath: `resources/tools/darwin-${arch}`,
-        type: 'dir',
-        severity: 'warn',
+        relPath: `resources/tools/darwin-${arch}/bin/cliclick`,
+        type: 'file',
+        severity: strictDarwinResources ? 'fatal' : 'warn',
       }
     );
   } else if (platform === 'win32') {
@@ -129,9 +130,9 @@ function buildCheckList(platform, arch) {
  * @param {string} [arch] - Node.js arch string (e.g. 'x64', 'arm64'); defaults to process.arch
  * @returns {{ results: CheckResult[]; passed: number; warnings: number; failed: number; hasFatal: boolean }}
  */
-function runChecks(rootDir, platform, arch) {
+function runChecks(rootDir, platform, arch, options = {}) {
   const resolvedArch = arch || process.arch;
-  const checks = buildCheckList(platform, resolvedArch);
+  const checks = buildCheckList(platform, resolvedArch, options);
 
   let passed = 0;
   let warnings = 0;
@@ -202,7 +203,9 @@ function main() {
     if (arches.length > 1) {
       console.log(`\n--- macOS ${arch} ---\n`);
     }
-    const result = runChecks(PROJECT_ROOT, process.platform, arch);
+    const result = runChecks(PROJECT_ROOT, process.platform, arch, {
+      strictDarwinResources: checkAllDarwinArches,
+    });
     passed += result.passed;
     warnings += result.warnings;
     failed += result.failed;

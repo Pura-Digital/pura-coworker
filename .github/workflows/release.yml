@@ -84,6 +84,9 @@ jobs:
       - name: Vite build
         run: npx vite build
 
+      - name: Pre-build check (arm64 + x64 resources)
+        run: node scripts/pre-build-check.js --all-darwin
+
       - name: Verify macOS signing credentials
         run: bash scripts/verify-macos-signing-env.sh
         env:
@@ -91,13 +94,27 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: Electron Builder (signed + notarized)
-        run: npx electron-builder --mac dmg zip dir --publish never
+        run: npx electron-builder --mac dmg zip dir --arm64 --x64 --publish never
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: List release artifacts
+        run: |
+          set -euo pipefail
+          echo "release/ contents:"
+          ls -la release/ || true
+          for ARCH_DIR in release/mac-arm64 release/mac-x64; do
+            if [ -d "$ARCH_DIR" ]; then
+              echo "$ARCH_DIR:"
+              ls -la "$ARCH_DIR"
+            else
+              echo "::warning::$ARCH_DIR not found"
+            fi
+          done
 
       - name: Smoke test - verify packaged resources
         run: |

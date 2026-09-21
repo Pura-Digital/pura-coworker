@@ -109,7 +109,7 @@ describe('pre-build-check: runChecks', () => {
   it('reports zero warnings when optional darwin resources are present', () => {
     populateDarwinArtifacts(tmpDir, 'x64');
     makeDir(path.join(tmpDir, 'resources/python/darwin-x64'));
-    makeDir(path.join(tmpDir, 'resources/tools/darwin-x64'));
+    makeFile(path.join(tmpDir, 'resources/tools/darwin-x64/bin/cliclick'));
 
     const result = runChecks(tmpDir, 'darwin', 'x64');
 
