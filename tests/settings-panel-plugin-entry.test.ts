@@ -12,11 +12,11 @@ const settingsPanelContent = [
 
 describe('SettingsPanel skills plugin browse entry', () => {
   it('unit: renders browse plugins action', () => {
-    expect(settingsPanelContent).toContain("t('skills.browsePlugins')");
+    expect(settingsPanelContent).toContain("t('skills.addFromMarketplace')");
   });
 
   it('smoke: includes plugin list modal title i18n key', () => {
-    expect(settingsPanelContent).toContain("t('skills.pluginListTitle')");
+    expect(settingsPanelContent).toContain("t('skills.marketplaceTitle')");
   });
 
   it('functional: includes plugin install action i18n key', () => {
