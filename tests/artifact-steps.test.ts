@@ -344,6 +344,9 @@ describe('classifyArtifactKind', () => {
   it('classifies deliverable files as output', () => {
     expect(classifyArtifactKind('/workspace/report.docx', { source: 'file' })).toBe('output');
     expect(classifyArtifactKind('/workspace/deck.pptx', { source: 'recent' })).toBe('output');
+    expect(classifyArtifactKind('/workspace/.aiden/artifacts/build.py', { source: 'recent' })).toBe(
+      'util'
+    );
   });
 });
 
@@ -396,5 +399,19 @@ describe('getArtifactCatalog', () => {
 
     expect(catalog.outputs).toHaveLength(1);
     expect(catalog.utils).toHaveLength(0);
+  });
+
+  it('maps recent output and utility file lists into separate sections', () => {
+    const catalog = getArtifactCatalog(
+      [],
+      {
+        outputs: [{ path: '/tmp/report.pdf' }],
+        utils: [{ path: '/tmp/.aiden/artifacts/run.sh' }],
+      },
+      '/tmp'
+    );
+
+    expect(catalog.outputs).toHaveLength(1);
+    expect(catalog.utils).toHaveLength(1);
   });
 });

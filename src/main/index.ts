@@ -102,7 +102,8 @@ import {
   setDevLogsEnabled,
   isDevLogsEnabled,
 } from './utils/logger';
-import { listRecentWorkspaceFiles } from './utils/recent-workspace-files';
+import { listRecentArtifactWorkspaceFiles } from './utils/recent-workspace-files';
+import { applyBffWebEnvToProcess, resolveBffWebEnv } from './tools/bff-web-env';
 import { buildDiagnosticsSummary } from './utils/diagnostics-summary';
 import {
   PURA_DIGITAL_REALTIME_MODEL,
@@ -131,16 +132,8 @@ if (configStore.isConfigured()) {
   configStore.applyToEnv();
 }
 
-// Persist BFF credentials from .env into config when not yet saved (packaged app bootstrap)
-const envBffBase = process.env.BFF_BASE_URL?.trim();
-const envWebKey = process.env.WEB_SERVICES_KEY?.trim();
-if (envBffBase && envWebKey && !configStore.get('bffBaseUrl')?.trim()) {
-  configStore.update({
-    bffBaseUrl: envBffBase.replace(/\/+$/, ''),
-    webServicesKey: envWebKey,
-  });
-  log('[Config] Saved BFF web-tools credentials from environment to config store');
-}
+// Global BFF web-tools (all providers): seed config from .env or release defaults
+applyBffWebEnvToProcess(resolveBffWebEnv());
 
 // Disable hardware acceleration for better compatibility
 app.disableHardwareAcceleration();
@@ -1534,9 +1527,9 @@ ipcMain.handle(
   'artifacts.listRecentFiles',
   async (_event, cwd: string, sinceMs: number, limit: number = 50) => {
     if (!cwd || !isAbsolute(cwd)) {
-      return [];
+      return { outputs: [], utils: [] };
     }
-    return listRecentWorkspaceFiles(cwd, sinceMs, limit);
+    return listRecentArtifactWorkspaceFiles(cwd, sinceMs, limit);
   }
 );
 

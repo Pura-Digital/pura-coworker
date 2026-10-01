@@ -42,6 +42,8 @@ export interface SessionState {
   executionClock: SessionExecutionClock;
   traceSteps: TraceStep[];
   contextWindow: number;
+  contextUsedTokens: number | null;
+  contextUsedPercent: number | null;
 }
 
 const DEFAULT_SESSION_STATE: SessionState = {
@@ -53,6 +55,8 @@ const DEFAULT_SESSION_STATE: SessionState = {
   executionClock: { startAt: null, endAt: null },
   traceSteps: [],
   contextWindow: 0,
+  contextUsedTokens: null,
+  contextUsedPercent: null,
 };
 
 // Helper to immutably update a single session's state within the record
@@ -198,6 +202,10 @@ interface AppState {
 
   // Context window actions
   setSessionContextWindow: (sessionId: string, contextWindow: number) => void;
+  setSessionContextUsage: (
+    sessionId: string,
+    usage: { contextWindow: number; tokens: number | null; percent: number | null }
+  ) => void;
 
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
@@ -644,6 +652,15 @@ export const useAppStore = create<AppState>((set) => ({
   setSessionContextWindow: (sessionId, contextWindow) =>
     set((state) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, { contextWindow }),
+    })),
+
+  setSessionContextUsage: (sessionId, usage) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        contextWindow: usage.contextWindow,
+        contextUsedTokens: usage.tokens,
+        contextUsedPercent: usage.percent,
+      }),
     })),
 
   // System theme actions

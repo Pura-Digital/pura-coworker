@@ -55,7 +55,7 @@ import type { SkillsAdapter } from '../skills/skills-adapter';
 import { AgentRuntimeExtensionManager } from '../extensions/agent-runtime-extension-manager';
 import { configStore } from '../config/config-store';
 import { applyBffWebEnvToProcess, getBffEnvForSpawn, resolveBffWebEnv } from '../tools/bff-web-env';
-import { formatBffConfiguredHint } from '../tools/web-client';
+import { bffWebToolsPromptHint } from '../tools/web-client';
 import { buildWebCustomTools } from '../tools/web-custom-tools';
 import { normalizeOpenAICompatibleBaseUrl } from '../config/auth-utils';
 import {
@@ -65,6 +65,8 @@ import {
   toUserFacingErrorText,
 } from './agent-runner-message-end';
 import { ensureUserMessageInChatPayload } from './ollama-payload-guard';
+import { getAidenArtifactsDirRelative } from '../../shared/aiden-workspace';
+import { calculateContextTokensFromUsage } from '../../shared/context-token-usage';
 import {
   clearRecoveryContext,
   readRecoveryContext,
@@ -406,6 +408,12 @@ function normalizeTokenUsage(usage: unknown): Message['tokenUsage'] | undefined 
     output_tokens?: unknown;
     inputTokens?: unknown;
     outputTokens?: unknown;
+    cacheRead?: unknown;
+    cache_read?: unknown;
+    cacheWrite?: unknown;
+    cache_write?: unknown;
+    totalTokens?: unknown;
+    total_tokens?: unknown;
   };
 
   const input = raw.input ?? raw.input_tokens ?? raw.inputTokens;
@@ -415,7 +423,34 @@ function normalizeTokenUsage(usage: unknown): Message['tokenUsage'] | undefined 
     return undefined;
   }
 
-  return { input, output };
+  const cacheRead =
+    typeof raw.cacheRead === 'number'
+      ? raw.cacheRead
+      : typeof raw.cache_read === 'number'
+        ? raw.cache_read
+        : undefined;
+  const cacheWrite =
+    typeof raw.cacheWrite === 'number'
+      ? raw.cacheWrite
+      : typeof raw.cache_write === 'number'
+        ? raw.cache_write
+        : undefined;
+  const totalTokens =
+    typeof raw.totalTokens === 'number'
+      ? raw.totalTokens
+      : typeof raw.total_tokens === 'number'
+        ? raw.total_tokens
+        : undefined;
+
+  const contextTokens = calculateContextTokensFromUsage({
+    input,
+    output,
+    cacheRead,
+    cacheWrite,
+    totalTokens,
+  });
+
+  return { input, output, cacheRead, cacheWrite, totalTokens, contextTokens };
 }
 
 interface AgentRunnerOptions {
@@ -1510,6 +1545,14 @@ ${hints.join('\n')}
       effectiveCwd =
         useSandboxIsolation && sandboxPath ? sandboxPath : workingDir || effectiveCwd;
 
+      if (effectiveCwd) {
+        try {
+          fs.mkdirSync(path.join(effectiveCwd, getAidenArtifactsDirRelative()), { recursive: true });
+        } catch (mkdirError) {
+          logWarn('[ClaudeAgentRunner] Failed to ensure .aiden/artifacts directory:', mkdirError);
+        }
+      }
+
       // Use app-specific Claude config directory to avoid conflicts with user settings
       // SDK uses CLAUDE_CONFIG_DIR to locate skills
       const userClaudeDir = this.getAppClaudeDir();
@@ -1894,12 +1937,7 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
             ? `<workspace_info>Your current workspace is: ${workingDir}</workspace_info>`
             : '';
 
-      const bffEnv = applyBffWebEnvToProcess(
-        resolveBffWebEnv({
-          bffBaseUrl: configStore.get('bffBaseUrl'),
-          webServicesKey: configStore.get('webServicesKey'),
-        })
-      );
+      const bffEnv = applyBffWebEnvToProcess(resolveBffWebEnv());
 
       const coworkAppendPrompt = [
         'You are an Aiden assistant. Be concise, accurate, and tool-capable.',
@@ -1909,16 +1947,20 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
 3. For relative time windows like "within two days" in browsing or research tasks, assume the most recent two relevant publication days unless the user explicitly defines another date range.
 4. For bracketed placeholders like [Agent], [Topic], etc., treat the word inside brackets as the literal search keyword unless the user says otherwise.
 5. When given a task, START DOING IT. Do not restate the task, do not list what you will do, do not ask for confirmation. Just execute.`,
+        `<workspace_outputs>
+Final deliverables for the user (Word, PDF, PowerPoint, spreadsheets, exported images, reports) must be saved in the workspace outside \`.aiden/\` — use the project root or a path the user specifies.
+Intermediate generation assets (helper scripts, temp builds, scratch files, skill pipeline outputs) belong under \`${getAidenArtifactsDirRelative()}/\`.
+</workspace_outputs>`,
         workspaceInfoPrompt,
         `<citation_requirements>
 If your answer uses linkable content from MCP tools or web search/crawl tools, include a "Sources:" section and otherwise use standard Markdown links: [Title](URL).
 </citation_requirements>`,
         `<tool_behavior>
 Tool routing:
-- For web research, news, or "search the web" tasks: use native WebSearch for quick orientation, then BffWebSearch (when configured) for a full SERP, then BffWebCrawl on a few chosen HTTPS URLs. Do NOT use raw curl against the BFF — use BffWebSearch/BffWebCrawl tools instead.
+- For web research, news, or "search the web" tasks: use native WebSearch for quick orientation, then BffWebSearch for a full SERP, then BffWebCrawl on a few chosen HTTPS URLs. Do NOT use raw curl against the BFF — use BffWebSearch/BffWebCrawl tools instead.
 - Optionally read the web-search-bff skill (SKILL.md) for query-improvement guidance before the first BffWebSearch when the query is ambiguous.
 - If user explicitly asks to use Chrome/browser, prioritize Chrome MCP tools (mcp__Chrome__*) over generic web tools.
-- ${formatBffConfiguredHint(bffEnv.configured)}
+- ${bffWebToolsPromptHint()}
 </tool_behavior>`,
         this.getBundledPathHints(),
       ]
@@ -2474,6 +2516,7 @@ Tool routing:
                     tokenUsage,
                   };
                   this.sendMessage(session.id, assistantMsg);
+                  this.emitSessionContextUsage(session.id, piSession);
                 }
               }
               break;
@@ -2572,6 +2615,9 @@ Tool routing:
                   title,
                   timestamp: Date.now(),
                 });
+              }
+              if (!event.aborted && !event.errorMessage) {
+                this.emitSessionContextUsage(session.id, piSession);
               }
               break;
             }
@@ -2805,6 +2851,22 @@ Tool routing:
   private sendTraceUpdate(sessionId: string, stepId: string, updates: Partial<TraceStep>): void {
     log(`[Trace] Update step ${stepId}:`, updates);
     this.sendToRenderer({ type: 'trace.update', payload: { sessionId, stepId, updates } });
+  }
+
+  private emitSessionContextUsage(sessionId: string, piSession: PiAgentSession): void {
+    const usage = piSession.getContextUsage?.();
+    if (!usage || usage.contextWindow <= 0) {
+      return;
+    }
+    this.sendToRenderer({
+      type: 'session.contextUsage',
+      payload: {
+        sessionId,
+        contextWindow: usage.contextWindow,
+        tokens: usage.tokens,
+        percent: usage.percent,
+      },
+    });
   }
 
   private sendMessage(sessionId: string, message: Message): void {

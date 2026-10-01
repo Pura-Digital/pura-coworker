@@ -138,6 +138,11 @@ export interface ThinkingContent {
 export interface TokenUsage {
   input: number;
   output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  totalTokens?: number;
+  /** Prompt-side context size for the turn (includes cache read/write when reported). */
+  contextTokens?: number;
 }
 
 // Trace types for visualization
@@ -567,6 +572,15 @@ export type ServerEvent =
   | { type: 'plugins.runtimeApplied'; payload: { sessionId: string; plugins: Array<{ name: string; path: string }> } }
   | { type: 'workdir.changed'; payload: { path: string } }
   | { type: 'session.contextInfo'; payload: { sessionId: string; contextWindow: number } }
+  | {
+      type: 'session.contextUsage';
+      payload: {
+        sessionId: string;
+        contextWindow: number;
+        tokens: number | null;
+        percent: number | null;
+      };
+    }
   | { type: 'navigate.to'; payload: { page: 'welcome' | 'settings' | 'session'; tab?: string; sessionId?: string } }
   | { type: 'native-theme.changed'; payload: { shouldUseDarkColors: boolean } }
   | { type: 'new-session' }

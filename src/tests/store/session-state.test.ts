@@ -320,6 +320,19 @@ describe('SessionState unified store', () => {
       useAppStore.getState().setSessionContextWindow('s1', 200000);
       expect(useAppStore.getState().sessionStates['s1'].contextWindow).toBe(200000);
     });
+
+    it('should set session context usage from agent runner', () => {
+      useAppStore.getState().addSession(makeSession('s1'));
+      useAppStore.getState().setSessionContextUsage('s1', {
+        contextWindow: 200000,
+        tokens: 48000,
+        percent: 24,
+      });
+      const state = useAppStore.getState().sessionStates['s1'];
+      expect(state.contextWindow).toBe(200000);
+      expect(state.contextUsedTokens).toBe(48000);
+      expect(state.contextUsedPercent).toBe(24);
+    });
   });
 
   describe('cross-session isolation', () => {

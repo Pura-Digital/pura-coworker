@@ -53,7 +53,10 @@ import {
   getDefaultTitleFromPrompt,
   normalizeGeneratedTitle,
 } from './session-title-utils';
-import { generateTitleWithClaudeSdk } from '../claude/claude-sdk-one-shot';
+import {
+  generateProjectMemoryWithClaudeSdk,
+  generateTitleWithClaudeSdk,
+} from '../claude/claude-sdk-one-shot';
 import { buildScheduledTaskTitle } from '../../shared/schedule/task-title';
 import { tryGetProjectManager } from '../project/project-manager';
 
@@ -846,13 +849,26 @@ export class SessionManager {
       const transcript = recent
         .map((m) => {
           const role = m.role === 'user' ? 'User' : 'Assistant';
-          const text = m.content
-            .filter((b) => b.type === 'text')
-            .map((b) => (b as { text: string }).text)
-            .join('\n');
+          const parts: string[] = [];
+          for (const block of m.content) {
+            if (block.type === 'text') {
+              parts.push((block as { text: string }).text);
+            } else if (block.type === 'tool_use') {
+              const toolName = (block as { name?: string }).name || 'tool';
+              parts.push(`[tool call] ${toolName}`);
+            } else if (block.type === 'tool_result') {
+              const content = (block as { content?: string }).content || '';
+              const snippet = content.trim().slice(0, 500);
+              if (snippet) {
+                parts.push(`[tool result] ${snippet}`);
+              }
+            }
+          }
+          const text = parts.join('\n').trim();
+          if (!text) return '';
           return `**${role}:** ${text}`;
         })
-        .filter((t) => t.length > 12)
+        .filter((entry) => entry.length > 12)
         .join('\n\n');
 
       if (!transcript) return;
@@ -875,10 +891,12 @@ ${transcript}
 Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new insights with existing ones; don't duplicate. Do not include preamble or commentary.`;
 
       const currentConfig = configStore.getAll();
-      const updatedMemory = await generateTitleWithClaudeSdk(systemPrompt, currentConfig);
+      const updatedMemory = await generateProjectMemoryWithClaudeSdk(systemPrompt, currentConfig);
       if (updatedMemory && updatedMemory.trim()) {
         fs.writeFileSync(memoryPath, updatedMemory.trim() + '\n', 'utf-8');
         log('[SessionManager] Updated project MEMORY.md for project:', project.id);
+      } else {
+        logWarn('[SessionManager] Project MEMORY.md update returned empty content for project:', project.id);
       }
     } catch (err) {
       logError('[SessionManager] Failed to update project MEMORY.md:', err);
@@ -1116,6 +1134,13 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
     this.promptQueues.delete(sessionId);
     this.messageCache.delete(sessionId);
     this.updateSessionStatus(sessionId, 'idle');
+
+    const stoppedSession = this.loadSession(sessionId);
+    if (stoppedSession?.projectId) {
+      this.scheduleProjectMemoryUpdate(stoppedSession).catch((err) =>
+        logError('[SessionManager] Project memory update failed after stop:', err)
+      );
+    }
   }
 
   // Delete a session

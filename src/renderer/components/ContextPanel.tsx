@@ -50,11 +50,10 @@ export function ContextPanel() {
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [mcpServers, setMcpServers] = useState<MCPServerInfo[]>([]);
-  const [recentWorkspaceFiles, setRecentWorkspaceFiles] = useState<Array<{
-    path: string;
-    modifiedAt: number;
-    size: number;
-  }>>([]);
+  const [recentArtifactFiles, setRecentArtifactFiles] = useState<{
+    outputs: Array<{ path: string; modifiedAt: number; size: number }>;
+    utils: Array<{ path: string; modifiedAt: number; size: number }>;
+  }>({ outputs: [], utils: [] });
 
   const ss = activeSessionId ? sessionStates[activeSessionId] : undefined;
   const steps = ss?.traceSteps ?? EMPTY_STEPS;
@@ -64,8 +63,8 @@ export function ContextPanel() {
     ? projects.find((p) => p.id === activeSession.projectId)
     : null;
   const { outputs: outputArtifacts, utils: utilArtifacts } = useMemo(
-    () => getArtifactCatalog(steps, recentWorkspaceFiles, currentWorkingDir),
-    [currentWorkingDir, recentWorkspaceFiles, steps]
+    () => getArtifactCatalog(steps, recentArtifactFiles, currentWorkingDir),
+    [currentWorkingDir, recentArtifactFiles, steps]
   );
   const canShowItemInFolder = typeof window !== 'undefined' && !!window.electronAPI?.showItemInFolder;
 
@@ -75,21 +74,32 @@ export function ContextPanel() {
   );
 
   const contextUsage = useMemo(() => {
-    const contextWindow = activeSessionId ? sessionStates[activeSessionId]?.contextWindow : undefined;
+    const sessionState = activeSessionId ? sessionStates[activeSessionId] : undefined;
+    const contextWindow = sessionState?.contextWindow;
     if (!contextWindow) return null;
 
-    let lastInput = 0;
+    if (sessionState?.contextUsedTokens != null) {
+      const used = sessionState.contextUsedTokens;
+      const percentage =
+        sessionState.contextUsedPercent != null
+          ? Math.min(sessionState.contextUsedPercent, 100)
+          : Math.min((used / contextWindow) * 100, 100);
+      return { used, total: contextWindow, percentage };
+    }
+
+    let lastUsed = 0;
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].tokenUsage?.input) {
-        lastInput = messages[i].tokenUsage!.input;
+      const usage = messages[i].tokenUsage;
+      if (!usage) continue;
+      const contextTokens = usage.contextTokens ?? usage.input + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0);
+      if (contextTokens > 0) {
+        lastUsed = contextTokens;
         break;
       }
     }
 
-    const percentage = lastInput > 0
-      ? Math.min((lastInput / contextWindow) * 100, 100)
-      : 0;
-    return { used: lastInput, total: contextWindow, percentage };
+    const percentage = lastUsed > 0 ? Math.min((lastUsed / contextWindow) * 100, 100) : 0;
+    return { used: lastUsed, total: contextWindow, percentage };
   }, [activeSessionId, sessionStates, messages]);
 
   const calledConnectors = useMemo(
@@ -134,7 +144,7 @@ export function ContextPanel() {
       || !currentWorkingDir
       || !activeSession?.createdAt
     ) {
-      setRecentWorkspaceFiles([]);
+      setRecentArtifactFiles({ outputs: [], utils: [] });
       return;
     }
 
@@ -147,12 +157,14 @@ export function ContextPanel() {
           50
         );
         if (!cancelled) {
-          setRecentWorkspaceFiles(files || []);
+          setRecentArtifactFiles(
+            files || { outputs: [], utils: [] }
+          );
         }
       } catch (error) {
         if (!cancelled) {
           console.error('Failed to load recent workspace files:', error);
-          setRecentWorkspaceFiles([]);
+          setRecentArtifactFiles({ outputs: [], utils: [] });
         }
       }
     }, 500);

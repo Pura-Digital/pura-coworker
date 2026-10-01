@@ -103,6 +103,8 @@ website/.vitepress/cache/
 
 # Aiden session recovery snapshots (workspace-local, per chat session)
 .aiden/session-recovery/
+# Aiden-generated deliverables (slides, exports, etc.)
+.aiden/artifacts/
 
 # Screenshots (debug/review)
 *.png

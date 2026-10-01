@@ -1,4 +1,5 @@
 import type { TraceStep } from '../types';
+import { isUnderAidenArtifactsPath } from '../../shared/artifact-classification';
 import { resolveArtifactPath } from './artifact-path';
 import { extractFilePathFromToolInput, extractFilePathFromToolOutput } from './tool-output-path';
 
@@ -241,6 +242,10 @@ export function classifyArtifactKind(
     return 'output';
   }
 
+  if (isUnderAidenArtifactsPath(pathValue)) {
+    return 'util';
+  }
+
   const normalizedPath = pathValue.replace(/\\/g, '/').toLowerCase();
   const fileName = normalizedPath.split('/').pop() || '';
   const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.') + 1) : '';
@@ -264,9 +269,14 @@ export function classifyArtifactKind(
   return 'output';
 }
 
+export type RecentArtifactFileLists = {
+  outputs: Array<{ path: string }>;
+  utils: Array<{ path: string }>;
+};
+
 export function getArtifactCatalog(
   steps: TraceStep[],
-  recentFiles: Array<{ path: string }>,
+  recentFiles: RecentArtifactFileLists | Array<{ path: string }>,
   cwd?: string | null
 ): ArtifactCatalog {
   const { artifactSteps, fileSteps } = getArtifactSteps(steps);
@@ -320,9 +330,16 @@ export function getArtifactCatalog(
     addItem(pathValue, getArtifactLabel(pathValue), kind);
   }
 
-  for (const file of recentFiles) {
-    const kind = classifyArtifactKind(file.path, { source: 'recent' });
-    addItem(file.path, getArtifactLabel(file.path), kind);
+  const recentLists: RecentArtifactFileLists = Array.isArray(recentFiles)
+    ? { outputs: recentFiles, utils: [] }
+    : recentFiles;
+
+  for (const file of recentLists.outputs) {
+    addItem(file.path, getArtifactLabel(file.path), 'output');
+  }
+
+  for (const file of recentLists.utils) {
+    addItem(file.path, getArtifactLabel(file.path), 'util');
   }
 
   return { outputs, utils };

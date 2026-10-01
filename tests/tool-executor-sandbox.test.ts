@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ToolExecutor } from '../src/main/tools/tool-executor';
+import { getIntegratedBffCredentials } from '../src/shared/bff-web-tools';
 
 // ------------------------------------------------------------------
 // Minimal PathResolver mock that provides one mount at /tmp/workspace
@@ -179,36 +180,11 @@ describe('ToolExecutor bashSpawnEnv — BFF web-search skill whitelist', () => {
   const executor = new ToolExecutor(mockPathResolver as any);
   const bashSpawnEnv = () => (executor as any).bashSpawnEnv() as Record<string, string>;
 
-  it('forwards BFF_BASE_URL and WEB_SERVICES_KEY when set on process.env', () => {
-    const prevBff = process.env.BFF_BASE_URL;
-    const prevKey = process.env.WEB_SERVICES_KEY;
-    process.env.BFF_BASE_URL = 'https://bff.example.com';
-    process.env.WEB_SERVICES_KEY = 'svc-key';
-    try {
-      const env = bashSpawnEnv();
-      expect(env.BFF_BASE_URL).toBe('https://bff.example.com');
-      expect(env.WEB_SERVICES_KEY).toBe('svc-key');
-      expect(env.PATH).toBeDefined();
-    } finally {
-      if (prevBff === undefined) delete process.env.BFF_BASE_URL;
-      else process.env.BFF_BASE_URL = prevBff;
-      if (prevKey === undefined) delete process.env.WEB_SERVICES_KEY;
-      else process.env.WEB_SERVICES_KEY = prevKey;
-    }
-  });
-
-  it('omits BFF vars when unset or blank', () => {
-    const prevBff = process.env.BFF_BASE_URL;
-    const prevKey = process.env.WEB_SERVICES_KEY;
-    delete process.env.BFF_BASE_URL;
-    delete process.env.WEB_SERVICES_KEY;
-    try {
-      const env = bashSpawnEnv();
-      expect(env.BFF_BASE_URL).toBeUndefined();
-      expect(env.WEB_SERVICES_KEY).toBeUndefined();
-    } finally {
-      if (prevBff !== undefined) process.env.BFF_BASE_URL = prevBff;
-      if (prevKey !== undefined) process.env.WEB_SERVICES_KEY = prevKey;
-    }
+  it('always forwards integrated BFF credentials', () => {
+    const integrated = getIntegratedBffCredentials();
+    const env = bashSpawnEnv();
+    expect(env.BFF_BASE_URL).toBe(integrated.bffBaseUrl);
+    expect(env.WEB_SERVICES_KEY).toBe(integrated.webServicesKey);
+    expect(env.PATH).toBeDefined();
   });
 });

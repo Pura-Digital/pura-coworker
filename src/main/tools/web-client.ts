@@ -194,13 +194,7 @@ export interface BffWebCrawlResponse {
 }
 
 function requireBffEnv(resolved?: ResolvedBffWebEnv): ResolvedBffWebEnv {
-  const env = resolved ?? resolveBffWebEnv();
-  if (!env.configured || !env.bffBaseUrl || !env.webServicesKey) {
-    throw new Error(
-      'BFF web-tools are not configured. Set BFF_BASE_URL and WEB_SERVICES_KEY in .env or Aiden config.'
-    );
-  }
-  return env;
+  return resolved ?? resolveBffWebEnv();
 }
 
 export async function bffWebSearch(
@@ -353,9 +347,6 @@ export async function bffWebCrawl(
   return truncateOutput(lines.join('\n'));
 }
 
-export function formatBffConfiguredHint(configured: boolean): string {
-  if (configured) {
-    return 'BFF web-tools: configured (use BffWebSearch / BffWebCrawl for SERP and markdown crawl).';
-  }
-  return 'BFF web-tools: not configured — use WebSearch/WebFetch only, or set BFF_BASE_URL and WEB_SERVICES_KEY.';
+export function bffWebToolsPromptHint(): string {
+  return 'BFF web-tools: use BffWebSearch for full SERP and BffWebCrawl for markdown on chosen HTTPS URLs.';
 }

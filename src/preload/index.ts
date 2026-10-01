@@ -161,8 +161,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       cwd: string,
       sinceMs: number,
       limit = 50
-    ): Promise<Array<{ path: string; modifiedAt: number; size: number }>> =>
-      ipcRenderer.invoke('artifacts.listRecentFiles', cwd, sinceMs, Math.min(limit, 500)),
+    ): Promise<{
+      outputs: Array<{ path: string; modifiedAt: number; size: number }>;
+      utils: Array<{ path: string; modifiedAt: number; size: number }>;
+    }> => ipcRenderer.invoke('artifacts.listRecentFiles', cwd, sinceMs, Math.min(limit, 500)),
   },
 
   // Config methods
@@ -533,7 +535,10 @@ declare global {
           cwd: string,
           sinceMs: number,
           limit?: number
-        ) => Promise<Array<{ path: string; modifiedAt: number; size: number }>>;
+        ) => Promise<{
+          outputs: Array<{ path: string; modifiedAt: number; size: number }>;
+          utils: Array<{ path: string; modifiedAt: number; size: number }>;
+        }>;
       };
       config: {
         get: () => Promise<AppConfig>;

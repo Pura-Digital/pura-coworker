@@ -415,3 +415,33 @@ export async function generateTitleWithClaudeSdk(
     return null;
   }
 }
+
+const PROJECT_MEMORY_SYSTEM_PROMPT = `You are a project memory manager. Update the project's MEMORY.md file with durable learnings from the session transcript.
+
+Rules:
+- Return ONLY the full updated MEMORY.md Markdown content.
+- No preamble, commentary, or code fences around the file.
+- Merge new insights with existing content; do not duplicate.
+- Keep bullet points concise.`;
+
+export async function generateProjectMemoryWithClaudeSdk(
+  memoryPrompt: string,
+  config: AppConfig
+): Promise<string | null> {
+  try {
+    const result = await runPiAiOneShot(
+      memoryPrompt,
+      PROJECT_MEMORY_SYSTEM_PROMPT,
+      config,
+      { maxTokens: 8192 }
+    );
+    const memory = result.text?.trim();
+    if (!memory && result.hasThinking) {
+      logWarn('[ProjectMemory] Thinking model returned reasoning only — no usable MEMORY.md text');
+    }
+    return memory || null;
+  } catch (error) {
+    logWarn('[ProjectMemory] pi-ai memory update failed:', error);
+    return null;
+  }
+}

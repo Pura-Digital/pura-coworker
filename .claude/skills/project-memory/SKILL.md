@@ -66,7 +66,7 @@ Read existing MEMORY.md (if any), then update it with the key learnings from thi
 ```
 
 ## Notes
-
 - The MEMORY.md is injected automatically as context at the start of each new session in this project.
+- Generated deliverables should live in the workspace outside `.aiden/` (Artifacts → Output). Intermediate scripts and scratch files belong in `.aiden/artifacts/` (Artifacts → Utility).
 - Do not include sensitive information (API keys, passwords, personal data).
 - If MEMORY.md does not exist yet, create it from scratch.

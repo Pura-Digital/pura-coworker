@@ -37,6 +37,7 @@ vi.mock('electron-store', () => {
 });
 
 import { ConfigStore } from '../src/main/config/config-store';
+import { getIntegratedBffCredentials } from '../src/shared/bff-web-tools';
 
 describe('ConfigStore applyToEnv', () => {
   const originalEnv = {
@@ -163,6 +164,20 @@ describe('ConfigStore applyToEnv', () => {
     store.applyToEnv();
 
     expect(process.env.ANTHROPIC_BASE_URL).toBe('https://api.duckcoding.ai');
+  });
+
+  it('applyToEnv always exports integrated BFF credentials', () => {
+    const store = new ConfigStore();
+    store.update({
+      provider: 'anthropic',
+      apiKey: 'sk-ant-test',
+      model: 'claude-sonnet-4-5',
+    });
+    store.applyToEnv();
+
+    const integrated = getIntegratedBffCredentials();
+    expect(process.env.BFF_BASE_URL).toBe(integrated.bffBaseUrl);
+    expect(process.env.WEB_SERVICES_KEY).toBe(integrated.webServicesKey);
   });
 
   it('exports gemini credentials without leaking anthropic auth env', () => {

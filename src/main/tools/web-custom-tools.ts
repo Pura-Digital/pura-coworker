@@ -26,7 +26,7 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
       name: 'WebSearch',
       label: 'Web search (quick)',
       description:
-        'Fast web orientation via DuckDuckGo Instant Answer (definitions, related topics). For full SERP with titles/URLs/snippets, use BffWebSearch when BFF is configured.',
+        'Fast web orientation via DuckDuckGo Instant Answer (definitions, related topics). For full SERP with titles/URLs/snippets, use BffWebSearch.',
       parameters: Type.Object({
         query: Type.String({ description: 'Search query' }),
       }),
@@ -44,7 +44,7 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
       name: 'WebFetch',
       label: 'Web fetch',
       description:
-        'Fetch a single http/https URL and return truncated body text. For multi-page markdown extraction behind the BFF, use BffWebCrawl when configured.',
+        'Fetch a single http/https URL and return truncated body text. For multi-page markdown extraction via the integrated BFF, use BffWebCrawl.',
       parameters: Type.Object({
         url: Type.String({ description: 'http or https URL' }),
       }),
@@ -60,13 +60,12 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
     },
   ];
 
-  if (bffEnv.configured) {
-    tools.push(
+  tools.push(
       {
         name: 'BffWebSearch',
         label: 'BFF web search (SERP)',
         description:
-          'Normalized web search via the configured BFF external web-tools API (SearXNG). Returns title, URL, and snippet for each result. Prefer this over raw curl/bash for research tasks.',
+          'Normalized web search via the integrated BFF external web-tools API (SearXNG). Returns title, URL, and snippet for each result. Prefer this over raw curl/bash for research tasks.',
         parameters: Type.Object({
           query: Type.String({ description: 'Search query' }),
           language: Type.Optional(Type.String({ description: 'Language hint, e.g. it or en' })),
@@ -112,7 +111,7 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
         name: 'BffWebCrawl',
         label: 'BFF web crawl (markdown)',
         description:
-          'Fetch full-page markdown for up to 5 HTTPS URLs via the configured BFF external web-tools API (Crawl4AI). Use after BffWebSearch to read chosen sources.',
+          'Fetch full-page markdown for up to 5 HTTPS URLs via the integrated BFF external web-tools API (Crawl4AI). Use after BffWebSearch to read chosen sources.',
         parameters: Type.Object({
           urls: Type.Array(Type.String(), {
             description: 'HTTPS URLs to crawl (max 5)',
@@ -132,7 +131,6 @@ export function buildWebCustomTools(resolved?: ResolvedBffWebEnv): ToolDefinitio
         },
       }
     );
-  }
 
   return tools;
 }

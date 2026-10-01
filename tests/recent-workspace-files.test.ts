@@ -2,113 +2,102 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { listRecentWorkspaceFiles } from '../src/main/utils/recent-workspace-files';
+import { listRecentArtifactWorkspaceFiles } from '../src/main/utils/recent-workspace-files';
 
-describe('listRecentWorkspaceFiles', () => {
+describe('listRecentArtifactWorkspaceFiles', () => {
   let rootDir: string;
+  let artifactsDir: string;
 
   beforeEach(async () => {
     rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'open-cowork-recent-files-'));
+    artifactsDir = path.join(rootDir, '.aiden', 'artifacts');
+    await fs.mkdir(artifactsDir, { recursive: true });
   });
 
   afterEach(async () => {
     await fs.rm(rootDir, { recursive: true, force: true });
   });
 
-  it('returns files created after the given timestamp', async () => {
+  it('returns deliverable outputs from workspace excluding .aiden', async () => {
     const before = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    const filePath = path.join(rootDir, 'deck.pptx');
-    await fs.writeFile(filePath, 'ppt');
+    await fs.writeFile(path.join(rootDir, 'report.docx'), 'doc');
+    await fs.writeFile(path.join(artifactsDir, 'build.py'), 'py');
 
-    const files = await listRecentWorkspaceFiles(rootDir, before);
+    const { outputs, utils } = await listRecentArtifactWorkspaceFiles(rootDir, before);
 
-    expect(files.map((item) => path.basename(item.path))).toContain('deck.pptx');
+    expect(outputs.map((item) => path.basename(item.path))).toContain('report.docx');
+    expect(outputs.map((item) => path.basename(item.path))).not.toContain('build.py');
+    expect(utils.map((item) => path.basename(item.path))).toContain('build.py');
+    expect(utils.map((item) => path.basename(item.path))).not.toContain('report.docx');
   });
 
-  it('ignores files inside excluded directories', async () => {
+  it('does not treat source code in workspace root as output deliverables', async () => {
     const before = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    await fs.mkdir(path.join(rootDir, 'node_modules'), { recursive: true });
-    await fs.writeFile(path.join(rootDir, 'node_modules', 'ignored.txt'), 'ignore');
-    await fs.writeFile(path.join(rootDir, 'report.html'), 'ok');
+    await fs.writeFile(path.join(rootDir, 'index.ts'), 'ts');
+    await fs.writeFile(path.join(rootDir, 'deck.pptx'), 'ppt');
 
-    const files = await listRecentWorkspaceFiles(rootDir, before);
+    const { outputs } = await listRecentArtifactWorkspaceFiles(rootDir, before);
+    const names = outputs.map((item) => path.basename(item.path));
 
-    expect(files.map((item) => path.basename(item.path))).toContain('report.html');
-    expect(files.map((item) => path.basename(item.path))).not.toContain('ignored.txt');
+    expect(names).toContain('deck.pptx');
+    expect(names).not.toContain('index.ts');
+  });
+
+  it('returns empty lists when .aiden/artifacts does not exist and no outputs', async () => {
+    const emptyRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'open-cowork-recent-files-empty-'));
+    try {
+      const { outputs, utils } = await listRecentArtifactWorkspaceFiles(emptyRoot, Date.now() - 1000);
+      expect(outputs).toEqual([]);
+      expect(utils).toEqual([]);
+    } finally {
+      await fs.rm(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores files inside excluded directories under artifacts', async () => {
+    const before = Date.now();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    await fs.mkdir(path.join(artifactsDir, 'node_modules'), { recursive: true });
+    await fs.writeFile(path.join(artifactsDir, 'node_modules', 'ignored.txt'), 'ignore');
+    await fs.writeFile(path.join(artifactsDir, 'helper.sh'), 'ok');
+
+    const { utils } = await listRecentArtifactWorkspaceFiles(rootDir, before);
+
+    expect(utils.map((item) => path.basename(item.path))).toContain('helper.sh');
+    expect(utils.map((item) => path.basename(item.path))).not.toContain('ignored.txt');
   });
 
   it('ignores system metadata files like .DS_Store', async () => {
     const before = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    await fs.writeFile(path.join(rootDir, '.DS_Store'), 'noise');
+    await fs.writeFile(path.join(artifactsDir, '.DS_Store'), 'noise');
     await fs.writeFile(path.join(rootDir, 'slides.pptx'), 'ppt');
 
-    const files = await listRecentWorkspaceFiles(rootDir, before);
+    const { outputs } = await listRecentArtifactWorkspaceFiles(rootDir, before);
 
-    expect(files.map((item) => path.basename(item.path))).toContain('slides.pptx');
-    expect(files.map((item) => path.basename(item.path))).not.toContain('.DS_Store');
+    expect(outputs.map((item) => path.basename(item.path))).toContain('slides.pptx');
+    expect(outputs.map((item) => path.basename(item.path))).not.toContain('.DS_Store');
   });
 
-  it('ignores common temp, lock, and backup file patterns', async () => {
+  it('orders each list by most recent change first', async () => {
     const before = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    const noiseFiles = [
-      '._slides.pptx',
-      '~$deck.pptx',
-      '.~lock.deck.pptx#',
-      'draft.md~',
-      'report.tmp',
-      'download.crdownload',
-    ];
-
-    for (const name of noiseFiles) {
-      await fs.writeFile(path.join(rootDir, name), 'noise');
-    }
-    await fs.writeFile(path.join(rootDir, 'real-output.pdf'), 'pdf');
-
-    const files = await listRecentWorkspaceFiles(rootDir, before);
-    const names = files.map((item) => path.basename(item.path));
-
-    expect(names).toContain('real-output.pdf');
-    for (const name of noiseFiles) {
-      expect(names).not.toContain(name);
-    }
-  });
-
-  it('ignores cache directories like __pycache__', async () => {
-    const before = Date.now();
-    await new Promise((resolve) => setTimeout(resolve, 5));
-
-    await fs.mkdir(path.join(rootDir, '__pycache__'), { recursive: true });
-    await fs.writeFile(path.join(rootDir, '__pycache__', 'script.cpython-311.pyc'), 'pyc');
-    await fs.writeFile(path.join(rootDir, 'presentation.pptx'), 'ppt');
-
-    const files = await listRecentWorkspaceFiles(rootDir, before);
-    const names = files.map((item) => path.basename(item.path));
-
-    expect(names).toContain('presentation.pptx');
-    expect(names).not.toContain('script.cpython-311.pyc');
-  });
-
-  it('orders results by most recent change first', async () => {
-    const before = Date.now();
-    await new Promise((resolve) => setTimeout(resolve, 5));
-
-    const older = path.join(rootDir, 'older.txt');
-    const newer = path.join(rootDir, 'newer.txt');
+    const older = path.join(rootDir, 'older.pdf');
+    const newer = path.join(rootDir, 'newer.pdf');
     await fs.writeFile(older, '1');
     await new Promise((resolve) => setTimeout(resolve, 10));
     await fs.writeFile(newer, '2');
 
-    const files = await listRecentWorkspaceFiles(rootDir, before);
+    const { outputs } = await listRecentArtifactWorkspaceFiles(rootDir, before);
 
-    expect(files[0]?.path).toBe(newer);
-    expect(files[1]?.path).toBe(older);
+    expect(outputs[0]?.path).toBe(newer);
+    expect(outputs[1]?.path).toBe(older);
   });
 });

@@ -273,6 +273,14 @@ export function useIPC() {
             store.setSessionContextWindow(event.payload.sessionId, event.payload.contextWindow);
             break;
 
+          case 'session.contextUsage':
+            store.setSessionContextUsage(event.payload.sessionId, {
+              contextWindow: event.payload.contextWindow,
+              tokens: event.payload.tokens,
+              percent: event.payload.percent,
+            });
+            break;
+
           case 'error':
             console.error('[useIPC] Server error:', event.payload.message);
             store.setLoading(false);

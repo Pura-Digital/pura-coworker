@@ -18,6 +18,7 @@ import {
   getLegacyDerivedKeyHexes,
 } from '../utils/store-encryption';
 import { normalizeLegacyCustomProfileDefaults } from '../../shared/custom-profile-defaults';
+import { applyBffWebEnvToProcess, resolveBffWebEnv } from '../tools/bff-web-env';
 import {
   isOpenAIProvider,
   isOllamaLegacyCustomOpenAIConfig,
@@ -1408,6 +1409,10 @@ export class ConfigStore {
           : current.memoryRuntime,
       isConfigured:
         updates.isConfigured !== undefined ? updates.isConfigured : current.isConfigured,
+      bffBaseUrl:
+        updates.bffBaseUrl !== undefined ? updates.bffBaseUrl : current.bffBaseUrl,
+      webServicesKey:
+        updates.webServicesKey !== undefined ? updates.webServicesKey : current.webServicesKey,
     });
   }
 
@@ -1643,14 +1648,7 @@ export class ConfigStore {
       process.env.COWORK_WORKDIR = projectedConfig.defaultWorkdir;
     }
 
-    const bffBaseUrl = projectedConfig.bffBaseUrl?.trim();
-    if (bffBaseUrl) {
-      process.env.BFF_BASE_URL = bffBaseUrl.replace(/\/+$/, '');
-    }
-    const webServicesKey = projectedConfig.webServicesKey?.trim();
-    if (webServicesKey) {
-      process.env.WEB_SERVICES_KEY = webServicesKey;
-    }
+    applyBffWebEnvToProcess(resolveBffWebEnv());
 
     log('[Config] Applied env vars for provider:', projectedConfig.provider, {
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? '✓ Set' : '(empty/unset)',

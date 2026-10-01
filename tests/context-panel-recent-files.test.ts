@@ -9,14 +9,15 @@ describe('ContextPanel recent workspace files integration', () => {
   it('loads recent workspace files through electron artifacts API', () => {
     const source = fs.readFileSync(contextPanelPath, 'utf8');
     expect(source).toContain('window.electronAPI?.artifacts?.listRecentFiles');
-    expect(source).toContain('setRecentWorkspaceFiles');
+    expect(source).toContain('setRecentArtifactFiles');
   });
 
   it('merges recent workspace files into the displayed artifacts list', () => {
     const source = fs.readFileSync(contextPanelPath, 'utf8');
-    expect(source).toContain('getArtifactCatalog(steps, recentWorkspaceFiles, currentWorkingDir)');
+    expect(source).toContain('getArtifactCatalog(steps, recentArtifactFiles, currentWorkingDir)');
 
     const artifactSource = fs.readFileSync(artifactStepsPath, 'utf8');
-    expect(artifactSource).toContain('for (const file of recentFiles)');
+    expect(artifactSource).toContain('recentLists.outputs');
+    expect(artifactSource).toContain('recentLists.utils');
   });
 });
