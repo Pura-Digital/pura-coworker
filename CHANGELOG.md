@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.7] - 2026-10-01
+
+### Added
+
+- Integrated BFF web research (`BffWebSearch` / `BffWebCrawl`) for all installs and LLM providers — no manual setup
+- Context panel token usage display and artifact classification helpers
+- Shared workspace paths under `.aiden/` for intermediate agent artifacts
+
+### Changed
+
+- Artifact steps and recent workspace file tracking in the context panel
+- BFF credentials resolved from built-in app configuration instead of per-machine `.env`
+
 ## [3.4.6] - 2026-09-21
 
 ### Added
