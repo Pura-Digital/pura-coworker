@@ -1,235 +1,129 @@
-import { beforeAll, describe, expect, it } from 'vitest';
-import path from 'node:path';
-import fs from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { getModel, type AssistantMessage, type Context, type Model } from '@mariozechner/pi-ai';
+import { convertMessages } from '../node_modules/@mariozechner/pi-ai/dist/providers/openai-completions.js';
+import { applyPiModelRuntimeOverrides } from '../src/main/claude/pi-model-resolution';
 
-const completionsPath = path.resolve(
-  'node_modules/@mariozechner/pi-ai/dist/providers/openai-completions.js'
-);
+const model = applyPiModelRuntimeOverrides(
+  { ...getModel('deepseek', 'deepseek-v4-pro'), provider: 'custom' },
+  { rawProvider: 'custom', configProvider: 'custom', customBaseUrl: 'https://relay.example/v1' }
+) as Model<'openai-completions'>;
+const compat: Parameters<typeof convertMessages>[2] = {
+  supportsStore: false,
+  supportsDeveloperRole: false,
+  supportsReasoningEffort: true,
+  supportsUsageInStreaming: true,
+  maxTokensField: 'max_tokens',
+  requiresToolResultName: false,
+  requiresAssistantAfterToolResult: false,
+  requiresThinkingAsText: false,
+  requiresReasoningContentOnAssistantMessages: true,
+  thinkingFormat: 'deepseek',
+  openRouterRouting: {},
+  vercelGatewayRouting: {},
+  supportsStrictMode: false,
+  zaiToolStream: false,
+  supportsLongCacheRetention: false,
+};
 
-function isPiAiPatchApplied(): boolean {
-  if (!fs.existsSync(completionsPath)) {
-    return false;
-  }
-  const completionsSource = fs.readFileSync(completionsPath, 'utf8');
-  return completionsSource.includes('requiresThinkingInContent');
+function assistant(content: AssistantMessage['content']): AssistantMessage {
+  return {
+    role: 'assistant',
+    provider: model.provider,
+    api: model.api,
+    model: model.id,
+    content,
+    stopReason: 'stop',
+    timestamp: 0,
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+  };
 }
 
-const patchApplied = isPiAiPatchApplied();
+function replay(messages: Context['messages'], overrides = {}) {
+  return convertMessages(model, { messages }, { ...compat, ...overrides }) as Array<
+    Record<string, unknown>
+  >;
+}
 
-describe.skipIf(!patchApplied)(
-  'DeepSeek thinking block serialization (requires @mariozechner/pi-ai patch)',
-  () => {
-    let convertMessages: (
-      model: unknown,
-      context: unknown,
-      compat: unknown
-    ) => Array<{ role: string; content: unknown }>;
-
-    beforeAll(async () => {
-      const mod = await import(pathToFileURL(completionsPath).href);
-      convertMessages = mod.convertMessages;
+describe('native DeepSeek reasoning replay (without a node_modules patch)', () => {
+  it('preserves reasoning_content alongside plain assistant text', () => {
+    const result = replay([
+      assistant([
+        { type: 'thinking', thinking: 'Reasoning', thinkingSignature: 'reasoning_content' },
+        { type: 'text', text: 'Answer' },
+      ]),
+    ]);
+    expect(result[0]).toMatchObject({
+      role: 'assistant',
+      content: 'Answer',
+      reasoning_content: 'Reasoning',
     });
+  });
 
-    const baseModel = {
-      id: 'deepseek-v4-pro',
-      name: 'deepseek-v4-pro',
-      api: 'openai-completions' as const,
-      provider: 'deepseek',
-      baseUrl: 'https://api.deepseek.com/v1',
-      reasoning: true,
-      input: ['text' as const],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 128000,
-      maxTokens: 16384,
-    };
+  it('joins multiple thinking blocks in the reasoning field', () => {
+    const result = replay([
+      assistant([
+        { type: 'thinking', thinking: 'First', thinkingSignature: 'reasoning_content' },
+        { type: 'thinking', thinking: 'Second', thinkingSignature: 'reasoning_content' },
+        { type: 'text', text: 'Answer' },
+      ]),
+    ]);
+    expect(result[0].reasoning_content).toBe('First\nSecond');
+    expect(result[0].content).toBe('Answer');
+  });
 
-    const baseCompat = {
-      supportsStore: false,
-      supportsDeveloperRole: false,
-      supportsReasoningEffort: true,
-      reasoningEffortMap: {},
-      supportsUsageInStreaming: true,
-      maxTokensField: 'max_completion_tokens' as const,
-      requiresToolResultName: false,
-      requiresAssistantAfterToolResult: false,
-      requiresThinkingAsText: false,
-      requiresThinkingInContent: true,
-      thinkingFormat: 'openai' as const,
-      openRouterRouting: {},
-      vercelGatewayRouting: {},
-      supportsStrictMode: true,
-    };
+  it('keeps reasoning through a tool call and result', () => {
+    const result = replay([
+      assistant([
+        { type: 'thinking', thinking: 'Need lookup', thinkingSignature: 'reasoning_content' },
+        { type: 'toolCall', id: 'call1', name: 'lookup', arguments: { query: 'ping' } },
+      ]),
+      {
+        role: 'toolResult',
+        toolCallId: 'call1',
+        toolName: 'lookup',
+        content: [{ type: 'text', text: 'pong' }],
+        isError: false,
+        timestamp: 0,
+      },
+    ]);
+    expect(result[0].reasoning_content).toBe('Need lookup');
+    expect(result[0].tool_calls).toEqual([
+      {
+        id: 'call1',
+        type: 'function',
+        function: { name: 'lookup', arguments: '{"query":"ping"}' },
+      },
+    ]);
+    expect(result[1]).toMatchObject({ role: 'tool', tool_call_id: 'call1', content: 'pong' });
+    expect(Array.isArray(result[0].content)).toBe(false);
+  });
 
-    const nonDeepSeekCompat = {
-      ...baseCompat,
-      requiresThinkingInContent: false,
-    };
+  it('injects empty reasoning when a tool-call turn has no thinking delta', () => {
+    const result = replay([
+      assistant([{ type: 'toolCall', id: 'call1', name: 'lookup', arguments: {} }]),
+    ]);
+    expect(result[0].reasoning_content).toBe('');
+    expect(result[0].tool_calls).toHaveLength(1);
+  });
 
-    const sameModelMeta = {
-      provider: 'deepseek',
-      api: 'openai-completions',
-      model: 'deepseek-v4-pro',
-    };
-
-    it('puts thinking blocks in content[] when requiresThinkingInContent is true', () => {
-      const context = {
-        systemPrompt: undefined,
-        messages: [
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Hello' }] },
-          {
-            role: 'assistant' as const,
-            ...sameModelMeta,
-            content: [
-              {
-                type: 'thinking' as const,
-                thinking: 'Let me think about this...',
-                thinkingSignature: 'reasoning_content',
-              },
-              { type: 'text' as const, text: 'Hi there!' },
-            ],
-          },
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Follow up' }] },
-        ],
-      };
-
-      const result = convertMessages(baseModel, context, baseCompat);
-
-      const assistantMsg = result.find((m) => m.role === 'assistant');
-      expect(assistantMsg).toBeDefined();
-
-      expect(Array.isArray(assistantMsg!.content)).toBe(true);
-      const content = assistantMsg!.content as Array<{
-        type: string;
-        thinking?: string;
-        text?: string;
-      }>;
-      expect(content[0].type).toBe('thinking');
-      expect(content[0].thinking).toBe('Let me think about this...');
-      expect(content[1].type).toBe('text');
-      expect(content[1].text).toBe('Hi there!');
-
-      expect((assistantMsg as Record<string, unknown>).reasoning_content).toBeUndefined();
+  it('injects empty reasoning for text-only assistant history', () => {
+    expect(replay([assistant([{ type: 'text', text: 'Answer' }])])[0]).toMatchObject({
+      content: 'Answer',
+      reasoning_content: '',
     });
+  });
 
-    it('puts thinking as top-level field when requiresThinkingInContent is false', () => {
-      const context = {
-        systemPrompt: undefined,
-        messages: [
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Hello' }] },
-          {
-            role: 'assistant' as const,
-            ...sameModelMeta,
-            content: [
-              {
-                type: 'thinking' as const,
-                thinking: 'Let me think about this...',
-                thinkingSignature: 'reasoning_content',
-              },
-              { type: 'text' as const, text: 'Hi there!' },
-            ],
-          },
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Follow up' }] },
-        ],
-      };
-
-      const result = convertMessages(baseModel, context, nonDeepSeekCompat);
-
-      const assistantMsg = result.find((m) => m.role === 'assistant');
-      expect(assistantMsg).toBeDefined();
-
-      expect(typeof assistantMsg!.content).toBe('string');
-      expect(assistantMsg!.content).toBe('Hi there!');
-
-      expect((assistantMsg as Record<string, unknown>).reasoning_content).toBe(
-        'Let me think about this...'
-      );
+  it('honors disabling mandatory reasoning replay', () => {
+    const result = replay([assistant([{ type: 'text', text: 'Answer' }])], {
+      requiresReasoningContentOnAssistantMessages: false,
     });
-
-    it('handles assistant message with only thinking blocks (no text)', () => {
-      const context = {
-        systemPrompt: undefined,
-        messages: [
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Hello' }] },
-          {
-            role: 'assistant' as const,
-            ...sameModelMeta,
-            content: [
-              {
-                type: 'thinking' as const,
-                thinking: 'Deep reasoning here...',
-                thinkingSignature: 'reasoning_content',
-              },
-            ],
-          },
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Follow up' }] },
-        ],
-      };
-
-      const result = convertMessages(baseModel, context, baseCompat);
-
-      const assistantMsg = result.find((m) => m.role === 'assistant');
-      expect(assistantMsg).toBeDefined();
-
-      expect(Array.isArray(assistantMsg!.content)).toBe(true);
-      const content = assistantMsg!.content as Array<{ type: string; thinking?: string }>;
-      expect(content).toHaveLength(1);
-      expect(content[0].type).toBe('thinking');
-      expect(content[0].thinking).toBe('Deep reasoning here...');
-    });
-
-    it('handles multiple thinking blocks in content[]', () => {
-      const context = {
-        systemPrompt: undefined,
-        messages: [
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Hello' }] },
-          {
-            role: 'assistant' as const,
-            ...sameModelMeta,
-            content: [
-              {
-                type: 'thinking' as const,
-                thinking: 'First thought',
-                thinkingSignature: 'reasoning_content',
-              },
-              {
-                type: 'thinking' as const,
-                thinking: 'Second thought',
-                thinkingSignature: 'reasoning_content',
-              },
-              { type: 'text' as const, text: 'Response' },
-            ],
-          },
-          { role: 'user' as const, content: [{ type: 'text' as const, text: 'Follow up' }] },
-        ],
-      };
-
-      const result = convertMessages(baseModel, context, baseCompat);
-
-      const assistantMsg = result.find((m) => m.role === 'assistant');
-      const content = assistantMsg!.content as Array<{
-        type: string;
-        thinking?: string;
-        text?: string;
-      }>;
-
-      expect(content).toHaveLength(3);
-      expect(content[0].type).toBe('thinking');
-      expect(content[0].thinking).toBe('First thought');
-      expect(content[1].type).toBe('thinking');
-      expect(content[1].thinking).toBe('Second thought');
-      expect(content[2].type).toBe('text');
-      expect(content[2].text).toBe('Response');
-    });
-  }
-);
-
-describe('DeepSeek thinking patch prerequisite', () => {
-  it('documents when the pi-ai patch suite is skipped', () => {
-    if (patchApplied) {
-      expect(isPiAiPatchApplied()).toBe(true);
-      return;
-    }
-    expect(isPiAiPatchApplied()).toBe(false);
+    expect(result[0]).not.toHaveProperty('reasoning_content');
   });
 });

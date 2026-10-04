@@ -59,6 +59,11 @@ import {
 } from '../claude/claude-sdk-one-shot';
 import { buildScheduledTaskTitle } from '../../shared/schedule/task-title';
 import { tryGetProjectManager } from '../project/project-manager';
+import {
+  ProjectMemoryUpdater,
+  buildProjectTranscript,
+  hasProjectMemory,
+} from '../project/project-memory';
 
 interface AgentRunner {
   run(session: Session, prompt: string, existingMessages: Message[]): Promise<void>;
@@ -91,6 +96,7 @@ export class SessionManager {
   private sessionTitleAttempts: Set<string> = new Set();
   private titleGenerationTokens: Map<string, symbol> = new Map();
   private messageCache: Map<string, Message[]> = new Map();
+  private projectMemoryUpdater = new ProjectMemoryUpdater();
   private static readonly MAX_CACHE_SIZE = 100;
 
   constructor(
@@ -744,18 +750,23 @@ export class SessionManager {
           });
         }
 
-        // Inject project MEMORY.md context (first turn only, if project session and file exists)
+        // Read the latest project memory on every turn, including resumed and moved chats.
         let finalPrompt = enhancedPrompt;
-        if (session.projectId && existingMessages.length === 0) {
+        if (session.projectId) {
           const projectMemoryContext = this.readProjectMemory(session.projectId);
           if (projectMemoryContext) {
-            finalPrompt = `<project_memory>\n${projectMemoryContext}\n</project_memory>\n\n${enhancedPrompt}`;
+            finalPrompt = `Use the following current project memory as background context when relevant. Current user instructions take precedence over remembered decisions.\n<project_memory>\n${projectMemoryContext}\n</project_memory>\n\n${enhancedPrompt}`;
             logCtx('[SessionManager] Injected project MEMORY.md for project:', session.projectId);
           }
         }
 
         // Run the agent
         await this.agentRunner.run(session, finalPrompt, messagesForContext);
+
+        // Persist learnings after each completed turn, independently of queue shutdown.
+        if (session.projectId) {
+          void this.scheduleProjectMemoryUpdate(session);
+        }
 
         if (this.extensionManager) {
           const stableMessages = this.getMessages(session.id);
@@ -817,7 +828,7 @@ export class SessionManager {
       const memoryPath = path.join(project.workDir, 'MEMORY.md');
       if (!fs.existsSync(memoryPath)) return null;
       const content = fs.readFileSync(memoryPath, 'utf-8').trim();
-      return content || null;
+      return hasProjectMemory(content) ? content : null;
     } catch (err) {
       logError('[SessionManager] Failed to read project MEMORY.md:', err);
       return null;
@@ -826,7 +837,7 @@ export class SessionManager {
 
   /**
    * Schedule an async job that updates MEMORY.md for a project session.
-   * The job summarises the last N messages and merges learnings into MEMORY.md.
+   * The job merges conversation learnings into MEMORY.md, recovering project history for empty files.
    */
   private async scheduleProjectMemoryUpdate(session: Session): Promise<void> {
     if (!session.projectId) return;
@@ -836,44 +847,20 @@ export class SessionManager {
       const project = pm.getProject(session.projectId);
       if (!project?.workDir) return;
 
-      const messages = this.getMessages(session.id);
-      if (messages.length < 2) return; // nothing meaningful to learn from
-
+      const completedMessages = this.getMessages(session.id);
+      if (!buildProjectTranscript(completedMessages)) return;
       const memoryPath = path.join(project.workDir, 'MEMORY.md');
-      const existing = fs.existsSync(memoryPath)
-        ? fs.readFileSync(memoryPath, 'utf-8').trim()
-        : '';
+      await this.projectMemoryUpdater.update(memoryPath, async (existing) => {
+        // Recover empty/scaffold memory from all chats already belonging to the project.
+        const messages = hasProjectMemory(existing)
+          ? completedMessages
+          : pm.getProjectSessions(project.id)
+              .flatMap((chat) => this.getMessages(chat.id))
+              .sort((a, b) => a.timestamp - b.timestamp);
+        const transcript = buildProjectTranscript(messages);
+        if (!transcript) return existing;
 
-      // Build a lightweight transcript of the last 20 messages
-      const recent = messages.slice(-20);
-      const transcript = recent
-        .map((m) => {
-          const role = m.role === 'user' ? 'User' : 'Assistant';
-          const parts: string[] = [];
-          for (const block of m.content) {
-            if (block.type === 'text') {
-              parts.push((block as { text: string }).text);
-            } else if (block.type === 'tool_use') {
-              const toolName = (block as { name?: string }).name || 'tool';
-              parts.push(`[tool call] ${toolName}`);
-            } else if (block.type === 'tool_result') {
-              const content = (block as { content?: string }).content || '';
-              const snippet = content.trim().slice(0, 500);
-              if (snippet) {
-                parts.push(`[tool result] ${snippet}`);
-              }
-            }
-          }
-          const text = parts.join('\n').trim();
-          if (!text) return '';
-          return `**${role}:** ${text}`;
-        })
-        .filter((entry) => entry.length > 12)
-        .join('\n\n');
-
-      if (!transcript) return;
-
-      const systemPrompt = `You are a project memory manager. Your task is to update a project's MEMORY.md file with learnings from a completed session.
+        const systemPrompt = `You are a project memory manager. Your task is to update a project's MEMORY.md file with learnings from a completed session.
 
 The MEMORY.md file captures:
 - Key decisions made in this project
@@ -890,16 +877,17 @@ ${transcript}
 
 Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new insights with existing ones; don't duplicate. Do not include preamble or commentary.`;
 
-      const currentConfig = configStore.getAll();
-      const updatedMemory = await generateProjectMemoryWithClaudeSdk(systemPrompt, currentConfig);
-      if (updatedMemory && updatedMemory.trim()) {
-        fs.writeFileSync(memoryPath, updatedMemory.trim() + '\n', 'utf-8');
-        log('[SessionManager] Updated project MEMORY.md for project:', project.id);
-      } else {
-        logWarn('[SessionManager] Project MEMORY.md update returned empty content for project:', project.id);
-      }
+        const currentConfig = configStore.getAll();
+        const updatedMemory = await generateProjectMemoryWithClaudeSdk(systemPrompt, currentConfig);
+        return updatedMemory;
+      });
+      log('[SessionManager] Updated project MEMORY.md for project:', project.id);
     } catch (err) {
       logError('[SessionManager] Failed to update project MEMORY.md:', err);
+      this.sendToRenderer({
+        type: 'error',
+        payload: { message: `Project memory update failed: ${err instanceof Error ? err.message : String(err)}` },
+      });
     }
   }
 
@@ -1102,14 +1090,6 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
           });
         }
       }
-
-      // Trigger post-session MEMORY.md update for project sessions
-      const completedSession = this.loadSession(session.id);
-      if (completedSession?.projectId) {
-        this.scheduleProjectMemoryUpdate(completedSession).catch((err) =>
-          logError('[SessionManager] Project memory update failed:', err)
-        );
-      }
     }
   }
 
@@ -1134,13 +1114,6 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
     this.promptQueues.delete(sessionId);
     this.messageCache.delete(sessionId);
     this.updateSessionStatus(sessionId, 'idle');
-
-    const stoppedSession = this.loadSession(sessionId);
-    if (stoppedSession?.projectId) {
-      this.scheduleProjectMemoryUpdate(stoppedSession).catch((err) =>
-        logError('[SessionManager] Project memory update failed after stop:', err)
-      );
-    }
   }
 
   // Delete a session

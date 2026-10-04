@@ -15,9 +15,11 @@ import i18n from '../i18n/config';
 // Check if running in Electron
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
 
-export function useIPC() {
-  // Handle incoming server events - only setup once
+export function useIPC(subscribeToEvents = false) {
+  // App owns the subscription. Child views only use the actions below, so
+  // mounting or closing a view cannot replace or remove the app's listener.
   useEffect(() => {
+    if (!subscribeToEvents) return;
     if (!isElectron) {
       console.log('[useIPC] Not in Electron, skipping IPC setup');
       return;
@@ -363,7 +365,7 @@ export function useIPC() {
       }
       cleanup?.();
     };
-  }, []); // Empty deps - setup listener only once!
+  }, [subscribeToEvents]);
 
   // Get actions for the rest of the hook
   const addSession = useAppStore((s) => s.addSession);
@@ -676,10 +678,15 @@ export function useIPC() {
     [send]
   );
 
-  const listSessions = useCallback(() => {
+  const listSessions = useCallback(async () => {
     if (!isElectron) return;
-    send({ type: 'session.list', payload: {} });
-  }, [send]);
+    try {
+      const sessions = await invoke<Session[]>({ type: 'session.list', payload: {} });
+      useAppStore.getState().setSessions(sessions);
+    } catch (error) {
+      console.error('[useIPC] Failed to load session history:', error);
+    }
+  }, [invoke]);
 
   // Get messages for a session (from persistent storage)
   const getSessionMessages = useCallback(

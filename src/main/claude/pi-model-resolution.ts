@@ -1,11 +1,11 @@
-import { getModel, type Api, type Model } from '@mariozechner/pi-ai';
+import { getModel, type Api, type Model, type OpenAICompletionsCompat } from '@mariozechner/pi-ai';
 import { isOfficialOpenAIBaseUrl } from '../config/auth-utils';
 
 const COMMON_FALLBACK_PROVIDERS = ['openai', 'anthropic', 'google'] as const;
 const INVALID_REGISTRY_PROVIDERS = new Set(['', 'custom']);
 const REASONING_MODEL_PATTERN =
   /\bthinking\b|\breasoner\b|deepseek-r1|deepseek-v4|kimi-k2|qwen3(?:\.5)?(?=[:/-]|$)/i;
-const DEEPSEEK_V4_MODEL_PATTERN = /^deepseek-v4(?:$|[-:])/i;
+const DEEPSEEK_V4_MODEL_PATTERN = /(?:^|\/)deepseek-v4(?:$|[-:])/i;
 type PiRegistryProvider = Parameters<typeof getModel>[0];
 
 export interface PiModelStringInput {
@@ -292,45 +292,49 @@ export function applyPiModelRuntimeOverrides(
     nextModel.reasoning &&
     nextModel.api === 'openai-completions'
   ) {
-    const currentCompat = (nextModel.compat || {}) as Record<string, unknown>;
-    const currentReasoningEffortMap = (
-      currentCompat.reasoningEffortMap && typeof currentCompat.reasoningEffortMap === 'object'
-        ? currentCompat.reasoningEffortMap
-        : {}
-    ) as Record<string, string>;
+    const currentCompat = (nextModel.compat || {}) as OpenAICompletionsCompat;
     nextModel = {
       ...nextModel,
+      thinkingLevelMap: {
+        ...nextModel.thinkingLevelMap,
+        off: 'none',
+      },
       compat: {
         ...currentCompat,
         supportsReasoningEffort: true,
-        reasoningEffortMap: {
-          ...currentReasoningEffortMap,
-          off: 'none',
-        },
       },
     } as typeof nextModel;
   }
 
-  // DeepSeek V4 models on custom/relay endpoints need thinking blocks in content[] array.
-  if (nextModel.api === 'openai-completions' && DEEPSEEK_V4_MODEL_PATTERN.test(nextModel.id)) {
-    const currentCompat = (nextModel.compat || {}) as Record<string, unknown>;
-    if (!currentCompat.requiresThinkingInContent) {
-      nextModel = {
-        ...nextModel,
-        compat: {
-          ...currentCompat,
-          requiresThinkingInContent: true,
-        },
-      } as typeof nextModel;
-    }
-  }
-
-  // Handle custom provider with explicit protocol override
+  // Honor the protocol override before applying protocol-specific compatibility.
   if (isCustomProvider && options.customProtocol) {
     const targetApi = inferPiApi(options.customProtocol);
     if (nextModel.api !== targetApi) {
       nextModel = { ...nextModel, api: targetApi } as typeof nextModel;
     }
+  }
+
+  // Native DeepSeek replay keeps reasoning_content on assistant/tool-call turns.
+  // Custom endpoints cannot be detected by the SDK from their URL alone.
+  if (nextModel.api === 'openai-completions' && DEEPSEEK_V4_MODEL_PATTERN.test(nextModel.id)) {
+    const currentCompat = (nextModel.compat || {}) as OpenAICompletionsCompat;
+    nextModel = {
+      ...nextModel,
+      thinkingLevelMap: {
+        minimal: 'high',
+        low: 'high',
+        medium: 'high',
+        high: 'high',
+        xhigh: 'max',
+        ...nextModel.thinkingLevelMap,
+      },
+      compat: {
+        ...currentCompat,
+        requiresReasoningContentOnAssistantMessages:
+          currentCompat.requiresReasoningContentOnAssistantMessages ?? true,
+        thinkingFormat: currentCompat.thinkingFormat ?? 'deepseek',
+      },
+    } as typeof nextModel;
   }
 
   return nextModel;

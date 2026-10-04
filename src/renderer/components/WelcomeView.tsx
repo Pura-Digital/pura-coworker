@@ -1,3 +1,5 @@
+import { ChatApiConfigSelector } from './ChatApiConfigSelector';
+import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
@@ -14,7 +16,6 @@ import {
   X,
   Paperclip,
   BookOpen,
-  FileSearch,
 } from 'lucide-react';
 import { AidenLogoLoader } from './AidenLogoLoader';
 
@@ -39,6 +40,10 @@ export function WelcomeView() {
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { startSession, changeWorkingDir, isElectron } = useIPC();
+  const { isSwitchingConfigSet, switchingConfigSetRef, configSetSelector } = useChatConfigSet(
+    isSubmitting,
+    isElectron
+  );
   const workingDir = useAppStore((state) => state.workingDir);
   const setGlobalNotice = useAppStore((state) => state.setGlobalNotice);
   const isConfigured = useAppStore((state) => state.isConfigured);
@@ -306,7 +311,8 @@ export function WelcomeView() {
 
     if (
       (!currentPrompt.trim() && pastedImages.length === 0 && attachedFiles.length === 0) ||
-      isSubmitting
+      isSubmitting ||
+      switchingConfigSetRef.current
     )
       return;
 
@@ -429,13 +435,6 @@ export function WelcomeView() {
       prompt: t('welcome.quickPromptPapers'),
       requiresChrome: true,
     },
-    {
-      id: 'research-notion',
-      label: t('welcome.summarizePapersToNotion'),
-      icon: FileSearch,
-      prompt: t('welcome.quickPromptNotion'),
-      requiresNotion: true,
-    },
   ];
 
   return (
@@ -488,10 +487,7 @@ export function WelcomeView() {
                   ? 'border-accent/30 bg-accent-muted text-accent'
                   : 'border-border-subtle bg-background/65 text-text-secondary hover:bg-surface-hover hover:text-text-primary'
               } ${
-                ('requiresChrome' in tag && tag.requiresChrome) ||
-                ('requiresNotion' in tag && tag.requiresNotion)
-                  ? 'relative'
-                  : ''
+                'requiresChrome' in tag && tag.requiresChrome ? 'relative' : ''
               }`}
             >
               <tag.icon
@@ -501,11 +497,6 @@ export function WelcomeView() {
               {'requiresChrome' in tag && tag.requiresChrome && (
                 <span className="ml-1 px-1.5 py-px text-[9px] rounded bg-surface-active text-text-muted">
                   {t('welcome.chromeRequired')}
-                </span>
-              )}
-              {'requiresNotion' in tag && tag.requiresNotion && (
-                <span className="ml-1 px-1.5 py-px text-[9px] rounded bg-surface-active text-text-muted">
-                  {t('welcome.notionRequired')}
                 </span>
               )}
             </button>
@@ -576,8 +567,8 @@ export function WelcomeView() {
           />
 
           {/* Bottom Actions */}
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border-muted min-w-0">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 min-w-0">
+            <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
               <button
                 type="button"
                 onClick={handleSelectFolder}
@@ -630,14 +621,17 @@ export function WelcomeView() {
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={!canSubmit || isSubmitting}
-              className="btn btn-primary px-5 py-2.5 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-            >
-              <span>{isSubmitting ? t('welcome.starting') : t('welcome.letsGo')}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="ml-auto flex min-w-0 max-w-full items-center justify-end gap-2">
+              <ChatApiConfigSelector {...configSetSelector} />
+              <button
+                type="submit"
+                disabled={!canSubmit || isSubmitting || isSwitchingConfigSet}
+                className="btn btn-primary px-5 py-2.5 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              >
+                <span>{isSubmitting ? t('welcome.starting') : t('welcome.letsGo')}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </form>
       </div>

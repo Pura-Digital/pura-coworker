@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.8] - 2026-10-05
+
+### Added
+
+- In-chat API configuration set and model selector on Welcome, Chat, and Project views
+- Automatic project `MEMORY.md` updates after each project turn, with transcript-aware merging
+- Tests for chat config set actions, Pi SDK sessions, preload subscriptions, and project memory
+
+### Changed
+
+- Upgraded `@mariozechner/pi-ai` and `@mariozechner/pi-coding-agent` to 0.73.1 (removed legacy pi-ai patch)
+- Project memory is injected on every turn, not only the first message of a session
+- Chat composer layout updated to fit the config selector alongside attachments and send controls
+
+### Removed
+
+- Notion quick action from the home welcome screen
+
 ## [3.4.7] - 2026-10-01
 
 ### Added

@@ -121,7 +121,7 @@ vi.mock('../src/main/claude/pi-model-resolution', () => ({
   },
 }));
 
-import { probeWithClaudeSdk } from '../src/main/claude/claude-sdk-one-shot';
+import { probeWithClaudeSdk, generateProjectMemoryWithClaudeSdk } from '../src/main/claude/claude-sdk-one-shot';
 
 function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -161,6 +161,15 @@ describe('probeWithClaudeSdk', () => {
     mocks.completeSimple.mockResolvedValue({
       content: [{ type: 'text', text: 'sdk_probe_ok' }],
     });
+  });
+
+  it('rejects truncated project memory and bounds the background request', async () => {
+    mocks.completeSimple.mockResolvedValue({
+      stopReason: 'length',
+      content: [{ type: 'text', text: '# Memory\n- Incomplete update' }],
+    });
+    expect(await generateProjectMemoryWithClaudeSdk('Update memory', createConfig())).toBeNull();
+    expect(mocks.completeSimple.mock.calls[0][2].signal).toBeInstanceOf(AbortSignal);
   });
 
   it('does not fall back to saved api key when the draft explicitly clears it', async () => {

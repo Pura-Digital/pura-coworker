@@ -2,9 +2,9 @@
  * Native web tools for pi-coding-agent (DuckDuckGo + BFF external web-tools).
  */
 
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent';
-import type { TSchema } from '@sinclair/typebox';
+import type { TSchema } from 'typebox';
 import { resolveBffWebEnv, type ResolvedBffWebEnv } from './bff-web-env';
 import { bffWebCrawl, bffWebSearch, fetchWebPage, searchWebInstantAnswer } from './web-client';
 

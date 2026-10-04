@@ -1,3 +1,5 @@
+import { ChatApiConfigSelector } from './ChatApiConfigSelector';
+import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,7 +10,6 @@ import {
   useActiveTurn,
   usePendingTurns,
   useActiveExecutionClock,
-  useAppConfig,
 } from '../store/selectors';
 import { useAppStore } from '../store';
 import { useIPC } from '../hooks/useIPC';
@@ -38,7 +39,6 @@ export function ChatView() {
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
   const executionClock = useActiveExecutionClock();
-  const appConfig = useAppConfig();
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const projects = useAppStore((s) => s.projects);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
@@ -74,6 +74,10 @@ export function ChatView() {
   const pendingCount = pendingTurns.length;
   const isSessionRunning = activeSession?.status === 'running';
   const canStop = isSessionRunning || hasActiveTurn || pendingCount > 0;
+  const { isSwitchingConfigSet, switchingConfigSetRef, configSetSelector } = useChatConfigSet(
+    canStop || isSubmitting,
+    isElectron
+  );
 
   const userMessageNavItems = useMemo(
     () => buildUserMessageNavItems(messages, t),
@@ -647,7 +651,8 @@ export function ChatView() {
     if (
       (!currentPrompt.trim() && pastedImages.length === 0 && attachedFiles.length === 0) ||
       !activeSessionId ||
-      isSubmitting
+      isSubmitting ||
+      switchingConfigSetRef.current
     )
       return;
 
@@ -894,19 +899,10 @@ export function ChatView() {
             )}
 
             <div
-              className={`flex items-end gap-2 p-3.5 rounded-[1.75rem] bg-background/88 border border-border-muted shadow-soft transition-colors ${
+              className={`flex flex-col gap-2 p-3.5 rounded-[1.75rem] bg-background/88 border border-border-muted shadow-soft transition-colors ${
                 isDragging ? 'ring-2 ring-accent bg-accent/5' : ''
               }`}
             >
-              <button
-                type="button"
-                onClick={handleFileSelect}
-                className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-                title={t('welcome.attachFiles')}
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-
               <textarea
                 ref={textareaRef}
                 value={prompt}
@@ -931,21 +927,28 @@ export function ChatView() {
                 placeholder={t('chat.typeMessage')}
                 disabled={isSubmitting}
                 rows={1}
-                style={{ minHeight: '44px', maxHeight: '200px' }}
-                className="flex-1 resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-[15px] py-2 leading-snug overflow-hidden"
+                style={{ minHeight: '64px', maxHeight: '200px' }}
+                className="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-[15px] py-2 leading-snug overflow-hidden"
               />
 
-              <div className="flex items-center gap-2">
-                {/* Model display */}
-                <span className="hidden sm:inline-flex px-2.5 py-1 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted">
-                  {appConfig?.model || t('chat.noModel')}
-                </span>
+              <div className="flex w-full min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleFileSelect}
+                  className="w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+                  title={t('welcome.attachFiles')}
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
 
+                <div className="ml-auto min-w-0 max-w-[70%]">
+                  <ChatApiConfigSelector {...configSetSelector} />
+                </div>
                 {canStop && (
                   <button
                     type="button"
                     onClick={handleStop}
-                    className="w-9 h-9 rounded-2xl flex items-center justify-center bg-error/10 text-error hover:bg-error/20 transition-colors"
+                    className="w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center bg-error/10 text-error hover:bg-error/20 transition-colors"
                     title={t('chat.stop')}
                   >
                     <Square className="w-4 h-4" />
@@ -958,9 +961,10 @@ export function ChatView() {
                       !textareaRef.current?.value.trim() &&
                       pastedImages.length === 0 &&
                       attachedFiles.length === 0) ||
-                    isSubmitting
+                    isSubmitting ||
+                    isSwitchingConfigSet
                   }
-                  className="w-9 h-9 rounded-2xl flex items-center justify-center bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover transition-colors"
+                  className="w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover transition-colors"
                   title={t('chat.sendMessage')}
                 >
                   <Send className="w-4 h-4" />

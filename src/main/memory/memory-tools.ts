@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { MemoryService } from './memory-service';
 import type { MemoryReadResult, MemorySearchResult, MemoryToolDefinition } from './memory-types';
 

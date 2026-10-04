@@ -363,9 +363,7 @@ describe('pi model resolution helpers', () => {
     );
 
     expect(model.compat?.supportsReasoningEffort).toBe(true);
-    expect((model.compat?.reasoningEffortMap as Record<string, string> | undefined)?.off).toBe(
-      'none'
-    );
+    expect(model.thinkingLevelMap?.off).toBe('none');
   });
 
   it('disables developer role for openrouter with custom endpoint', () => {
@@ -447,7 +445,7 @@ describe('pi model resolution helpers', () => {
     expect((model.compat as any)?.supportsStreaming).toBe(true);
   });
 
-  it('sets requiresThinkingInContent for DeepSeek V4 models on custom endpoints', () => {
+  it('sets native reasoning compatibility for DeepSeek V4 models on custom endpoints', () => {
     const model = applyPiModelRuntimeOverrides(
       {
         id: 'deepseek-v4-pro',
@@ -468,10 +466,53 @@ describe('pi model resolution helpers', () => {
       }
     );
 
-    expect(model.compat?.requiresThinkingInContent).toBe(true);
+    expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBe(true);
+    expect(model.compat?.thinkingFormat).toBe('deepseek');
+    expect(model.thinkingLevelMap?.low).toBe('high');
+    expect(model.thinkingLevelMap?.xhigh).toBe('max');
   });
 
-  it('does not set requiresThinkingInContent for non-V4 DeepSeek models on custom endpoints', () => {
+  it.each(['deepseek-v4-flash', 'deepseek/deepseek-v4-pro', 'deepseek-v4-pro:latest'])(
+    'uses native reasoning compatibility for %s',
+    (id) => {
+      const model = applyPiModelRuntimeOverrides(
+        buildSyntheticPiModel(id, 'custom', 'openai', 'https://relay.example/v1'),
+        { rawProvider: 'custom', customProtocol: 'openai' }
+      );
+      expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBe(true);
+      expect(model.thinkingLevelMap?.xhigh).toBe('max');
+    }
+  );
+
+  it('preserves explicit DeepSeek compatibility and thinking-level overrides', () => {
+    const source = buildSyntheticPiModel('deepseek-v4-pro', 'custom', 'openai');
+    const model = applyPiModelRuntimeOverrides({
+      ...source,
+      compat: { requiresReasoningContentOnAssistantMessages: false, thinkingFormat: 'openrouter' },
+      thinkingLevelMap: { low: 'medium', xhigh: null },
+    });
+    expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBe(false);
+    expect(model.compat?.thinkingFormat).toBe('openrouter');
+    expect(model.thinkingLevelMap?.low).toBe('medium');
+    expect(model.thinkingLevelMap?.xhigh).toBeNull();
+  });
+
+  it('applies DeepSeek compatibility after selecting the final custom protocol', () => {
+    const source = buildSyntheticPiModel('deepseek-v4-pro', 'custom', 'anthropic');
+    const model = applyPiModelRuntimeOverrides(source, {
+      rawProvider: 'custom', customProtocol: 'openai',
+    });
+    expect(model.api).toBe('openai-completions');
+    expect(model.compat?.thinkingFormat).toBe('deepseek');
+    const anthropic = applyPiModelRuntimeOverrides(
+      buildSyntheticPiModel('deepseek-v4-pro', 'custom', 'openai'),
+      { rawProvider: 'custom', customProtocol: 'anthropic' }
+    );
+    expect(anthropic.api).toBe('anthropic-messages');
+    expect(anthropic.compat?.thinkingFormat).toBeUndefined();
+  });
+
+  it('does not force V4 compatibility on other DeepSeek models', () => {
     const model = applyPiModelRuntimeOverrides(
       {
         id: 'deepseek-reasoner',
@@ -492,6 +533,6 @@ describe('pi model resolution helpers', () => {
       }
     );
 
-    expect(model.compat?.requiresThinkingInContent).toBeUndefined();
+    expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBeUndefined();
   });
 });

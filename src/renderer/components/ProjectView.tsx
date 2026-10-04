@@ -1,3 +1,5 @@
+import { ChatApiConfigSelector } from './ChatApiConfigSelector';
+import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -63,6 +65,10 @@ export function ProjectView() {
   const [showConfigure, setShowConfigure] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isComposingRef = useRef(false);
+  const { isSwitchingConfigSet, switchingConfigSetRef, configSetSelector } = useChatConfigSet(
+    isSubmitting,
+    isElectron
+  );
 
   const projectSessions = useMemo(() => {
     if (!project) return [];
@@ -126,7 +132,11 @@ export function ProjectView() {
     if (!project) return;
 
     const currentPrompt = textareaRef.current?.value || prompt;
-    if ((!currentPrompt.trim() && attachedFiles.length === 0) || isSubmitting) return;
+    if (
+      (!currentPrompt.trim() && attachedFiles.length === 0) ||
+      isSubmitting ||
+      switchingConfigSetRef.current
+    ) return;
 
     const contentBlocks: ContentBlock[] = [];
     attachedFiles.forEach((file) => {
@@ -261,7 +271,7 @@ export function ProjectView() {
               }}
             />
 
-            <div className="flex items-center justify-between pt-3 mt-2 border-t border-border-muted">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-2">
               <div className="flex items-center gap-3">
                 {isElectron && (
                   <button
@@ -274,14 +284,17 @@ export function ProjectView() {
                   </button>
                 )}
               </div>
-              <button
-                type="submit"
-                disabled={!canSubmit || isSubmitting || !isConfigured}
-                className="btn btn-primary px-5 py-2.5 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>{isSubmitting ? t('welcome.starting') : t('welcome.letsGo')}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="ml-auto flex min-w-0 max-w-full items-center justify-end gap-2">
+                <ChatApiConfigSelector {...configSetSelector} />
+                <button
+                  type="submit"
+                  disabled={!canSubmit || isSubmitting || isSwitchingConfigSet || !isConfigured}
+                  className="btn btn-primary px-5 py-2.5 rounded-2xl shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>{isSubmitting ? t('welcome.starting') : t('welcome.letsGo')}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </form>
 

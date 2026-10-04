@@ -88,7 +88,7 @@ function App() {
   const setProjects = useAppStore((s) => s.setProjects);
   const setActiveProject = useAppStore((s) => s.setActiveProject);
   const projects = useAppStore((s) => s.projects);
-  const { listSessions, isElectron } = useIPC();
+  const { listSessions, isElectron } = useIPC(true);
   const { status: updaterStatus, download, install, retry, dismiss } = useUpdater();
   const { width } = useWindowSize();
   const initialized = useRef(false);

@@ -48,10 +48,6 @@ import type {
 import type { Session } from '../renderer/types';
 import type { UpdaterSnapshot } from '../shared/updater-types';
 
-// Track registered callbacks to prevent duplicate listeners
-let registeredCallback: ((event: ServerEvent) => void) | null = null;
-let ipcListener: ((event: Electron.IpcRendererEvent, data: ServerEvent) => void) | null = null;
-
 // Allowlist of valid ClientEvent types to prevent spoofing arbitrary IPC channels
 const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent['type']>([
   'session.start',
@@ -84,20 +80,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('client-event', event);
   },
 
-  // Receive events from main process - ensures only ONE listener
+  // Each subscriber owns its listener: chat and updater events coexist.
   on: (callback: (event: ServerEvent) => void) => {
-    // Remove previous listener if exists
-    if (ipcListener) {
-      console.log('[Preload] Removing previous listener');
-      ipcRenderer.removeListener('server-event', ipcListener);
-    }
-
-    registeredCallback = callback;
-    ipcListener = (_: Electron.IpcRendererEvent, data: ServerEvent) => {
+    const ipcListener = (_: Electron.IpcRendererEvent, data: ServerEvent) => {
       console.log('[Preload] Received event:', data.type);
-      if (registeredCallback) {
-        registeredCallback(data);
-      }
+      callback(data);
     };
 
     console.log('[Preload] Registering new listener');
@@ -106,11 +93,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Return cleanup function
     return () => {
       console.log('[Preload] Cleanup called');
-      if (ipcListener) {
-        ipcRenderer.removeListener('server-event', ipcListener);
-        ipcListener = null;
-        registeredCallback = null;
-      }
+      ipcRenderer.removeListener('server-event', ipcListener);
     };
   },
 

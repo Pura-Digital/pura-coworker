@@ -14,13 +14,17 @@
  */
 import {
   createAgentSession,
+  getAgentDir,
   SessionManager as PiSessionManager,
   SettingsManager as PiSettingsManager,
-  createCodingTools,
+  createReadToolDefinition,
+  createBashToolDefinition,
+  createEditToolDefinition,
+  createWriteToolDefinition,
   type AgentSession as PiAgentSession,
   type ToolDefinition,
 } from '@mariozechner/pi-coding-agent';
-import { Type, type TSchema } from '@sinclair/typebox';
+import { Type, type TSchema } from 'typebox';
 import { getSharedAuthStorage, ModelRegistry } from './shared-auth';
 import type { Session, Message, TraceStep, ServerEvent, ContentBlock } from '../../renderer/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -525,6 +529,13 @@ export class ClaudeAgentRunner {
       return undefined;
     }
     const record = event as Record<string, unknown>;
+    const result = record.result;
+    if (result && typeof result === 'object' && 'summary' in result) {
+      const summary = result.summary;
+      if (typeof summary === 'string' && summary.trim()) {
+        return summary.trim();
+      }
+    }
     for (const key of ['summary', 'compactedSummary', 'compactionSummary', 'result']) {
       const value = record[key];
       if (typeof value === 'string' && value.trim()) {
@@ -1999,24 +2010,25 @@ Tool routing:
       // executed via Pi SDK's Bash tool can find bundled and user-installed executables.
       await enrichProcessPathForBuild();
 
-      const codingTools = createCodingTools(effectiveCwd, {
-        bash: {
+      const codingTools = [
+        createReadToolDefinition(effectiveCwd),
+        createBashToolDefinition(effectiveCwd, {
           spawnHook: (ctx) => ({
             ...ctx,
             env: getBffEnvForSpawn({ ...(ctx.env ?? {}) }),
           }),
-        },
-      });
+        }),
+        createEditToolDefinition(effectiveCwd),
+        createWriteToolDefinition(effectiveCwd),
+      ] as unknown as ToolDefinition[];
 
       // Inject a default 120s timeout for bash commands when the model omits one
       const withTimeout = ClaudeAgentRunner.wrapBashToolWithDefaultTimeout(
-        codingTools as ToolDefinition[]
+        codingTools
       );
 
       // Wrap the bash tool to intercept sudo commands and request passwords
-      // Note: wrapBashToolForSudo returns ToolDefinition[] (5-param execute) but
-      // createAgentSession.tools expects Tool[] (4-param execute). The extra ctx
-      // parameter is simply not passed by the session runner — safe to cast.
+      // Register the wrapped definitions as custom tools to override SDK defaults.
       const wrappedTools = this.wrapBashToolForSudo(withTimeout, session.id, effectiveCwd);
 
       // Diagnostic: log tools being passed to SDK (helps debug Ollama tool use)
@@ -2072,12 +2084,13 @@ Tool routing:
         const { DefaultResourceLoader } = await import('@mariozechner/pi-coding-agent');
         const resourceLoader = new DefaultResourceLoader({
           cwd: effectiveCwd,
+          agentDir: getAgentDir(),
           additionalSkillPaths: skillPaths,
-          appendSystemPrompt: coworkAppendPrompt,
+          appendSystemPrompt: [coworkAppendPrompt],
         });
         await resourceLoader.reload();
 
-        const modelRegistry = new ModelRegistry(authStorage);
+        const modelRegistry = ModelRegistry.create(authStorage);
 
         // Ollama-specific compaction tuning based on actual context window
         const contextWindow = piModel.contextWindow || 128000;
@@ -2114,8 +2127,8 @@ Tool routing:
           thinkingLevel,
           authStorage,
           modelRegistry,
-          tools: wrappedTools as unknown as ReturnType<typeof createCodingTools>,
-          customTools,
+          tools: [...wrappedTools, ...customTools].map((tool) => tool.name),
+          customTools: [...wrappedTools, ...customTools],
           sessionManager: PiSessionManager.inMemory(),
           settingsManager: PiSettingsManager.inMemory({
             compaction: compactionSettings,
@@ -2566,7 +2579,7 @@ Tool routing:
               break;
             }
 
-            case 'auto_compaction_start': {
+            case 'compaction_start': {
               if (provider === 'ollama') {
                 log(
                   '[ClaudeAgentRunner] Ollama auto-compaction started',
@@ -2585,7 +2598,7 @@ Tool routing:
               break;
             }
 
-            case 'auto_compaction_end': {
+            case 'compaction_end': {
               const status = event.aborted ? 'error' : event.errorMessage ? 'error' : 'completed';
               const title = event.aborted
                 ? 'Context compaction aborted'
