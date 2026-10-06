@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.9] - 2026-10-06
+
+### Changed
+
+- Pura Digital models catalog URL now points to `https://ai.puradigital.ai/public/models`
+
+### Fixed
+
+- Git commit-msg hook (commitlint) works from GUI clients when `nvm`/`npx` are not on the default PATH
+
 ## [3.4.8] - 2026-10-05
 
 ### Added
