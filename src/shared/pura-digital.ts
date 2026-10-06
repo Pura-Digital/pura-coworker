@@ -5,7 +5,7 @@ export const PURA_DIGITAL_HOST = 'llm.puradigital.it';
 export const PURA_DIGITAL_BASE_URL = `https://${PURA_DIGITAL_HOST}/v1`;
 
 /** Public catalog of text-inference models exposed to Pura Digital clients. */
-export const PURA_DIGITAL_MODELS_CATALOG_URL = 'https://ai.archiveye.ai/public/models';
+export const PURA_DIGITAL_MODELS_CATALOG_URL = 'https://ai.puradigital.ai/public/models';
 
 /** Default Realtime model id (OpenAI-compatible session + WS). */
 export const PURA_DIGITAL_REALTIME_MODEL = 'gpt-4o-realtime-preview-2024-12-17';
