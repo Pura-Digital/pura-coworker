@@ -1,2 +1,10 @@
 #!/usr/bin/env sh
-npx --no -- commitlint --edit "$1"
+. "$(dirname -- "$0")/common.sh"
+
+cd "$(dirname -- "$0")/.." || exit 1
+
+if [ -x "./node_modules/.bin/commitlint" ]; then
+  ./node_modules/.bin/commitlint --config commitlint.config.cjs --edit "$1"
+else
+  npx --no -- commitlint --config commitlint.config.cjs --edit "$1"
+fi
