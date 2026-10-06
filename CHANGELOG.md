@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.10] - 2026-10-06
+
+### Fixed
+
+- Pura Digital models catalog URL now uses the canonical host `https://ai.puradigital.it/public/models` (3.4.9 incorrectly used `.ai`)
+
 ## [3.4.9] - 2026-10-06
 
 ### Changed
