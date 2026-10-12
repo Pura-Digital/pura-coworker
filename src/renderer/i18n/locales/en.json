@@ -1230,5 +1230,30 @@
     "retryAction": "Try again",
     "upToDateTitle": "You're on the latest version",
     "upToDateBody": "Aiden {{version}} is up to date."
+  },
+  "anonymization": {
+    "title": "Data anonymization",
+    "description": "Local detection and restoration with rizzo-pii. Matching stays on your device, isolated by chat. The model may miss sensitive data.",
+    "enable": "Enable for this setup",
+    "download": "Download local model (about 1.3 GB)",
+    "downloading": "Downloading model: {{progress}}%",
+    "cancel": "Cancel download",
+    "downloadFailed": "Download or verification failed. Try again.",
+    "unavailable": "Anonymization service unavailable.",
+    "active": "Anonymization active",
+    "attention": "Anonymization needs your decision",
+    "clearWarning": "Proceeding without anonymization sends the affected content to the provider in clear text. This choice applies only to this case.",
+    "decisionFailed": "Could not apply your choice. Try again.",
+    "pending": "Pending requests: {{count}}",
+    "actions": {
+      "retry": "Retry",
+      "exclude": "Exclude content",
+      "cancel": "Cancel",
+      "proceed": "Proceed without anonymization",
+      "restart": "Restart anonymization service"
+    },
+    "chat": "Chat: {{title}}",
+    "notReady": "Anonymization: service not ready",
+    "voiceClear": "This voice connection is not anonymized; text chat remains protected."
   }
 }

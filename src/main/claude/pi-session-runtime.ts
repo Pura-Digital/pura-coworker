@@ -8,6 +8,7 @@ export interface PiSessionRuntimeSignatureInput {
   modelBaseUrl?: string;
   effectiveCwd?: string;
   apiKey?: string;
+  anonymizationEnabled?: boolean;
 }
 
 function normalizeText(value: string | undefined): string {
@@ -27,6 +28,7 @@ export function buildPiSessionRuntimeSignature(
 ): string {
   return JSON.stringify({
     configProvider: normalizeText(input.configProvider),
+    anonymizationEnabled: input.anonymizationEnabled === true,
     customProtocol: normalizeText(input.customProtocol),
     modelProvider: normalizeText(input.modelProvider),
     modelApi: normalizeText(input.modelApi),

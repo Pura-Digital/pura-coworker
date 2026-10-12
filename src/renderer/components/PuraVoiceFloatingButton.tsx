@@ -193,7 +193,7 @@ export function PuraVoiceFloatingButton() {
                   {t('puraVoiceFab.title')}
                 </span>
               </div>
-              <p className="text-xs leading-snug text-text-muted">{t('puraVoiceFab.badge')}</p>
+              <p className="text-xs leading-snug text-text-muted">{t(appConfig?.anonymizationEnabled && (status === 'connected' || status === 'listening') ? 'anonymization.voiceClear' : 'puraVoiceFab.badge')}</p>
 
               {isPura ? (
                 <>

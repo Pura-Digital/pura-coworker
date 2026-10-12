@@ -1,3 +1,4 @@
+import { AnonymizationIndicator } from './AnonymizationIndicator';
 import { ChatApiConfigSelector } from './ChatApiConfigSelector';
 import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -954,6 +955,7 @@ export function ChatView() {
                     <Square className="w-4 h-4" />
                   </button>
                 )}
+                <AnonymizationIndicator />
                 <button
                   type="submit"
                   disabled={

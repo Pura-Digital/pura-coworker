@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/Rizzo-AI-Academy/rizzo-pii",
+  "commit": "30d6f9c675e245bc8494df959adaeaa9d8de35c7",
+  "model": "v1.5.0",
+  "functions": [
+    "chunk_text",
+    "detect_model",
+    "_is_word",
+    "_merge"
+  ]
+}

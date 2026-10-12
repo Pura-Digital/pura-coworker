@@ -38,9 +38,36 @@ jobs:
       - name: Test with Coverage
         run: npm run test:coverage
 
+  anonymization-runtimes:
+    name: PII runtime (${{ matrix.target }})
+    needs: [lint-and-test]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            target: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin-x64
+          - runner: windows-latest
+            target: win32-x64
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Build private offline CPU worker
+        run: python scripts/prepare-anonymization.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pii-runtime-${{ matrix.target }}
+          path: .bundle-resources/anonymization/${{ matrix.target }}
+          include-hidden-files: true
+
   build-macos:
     name: Release macOS
-    needs: [lint-and-test]
+    needs: [lint-and-test, anonymization-runtimes]
     runs-on: macos-14
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -59,6 +86,17 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: pii-runtime-darwin-arm64
+          path: .bundle-resources/anonymization/darwin-arm64
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: pii-runtime-darwin-x64
+          path: .bundle-resources/anonymization/darwin-x64
+      - name: Restore worker executable permissions
+        run: chmod +x .bundle-resources/anonymization/darwin-*/rizzo-worker/rizzo-worker
 
       - name: Install cliclick for GUI tools
         run: brew install cliclick
@@ -141,7 +179,7 @@ jobs:
 
   build-windows:
     name: Release Windows
-    needs: [lint-and-test]
+    needs: [lint-and-test, anonymization-runtimes]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -160,6 +198,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: pii-runtime-win32-x64
+          path: .bundle-resources/anonymization/win32-x64
 
       - name: Download Node binaries
         run: node scripts/download-node.js

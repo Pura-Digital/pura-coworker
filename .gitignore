@@ -112,3 +112,7 @@ website/.vitepress/cache/
 !public/*.png
 !website/public/*.png
 !resources/social-preview.png
+
+# Local PII runtime, model smoke-test files and Python bytecode
+.cache/anonymization-*/
+resources/anonymization/**/__pycache__/

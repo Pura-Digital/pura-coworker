@@ -57,6 +57,7 @@ interface ConfigStateSnapshot {
   activeProfileKey: ProviderProfileKey;
   profiles: Record<ProviderProfileKey, UIProviderProfile>;
   enableThinking: boolean;
+  anonymizationEnabled: boolean;
 }
 
 interface ApiConfigBootstrap {
@@ -326,6 +327,7 @@ export function buildApiConfigSnapshot(
     activeProfileKey,
     profiles,
     enableThinking: Boolean(config?.enableThinking),
+    anonymizationEnabled: Boolean(config?.anonymizationEnabled),
   };
 }
 
@@ -352,12 +354,14 @@ function toPersistedProfiles(
 export function buildApiConfigDraftSignature(
   activeProfileKey: ProviderProfileKey,
   profiles: Record<ProviderProfileKey, UIProviderProfile>,
-  enableThinking: boolean
+  enableThinking: boolean,
+  anonymizationEnabled = false
 ): string {
   const persisted = toPersistedProfiles(profiles);
   return JSON.stringify({
     activeProfileKey,
     enableThinking,
+    anonymizationEnabled,
     profiles: PROFILE_KEYS.map((key) => ({
       key,
       apiKey: persisted[key]?.apiKey || '',
@@ -560,6 +564,7 @@ interface ApiConfigState {
   pendingConfigSetAction: PendingConfigSetAction | null;
   // Extended thinking flag
   enableThinking: boolean;
+  anonymizationEnabled: boolean;
   // Remember last custom protocol so switching back to custom restores it
   lastCustomProtocol: CustomProtocolType;
   // Signature of the last persisted state (used for dirty-check)
@@ -602,6 +607,7 @@ type ApiConfigAction =
         profiles: Record<ProviderProfileKey, UIProviderProfile>;
         activeProfileKey: ProviderProfileKey;
         enableThinking: boolean;
+  anonymizationEnabled: boolean;
         configSets: ApiConfigSet[];
         activeConfigSetId: string;
         lastCustomProtocol: CustomProtocolType;
@@ -612,6 +618,7 @@ type ApiConfigAction =
   | { type: 'SET_ACTIVE_PROFILE_KEY'; payload: ProviderProfileKey }
   // Enable thinking toggle
   | { type: 'SET_ENABLE_THINKING'; payload: boolean }
+  | { type: 'SET_ANONYMIZATION'; payload: boolean }
   // Patch one profile in the profiles map
   | { type: 'PATCH_PROFILE'; profileKey: ProviderProfileKey; patch: Partial<UIProviderProfile> }
   // Replace a profile using a functional updater
@@ -671,6 +678,7 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
         profiles: action.payload.profiles,
         activeProfileKey: action.payload.activeProfileKey,
         enableThinking: action.payload.enableThinking,
+        anonymizationEnabled: action.payload.anonymizationEnabled,
         configSets: action.payload.configSets,
         activeConfigSetId: action.payload.activeConfigSetId,
         pendingConfigSetAction: null,
@@ -680,6 +688,9 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
 
     case 'SET_ACTIVE_PROFILE_KEY':
       return { ...state, activeProfileKey: action.payload };
+
+    case 'SET_ANONYMIZATION':
+      return { ...state, anonymizationEnabled: action.payload };
 
     case 'SET_ENABLE_THINKING':
       return { ...state, enableThinking: action.payload };
@@ -835,6 +846,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       isMutatingConfigSet: false,
       lastCustomProtocol: initialLastCustomProtocol,
       enableThinking: Boolean(initialConfig?.enableThinking),
+      anonymizationEnabled: Boolean(initialConfig?.anonymizationEnabled),
       discoveredModels: {},
       isLoadingConfig: true,
       savedDraftSignature: '',
@@ -867,6 +879,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isMutatingConfigSet,
     lastCustomProtocol,
     enableThinking,
+    anonymizationEnabled,
     discoveredModels,
     isLoadingConfig,
     savedDraftSignature,
@@ -1108,8 +1121,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         (customProtocol === 'gemini' && isCustomGeminiLoopbackGateway(baseUrl))));
   const requiresApiKey = !allowEmptyApiKey;
   const currentDraftSignature = useMemo(
-    () => buildApiConfigDraftSignature(activeProfileKey, profiles, enableThinking),
-    [activeProfileKey, profiles, enableThinking]
+    () => buildApiConfigDraftSignature(activeProfileKey, profiles, enableThinking, anonymizationEnabled),
+    [activeProfileKey, profiles, enableThinking, anonymizationEnabled]
   );
   const hasUnsavedChanges =
     savedDraftSignature !== '' && currentDraftSignature !== savedDraftSignature;
@@ -1135,13 +1148,15 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
           profiles: bootstrap.snapshot.profiles,
           activeProfileKey: bootstrap.snapshot.activeProfileKey,
           enableThinking: bootstrap.snapshot.enableThinking,
+          anonymizationEnabled: bootstrap.snapshot.anonymizationEnabled,
           configSets: bootstrap.configSets,
           activeConfigSetId: bootstrap.activeConfigSetId,
           lastCustomProtocol: resolvedLastCustomProtocol,
           savedDraftSignature: buildApiConfigDraftSignature(
             bootstrap.snapshot.activeProfileKey,
             bootstrap.snapshot.profiles,
-            bootstrap.snapshot.enableThinking
+            bootstrap.snapshot.enableThinking,
+            bootstrap.snapshot.anonymizationEnabled
           ),
         },
       });
@@ -1285,6 +1300,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [updateActiveProfile]);
 
   // Public setter exposed to consumers — wraps dispatch so the interface stays stable
+  const setAnonymizationEnabled = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_ANONYMIZATION', payload: value });
+  }, []);
+
   const setEnableThinking = useCallback((value: boolean) => {
     dispatch({ type: 'SET_ENABLE_THINKING', payload: value });
   }, []);
@@ -1890,6 +1909,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
           profiles: persistedProfiles,
           activeConfigSetId,
           enableThinking,
+    anonymizationEnabled,
         };
 
         if (onSave) {
@@ -1928,6 +1948,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       customModel,
       customProtocol,
       enableThinking,
+    anonymizationEnabled,
       model,
       onSave,
       presets,
@@ -2205,6 +2226,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     modelInputPlaceholder: modelInputGuidance.placeholder,
     modelInputHint: modelInputGuidance.hint,
     enableThinking,
+    anonymizationEnabled,
     isSaving,
     isTesting,
     isRefreshingModels,
@@ -2246,6 +2268,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     setMaxTokens,
     toggleCustomModel,
     setEnableThinking,
+    setAnonymizationEnabled,
     applyCommonProviderSetup,
     changeProvider,
     changeProtocol,

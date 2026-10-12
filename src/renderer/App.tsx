@@ -1,3 +1,4 @@
+import { AnonymizationDecisions } from './components/AnonymizationDecisions';
 import { Suspense, lazy, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from './store';
 import {
@@ -254,6 +255,8 @@ function App() {
 
       {/* Sudo Password Dialog */}
       {pendingSudoPassword && <SudoPasswordDialog request={pendingSudoPassword} />}
+
+      <AnonymizationDecisions />
 
       {/* Config Modal */}
       <PanelErrorBoundary name="ConfigModal" fallback={null}>

@@ -644,6 +644,7 @@ export interface ProviderProfile {
 }
 
 export interface ApiConfigSet {
+  anonymizationEnabled?: boolean;
   id: ConfigSetId;
   name: string;
   isSystem?: boolean;
@@ -686,6 +687,7 @@ export interface MemoryRuntimeConfig {
 }
 
 export interface AppConfig {
+  anonymizationEnabled?: boolean;
   provider: ProviderType;
   apiKey: string;
   baseUrl?: string;

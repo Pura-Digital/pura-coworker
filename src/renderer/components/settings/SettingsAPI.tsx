@@ -1,3 +1,4 @@
+import { AnonymizationSettings } from '../AnonymizationSettings';
 import { useTranslation } from 'react-i18next';
 import {
   Key,
@@ -37,6 +38,8 @@ interface ModelOptionItem {
 export function SettingsAPI() {
   const { t } = useTranslation();
   const {
+    anonymizationEnabled,
+    setAnonymizationEnabled,
     provider,
     customProtocol,
     apiKey,
@@ -400,6 +403,8 @@ export function SettingsAPI() {
           onToggle={() => setEnableThinking(!enableThinking)}
         />
       </SettingsCard>
+
+      {provider !== 'ollama' && <SettingsCard><AnonymizationSettings enabled={anonymizationEnabled} onChange={setAnonymizationEnabled} /></SettingsCard>}
 
       <SettingsDisclosure title={t('api.sectionDiagnostics')}>
         <ApiDiagnosticsPanel

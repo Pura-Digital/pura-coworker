@@ -1,3 +1,5 @@
+import { getAnonymizationGateway } from './anonymization/gateway';
+import { registerAnonymizationIpc } from './anonymization/ipc';
 /**
  * @module main/index
  *
@@ -1308,6 +1310,8 @@ ipcMain.handle('client-invoke', async (_event, data: ClientEvent) => {
   return handleClientEvent(data);
 });
 
+app.whenReady().then(() => registerAnonymizationIpc());
+
 ipcMain.handle('get-version', () => {
   try {
     return app.getVersion();
@@ -1691,7 +1695,7 @@ ipcMain.handle('config.isConfigured', () => {
   }
 });
 
-ipcMain.handle('puraDigital.realtimeSession', async (): Promise<PuraRealtimeSessionResult> => {
+ipcMain.handle('puraDigital.realtimeSession', async (_event, chatId?: unknown): Promise<PuraRealtimeSessionResult> => {
   try {
     const cfg = configStore.getAll();
     if (!isPuraDigitalFromAppConfig(cfg)) {
@@ -1703,6 +1707,16 @@ ipcMain.handle('puraDigital.realtimeSession', async (): Promise<PuraRealtimeSess
     const apiKey = (profile?.apiKey ?? cfg.apiKey ?? '').trim();
     if (!apiKey) {
       return { ok: false, error: 'missing_key' };
+    }
+    if (cfg.anonymizationEnabled === true) {
+      let action;
+      do {
+        action = await getAnonymizationGateway().complex(
+          typeof chatId === 'string' && chatId.length <= 128 ? chatId : 'voice-session',
+          'La voce realtime non è anonimizzabile in questa versione. Procedi comunque avvia questa connessione vocale in chiaro fino alla disconnessione; le richieste della chat testuale restano protette.'
+        );
+      } while (action === 'retry');
+      if (action === 'exclude') return { ok: false, error: 'anonymization_excluded', message: 'Connessione vocale esclusa.' };
     }
     const normalizedBase = baseUrl.replace(/\/+$/, '');
     const sessionUrl = `${normalizedBase}/realtime/sessions`;

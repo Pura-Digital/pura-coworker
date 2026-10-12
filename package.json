@@ -1,7 +1,7 @@
 {
   "name": "aiden",
   "version": "3.4.10",
-  "description": "Open-source AI agent desktop app for Windows & macOS — one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
+  "description": "Open-source AI agent desktop app for Windows & macOS \u2014 one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
   "keywords": [
     "ai-agent",
     "claude",
@@ -37,9 +37,9 @@
   },
   "main": "dist-electron/main/index.js",
   "scripts": {
-    "dev": "npm run download:node && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
-    "dev:with-python": "npm run download:node && npm run prepare:python && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
-    "build": "npm run download:node:darwin-all && npm run prepare:gui-tools:all && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js --all-darwin && electron-builder",
+    "dev": "npm run prepare:anonymization && npm run download:node && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
+    "dev:with-python": "npm run prepare:anonymization && npm run download:node && npm run prepare:python && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
+    "build": "npm run prepare:anonymization && npm run download:node:darwin-all && npm run prepare:gui-tools:all && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js --all-darwin && electron-builder",
     "build:win": "node scripts/build-windows.js",
     "build:wsl-agent": "tsc -p src/main/sandbox/wsl-agent/tsconfig.json",
     "build:lima-agent": "tsc -p src/main/sandbox/lima-agent/tsconfig.json",
@@ -64,7 +64,9 @@
     "typecheck": "tsc --noEmit",
     "pre-build-check": "node scripts/pre-build-check.js",
     "clean": "rimraf dist dist-electron dist-mcp dist-wsl-agent dist-lima-agent .bundle-resources release",
-    "deploy:local": "bash scripts/deploy-local.sh"
+    "deploy:local": "bash scripts/deploy-local.sh",
+    "prepare:anonymization": "node scripts/prepare-anonymization.js",
+    "test:anonymization:smoke": "node scripts/test-anonymization-smoke.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -75,6 +75,8 @@ win:
         - x64
   artifactName: ${productName}-${version}-win-${arch}.${ext}
   extraResources:
+    - from: .bundle-resources/anonymization/win32-${arch}
+      to: anonymization
     - from: resources/icon.ico
       to: icon.ico
     - from: resources/tray-icon.ico
@@ -116,6 +118,8 @@ mac:
     NSScreenCaptureUsageDescription: 'Aiden needs screen recording access for GUI automation.'
     NSAccessibilityUsageDescription: 'Aiden needs accessibility access for GUI automation.'
   extraResources:
+    - from: .bundle-resources/anonymization/darwin-${arch}
+      to: anonymization
     - from: .bundle-resources/mcp
       to: mcp
     - from: resources/node/darwin-${arch}
@@ -139,6 +143,8 @@ linux:
         - x64
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
   extraResources:
+    - from: .bundle-resources/anonymization/linux-${arch}
+      to: anonymization
     - from: .bundle-resources/mcp
       to: mcp
     - from: resources/node/linux-x64

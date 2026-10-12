@@ -1,3 +1,7 @@
+import { createVisionConsentScope } from '../anonymization/vision-consent';
+import { streamSimple } from '@mariozechner/pi-ai';
+import { getAnonymizationGateway, anonymizationContext } from '../anonymization/gateway';
+import { anonymizationCompactionExtension } from '../anonymization/compaction-extension';
 /**
  * @module main/claude/agent-runner
  *
@@ -311,7 +315,17 @@ function buildMcpCustomTools(mcpManager: MCPManager): ToolDefinition[] {
       parameters,
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
         try {
-          const result = await mcpManager.callTool(mcpTool.name, params as Record<string, unknown>);
+          const run = anonymizationContext.getStore();
+          const consent = run?.enabled && isGuiOperateServerName(mcpTool.serverName)
+            ? await createVisionConsentScope(run.chatId, _signal) : undefined;
+          let result: unknown;
+          try {
+            const argumentsForTool = consent
+              ? { ...params as Record<string, unknown>, __aidenPrivacy: consent.capability }
+              : params as Record<string, unknown>;
+            result = await mcpManager.callTool(mcpTool.name, argumentsForTool,
+              consent ? { signal: _signal, waitForHuman: true } : undefined);
+          } finally { consent?.dispose(); }
           const normalizedResult = normalizeMcpToolResultForModel(result);
           return {
             content: [{ type: 'text' as const, text: normalizedResult.text }],
@@ -1658,6 +1672,7 @@ ${hints.join('\n')}
       const thinkingLevel: PiThinkingLevel = enableThinking ? 'medium' : 'off';
       const sessionRuntimeSignature = buildPiSessionRuntimeSignature({
         configProvider: runtimeConfig.provider,
+        anonymizationEnabled: anonymizationContext.getStore()?.enabled ?? runtimeConfig.anonymizationEnabled,
         customProtocol: runtimeConfig.customProtocol,
         modelProvider: piModel.provider,
         modelApi: piModel.api,
@@ -2087,6 +2102,7 @@ Tool routing:
           agentDir: getAgentDir(),
           additionalSkillPaths: skillPaths,
           appendSystemPrompt: [coworkAppendPrompt],
+          extensionFactories: [anonymizationCompactionExtension],
         });
         await resourceLoader.reload();
 
@@ -2200,6 +2216,10 @@ Tool routing:
 
         logTiming('pi-coding-agent session created', runStartTime);
       }
+
+      piSession.agent.streamFn = (anonymizationContext.getStore()?.enabled ?? runtimeConfig.anonymizationEnabled) && runtimeConfig.provider !== 'ollama'
+        ? getAnonymizationGateway().stream(session.id, streamSimple)
+        : streamSimple;
 
       // Set up event handler to bridge pi-coding-agent events → our ServerEvent protocol
 

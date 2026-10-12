@@ -1,3 +1,4 @@
+import { AnonymizationSettings } from './AnonymizationSettings';
 import { useEffect } from 'react';
 import {
   X,
@@ -47,6 +48,8 @@ export function ConfigModal({
 }: ConfigModalProps) {
   const { t } = useTranslation();
   const {
+    anonymizationEnabled,
+    setAnonymizationEnabled,
     provider,
     customProtocol,
     apiKey,
@@ -255,6 +258,8 @@ export function ConfigModal({
           </div>
 
           {/* Custom Protocol */}
+          {provider !== 'ollama' && <AnonymizationSettings enabled={anonymizationEnabled} onChange={setAnonymizationEnabled} />}
+
           {provider === 'custom' && !isPuraMode && (
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
@@ -339,7 +344,7 @@ export function ConfigModal({
               {isOllamaMode && (
                 <p className="text-xs text-text-muted">{t('api.discoverLocalOllamaHint')}</p>
               )}
-              {provider === 'custom' && <GuidanceInlineHint text={baseUrlGuidanceText} />}
+              {provider !== 'ollama' && <GuidanceInlineHint text={baseUrlGuidanceText} />}
             </div>
           )}
 

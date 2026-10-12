@@ -74,11 +74,13 @@ export interface ApiConfigSet {
   customProtocol: CustomProtocolType;
   activeProfileKey: ProviderProfileKey;
   profiles: Partial<Record<ProviderProfileKey, ProviderProfile>>;
+  anonymizationEnabled?: boolean;
   enableThinking: boolean;
   updatedAt: string;
 }
 
 export interface AppConfig {
+  anonymizationEnabled?: boolean;
   // API Provider
   provider: ProviderType;
 
@@ -730,6 +732,7 @@ export class ConfigStore {
     contextWindow?: number;
     maxTokens?: number;
     enableThinking: boolean;
+    anonymizationEnabled: boolean;
   } {
     const profiles = this.cloneProfiles(configSet.profiles);
     const activeProfileKey = isProfileKey(configSet.activeProfileKey)
@@ -748,6 +751,7 @@ export class ConfigStore {
       contextWindow: activeProfile.contextWindow,
       maxTokens: activeProfile.maxTokens,
       enableThinking: toBoolean(configSet.enableThinking, false),
+      anonymizationEnabled: configSet.provider !== 'ollama' && configSet.anonymizationEnabled === true,
     };
   }
 
@@ -793,6 +797,7 @@ export class ConfigStore {
       activeProfileKey,
       profiles,
       enableThinking: toBoolean(rawSet?.enableThinking, fallback.enableThinking),
+      anonymizationEnabled: provider !== 'ollama' && rawSet?.anonymizationEnabled === true,
       updatedAt,
     };
   }
@@ -989,6 +994,7 @@ export class ConfigStore {
       memoryEnabled: toBoolean(raw.memoryEnabled, defaultConfig.memoryEnabled),
       memoryRuntime: normalizeMemoryRuntimeConfig(raw.memoryRuntime),
       enableThinking: projected.enableThinking,
+      anonymizationEnabled: projected.anonymizationEnabled,
       isConfigured: toBoolean(raw.isConfigured, defaultConfig.isConfigured),
     };
     this.normalizeModelIds(result);
@@ -1026,6 +1032,7 @@ export class ConfigStore {
       activeProfileKey: projected.activeProfileKey,
       profiles: projected.profiles,
       enableThinking: projected.enableThinking,
+      anonymizationEnabled: projected.anonymizationEnabled,
       activeConfigSetId: activeConfigSet.id,
       configSets: nextConfigSets,
     };
@@ -1192,6 +1199,7 @@ export class ConfigStore {
       const cloned = this.cloneConfigSet(source);
       newSet = {
         ...cloned,
+        anonymizationEnabled: false,
         id,
         name,
         isSystem: false,
@@ -1316,7 +1324,8 @@ export class ConfigStore {
       updates.apiKey !== undefined ||
       updates.baseUrl !== undefined ||
       updates.model !== undefined ||
-      updates.enableThinking !== undefined;
+      updates.enableThinking !== undefined ||
+      updates.anonymizationEnabled !== undefined;
 
     if (mutatesActiveSet) {
       if (updates.profiles) {
@@ -1377,6 +1386,7 @@ export class ConfigStore {
         profiles: nextProfiles,
         enableThinking:
           updates.enableThinking !== undefined ? updates.enableThinking : targetSet.enableThinking,
+        anonymizationEnabled: nextProvider !== 'ollama' && (updates.anonymizationEnabled ?? targetSet.anonymizationEnabled) === true,
         updatedAt: nowISO(),
       };
 

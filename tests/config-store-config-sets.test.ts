@@ -48,6 +48,21 @@ describe('ConfigStore config sets', () => {
     mocks.seed = {};
   });
 
+  it('keeps anonymization isolated per setup and disabled for newly created setups', () => {
+    const store = new ConfigStore();
+    store.update({ provider: 'custom', customProtocol: 'openai', anonymizationEnabled: true });
+    const sourceId = store.getAll().activeConfigSetId;
+    expect(store.getAll().anonymizationEnabled).toBe(true);
+    const cloned = store.createSet({ name: 'Copy', mode: 'clone' });
+    expect(cloned.anonymizationEnabled).toBe(false);
+    store.switchSet({ id: sourceId });
+    expect(store.getAll().anonymizationEnabled).toBe(true);
+    const blank = store.createSet({ name: 'New', mode: 'blank' });
+    expect(blank.anonymizationEnabled).toBe(false);
+    store.update({ provider: 'ollama', anonymizationEnabled: true });
+    expect(store.getAll().anonymizationEnabled).toBe(false);
+  });
+
   it('migrates legacy fields into default config set transparently', () => {
     mocks.seed = {
       provider: 'openai',

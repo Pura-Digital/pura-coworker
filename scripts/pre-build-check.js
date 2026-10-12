@@ -37,6 +37,12 @@ function buildCheckList(platform, arch, options = {}) {
   const checks = [
     // Common checks (all platforms, FATAL)
     {
+      label: `Local anonymization runtime (${platform}/${arch})`,
+      relPath: `.bundle-resources/anonymization/${platform}-${arch}/rizzo-worker/rizzo-worker${platform === 'win32' ? '.exe' : ''}`,
+      type: 'file',
+      severity: 'fatal',
+    },
+    {
       label: 'GUI Operate MCP server bundle',
       relPath: '.bundle-resources/mcp/gui-operate-server.js',
       type: 'file',

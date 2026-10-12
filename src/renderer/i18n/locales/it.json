@@ -1230,5 +1230,30 @@
     "retryAction": "Riprova",
     "upToDateTitle": "Sei già aggiornato",
     "upToDateBody": "Aiden {{version}} è aggiornato."
+  },
+  "anonymization": {
+    "title": "Anonimizzazione dei dati",
+    "description": "Rilevamento e ripristino locali con rizzo-pii. Il matching rimane sul dispositivo, separato per chat. Il modello può non riconoscere tutti i dati sensibili.",
+    "enable": "Abilita per questo setup",
+    "download": "Scarica modello locale (circa 1,3 GB)",
+    "downloading": "Download modello: {{progress}}%",
+    "cancel": "Annulla download",
+    "downloadFailed": "Download o verifica non riusciti. Riprova.",
+    "unavailable": "Servizio di anonimizzazione non disponibile.",
+    "active": "Anonimizzazione attiva",
+    "attention": "Anonimizzazione: serve una scelta",
+    "clearWarning": "Procedendo in chiaro, il contenuto coinvolto sarà inviato al provider senza anonimizzazione. La scelta vale solo per questo caso.",
+    "decisionFailed": "Impossibile applicare la scelta. Riprova.",
+    "pending": "Richieste in attesa: {{count}}",
+    "actions": {
+      "retry": "Riprova",
+      "exclude": "Escludi il contenuto",
+      "cancel": "Annulla",
+      "proceed": "Procedi comunque (in chiaro)",
+      "restart": "Riavvia servizio anonimizzazione"
+    },
+    "chat": "Conversazione: {{title}}",
+    "notReady": "Anonimizzazione: servizio non pronto",
+    "voiceClear": "Questa connessione vocale è in chiaro; la chat testuale resta protetta."
   }
 }
