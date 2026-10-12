@@ -36,7 +36,11 @@ beforeEach(() => {
   vi.mocked(restartAppForSystemStorage).mockReset();
 });
 
-import { AnonymizationGateway, withAnonymization } from '../src/main/anonymization/gateway';
+import {
+  AnonymizationGateway,
+  anonymizationContext,
+  withAnonymization,
+} from '../src/main/anonymization/gateway';
 import {
   normalizeMcpToolResultForModel,
   normalizeToolExecutionResultForUi,
@@ -89,6 +93,34 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it('retains request consent when an SDK invokes the stream outside its originating async context', async () => {
+    const gateway = makeGateway();
+    vi.mocked(gateway.service.start).mockRejectedValue(new Error('offline'));
+    let count = 0;
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') {
+        count++;
+        queueMicrotask(() => void gateway.decide(event.decision.id, 'proceed'));
+      }
+    });
+    const provider: StreamFn = () => {
+      const result = createAssistantMessageEventStream();
+      result.push({ type: 'done', reason: 'stop', message: message('ok') });
+      return result;
+    };
+    let detached!: StreamFn;
+    await withAnonymization('chat', true, async () => {
+      detached = gateway.stream('chat', provider);
+      await gateway.prepare('chat', { messages: [] });
+    });
+    expect(anonymizationContext.getStore()).toBeUndefined();
+    await (await detached(model, { messages: [] })).result();
+    await (await detached(model, { messages: [] })).result();
+    expect(count).toBe(1);
+    const fresh = withAnonymization('chat', true, () => gateway.stream('chat', provider));
+    await (await fresh(model, { messages: [] })).result();
+    expect(count).toBe(2);
+  });
   it('shares one service-failure decision across sequential and concurrent completions of a request', async () => {
     const gateway = makeGateway();
     vi.mocked(gateway.service.start).mockRejectedValue(new Error('offline'));

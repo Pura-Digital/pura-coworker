@@ -1,0 +1,19 @@
+/* Glass belongs to the window shell, never to the ordinary theme palette.
+   These unlayered rules also override native glass's layered base styles. */
+html.native-os-glass {
+  --color-background: #060b17;
+  --color-background-secondary: #0a1122;
+  --color-surface: #070e1d;
+  --color-surface-hover: #141e33;
+  --color-surface-active: #1a2540;
+  --color-surface-muted: #0a1120;
+}
+
+html.native-os-glass.light {
+  --color-background: #ffffff;
+  --color-background-secondary: #f5f9ff;
+  --color-surface: #ffffff;
+  --color-surface-hover: #eff5ff;
+  --color-surface-active: #e4eeff;
+  --color-surface-muted: #f7faff;
+}

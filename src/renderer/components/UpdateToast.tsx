@@ -47,7 +47,7 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
 
   return (
     <div className="fixed bottom-4 left-4 z-50 max-w-sm">
-      <div className="rounded-[1.4rem] border border-border-subtle bg-background/95 backdrop-blur-md shadow-elevated overflow-hidden">
+      <div className="rounded-[1.4rem] border border-border-subtle bg-background backdrop-blur-md shadow-elevated overflow-hidden">
         <div className="flex items-start gap-3 px-4 py-3">
           <div
             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${

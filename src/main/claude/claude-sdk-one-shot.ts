@@ -294,6 +294,10 @@ export async function runPiAiOneShot(
   const protectedCall = privacyRun?.enabled ?? config.anonymizationEnabled === true;
   const chatId = privacyRun?.chatId || logStorage.getStore()?.sessionId;
   if (protectedCall && !chatId) throw new Error('Contesto chat mancante: chiamata ausiliaria protetta sospesa.');
+  // Titles and memory completions are optional auxiliary calls. They must not
+  // reopen a foreground service-failure dialog or request Keychain access.
+  if (protectedCall && getAnonymizationGateway().service.status().service !== 'ready')
+    throw new Error('Servizio di anonimizzazione non disponibile: chiamata ausiliaria sospesa.');
   const response = protectedCall
     ? await (await getAnonymizationGateway().stream(chatId!)(resolvedModel, { systemPrompt, messages: [userMsg] }, { ...options, apiKey: apiKey || undefined })).result()
     : await completeSimple(

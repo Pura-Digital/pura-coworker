@@ -749,7 +749,8 @@ export class AnonymizationGateway extends EventEmitter {
     return copy;
   }
   stream(chatId: string, original: StreamFn = streamSimple): StreamFn {
-    return (model, context, options) => {
+    const origin = anonymizationContext.getStore();
+    const stream: StreamFn = (model, context, options) => {
       const output = createAssistantMessageEventStream();
       void (async () => {
         try {
@@ -925,6 +926,12 @@ export class AnonymizationGateway extends EventEmitter {
         }
       })();
       return output;
+    };
+    return (model, context, options) => {
+      const current = anonymizationContext.getStore();
+      if (current?.chatId === chatId || origin?.chatId !== chatId)
+        return stream(model, context, options);
+      return anonymizationContext.run(origin, () => stream(model, context, options));
     };
   }
   cancelChat(chatId: string): void {
