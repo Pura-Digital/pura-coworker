@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAssistantMessageEventStream,
   type AssistantMessage,
+  type Context,
   type Model,
 } from '@mariozechner/pi-ai';
 import type { StreamFn } from '@mariozechner/pi-agent-core';
@@ -20,6 +21,10 @@ vi.mock('electron', () => ({
 }));
 
 import { AnonymizationGateway, withAnonymization } from '../src/main/anonymization/gateway';
+import {
+  normalizeMcpToolResultForModel,
+  normalizeToolExecutionResultForUi,
+} from '../src/main/claude/tool-result-utils';
 const gateways: AnonymizationGateway[] = [];
 afterEach(() => {
   gateways.splice(0).forEach((g) => g.dispose());
@@ -67,6 +72,108 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it.each(['text', 'resource', 'json'] as const)(
+    'protects Archiveye top-k %s results while preserving readable documents and citations locally',
+    async (format) => {
+      const gateway = makeGateway();
+      vi.mocked(gateway.service.analyze).mockImplementation(async (text) => ({
+        complex: false,
+        entities: [...text.matchAll(/Mario Rossi|mario@example\.com/g)].map((match) => ({
+          label: match[0].includes('@') ? 'EMAIL' : 'FULLNAME',
+          start: match.index!,
+          end: match.index! + match[0].length,
+          score: 1,
+        })),
+      }));
+      const documents = [
+        { id: 'doc-1', title: 'Contratto Mario Rossi', text: 'Mario Rossi: mario@example.com' },
+        { id: 'doc-2', title: 'Rinnovo', text: 'Rinnovo del contratto di Mario Rossi' },
+      ];
+      const topK = {
+        results: documents.map((document, index) => ({
+          documentId: document.id,
+          title: document.title,
+          chunk: document.text,
+          rank: index + 1,
+          page: 1,
+        })),
+      };
+      const text = JSON.stringify(topK);
+      const result =
+        format === 'text'
+          ? { content: [{ type: 'text', text }] }
+          : format === 'resource'
+            ? {
+                content: [
+                  {
+                    type: 'resource',
+                    resource: {
+                      uri: 'archiveye://documents/top-k',
+                      mimeType: 'application/json',
+                      text,
+                    },
+                  },
+                ],
+              }
+            : topK;
+      const snapshot = structuredClone({ documents, result });
+      const normalized = normalizeMcpToolResultForModel(result);
+      const context: Context = {
+        messages: [
+          { role: 'user', content: 'Cerca il contratto di Mario Rossi', timestamp: 1 },
+          {
+            ...message(''),
+            content: [
+              {
+                type: 'toolCall',
+                id: 'search-1',
+                name: 'mcp__archiveye__search',
+                arguments: { query: 'Mario Rossi' },
+              },
+            ],
+          },
+          {
+            role: 'toolResult',
+            toolCallId: 'search-1',
+            toolName: 'mcp__archiveye__search',
+            content: [{ type: 'text', text: normalized.text }],
+            isError: false,
+            timestamp: 2,
+          },
+        ],
+      };
+      const transcript = structuredClone(context);
+      const original: StreamFn = (_model, outgoing) => {
+        const serialized = JSON.stringify(outgoing);
+        expect(serialized).not.toContain('Mario Rossi');
+        expect(serialized).not.toContain('mario@example.com');
+        const retrieval = outgoing.messages.find((item) => item.role === 'toolResult')!;
+        const chunks = JSON.stringify(retrieval.content);
+        expect(chunks).toContain('doc-1');
+        expect(chunks).toContain('doc-2');
+        const nameToken = chunks.match(/\[AIDEN_[a-f0-9]+_FULLNAME_\d+\]/)![0];
+        expect(serialized.split(nameToken).length).toBeGreaterThan(3);
+        const upstream = createAssistantMessageEventStream();
+        upstream.push({
+          type: 'done',
+          reason: 'stop',
+          message: message(`Contratto di ${nameToken} [doc-1, pagina 1]`),
+        });
+        return upstream;
+      };
+      const response = await (
+        await gateway.stream('archiveye-chat', original)(model, context)
+      ).result();
+      expect(response.content).toEqual([
+        { type: 'text', text: 'Contratto di Mario Rossi [doc-1, pagina 1]' },
+      ]);
+      expect(context).toEqual(transcript);
+      expect({ documents, result }).toEqual(snapshot);
+      expect(normalizeToolExecutionResultForUi(result).content).toContain('Mario Rossi');
+      expect(normalizeToolExecutionResultForUi(result).content).toContain('mario@example.com');
+    }
+  );
+
   it('protects data inserted by final payload hooks and restores the new references', async () => {
     const gateway = makeGateway();
     let sent: Record<string, unknown> = {};
