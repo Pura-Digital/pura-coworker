@@ -135,7 +135,15 @@ export function AnonymizationDecisions() {
               {action === 'restart' && current.state === 'restarting' && (
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
-              {t(`anonymization.actions.${action}`)}
+              {action === 'restart' && current.recovery === 'system-storage'
+                ? t(
+                    current.restartApp
+                      ? window.electronAPI.platform === 'darwin'
+                        ? 'anonymization.authorizeRestart'
+                        : 'anonymization.restartApp'
+                      : 'anonymization.authorizeAccess'
+                  )
+                : t(`anonymization.actions.${action}`)}
             </button>
           ))}
         </div>

@@ -35,6 +35,16 @@ function buildCheckList(platform, arch, options = {}) {
   const strictDarwinResources = options.strictDarwinResources === true;
   /** @type {CheckSpec[]} */
   const checks = [
+    ...(platform === 'darwin'
+      ? [
+          {
+            label: `Native Keychain authorization (${arch})`,
+            relPath: `.bundle-resources/anonymization/darwin-${arch}/aiden-keychain-access`,
+            type: 'file',
+            severity: 'fatal',
+          },
+        ]
+      : []),
     // Common checks (all platforms, FATAL)
     {
       label: `Local anonymization runtime (${platform}/${arch})`,
@@ -218,9 +228,7 @@ function main() {
     hasFatal = hasFatal || result.hasFatal;
   }
 
-  console.log(
-    `\nPre-build check: ${passed} passed, ${warnings} warnings, ${failed} failed`
-  );
+  console.log(`\nPre-build check: ${passed} passed, ${warnings} warnings, ${failed} failed`);
 
   if (hasFatal) {
     console.log(

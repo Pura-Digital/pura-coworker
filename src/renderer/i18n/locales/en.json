@@ -1232,6 +1232,9 @@
     "upToDateBody": "Aiden {{version}} is up to date."
   },
   "anonymization": {
+    "authorizeAccess": "Authorize Keychain access",
+    "authorizeRestart": "Authorize and restart Aiden",
+    "restartApp": "Restart Aiden",
     "title": "Data anonymization",
     "description": "Local detection and restoration with rizzo-pii. Matching stays on your device, isolated by chat. The model may miss sensitive data.",
     "enable": "Enable for this setup",

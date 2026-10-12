@@ -29,7 +29,10 @@ function makeDir(dirPath: string): void {
  * Creates all artifacts that are required for a successful darwin/arm64 check.
  */
 function populateDarwinArtifacts(root: string, arch: string = 'arm64'): void {
-  makeFile(path.join(root, `.bundle-resources/anonymization/darwin-${arch}/rizzo-worker/rizzo-worker`));
+  makeFile(path.join(root, `.bundle-resources/anonymization/darwin-${arch}/aiden-keychain-access`));
+  makeFile(
+    path.join(root, `.bundle-resources/anonymization/darwin-${arch}/rizzo-worker/rizzo-worker`)
+  );
   // Common FATAL resources
   makeFile(path.join(root, '.bundle-resources/mcp/gui-operate-server.js'));
   makeFile(path.join(root, '.bundle-resources/mcp/software-dev-server-example.js'));
@@ -46,7 +49,9 @@ function populateDarwinArtifacts(root: string, arch: string = 'arm64'): void {
  * Creates all artifacts that are required for a successful win32/x64 check.
  */
 function populateWin32Artifacts(root: string): void {
-  makeFile(path.join(root, '.bundle-resources/anonymization/win32-x64/rizzo-worker/rizzo-worker.exe'));
+  makeFile(
+    path.join(root, '.bundle-resources/anonymization/win32-x64/rizzo-worker/rizzo-worker.exe')
+  );
   makeFile(path.join(root, '.bundle-resources/mcp/gui-operate-server.js'));
   makeFile(path.join(root, '.bundle-resources/mcp/software-dev-server-example.js'));
   makeDir(path.join(root, 'dist-electron'));

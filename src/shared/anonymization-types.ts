@@ -13,6 +13,8 @@ export interface AnonymizationDecision {
   reason: string;
   actions: AnonymizationAction[];
   state: 'waiting' | 'restarting';
+  recovery?: 'system-storage';
+  restartApp?: boolean;
 }
 export type AnonymizationEvent =
   | { type: 'status'; status: AnonymizationStatus }

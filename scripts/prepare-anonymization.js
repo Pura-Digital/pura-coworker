@@ -6,6 +6,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
+const keychainBuild = spawnSync(
+  process.execPath,
+  [path.join(root, 'scripts/prepare-keychain.js')],
+  { stdio: 'inherit' }
+);
+if (keychainBuild.status !== 0) process.exit(keychainBuild.status || 1);
 const target = path.join(
   root,
   '.bundle-resources/anonymization',

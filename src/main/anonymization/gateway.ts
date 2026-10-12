@@ -19,6 +19,7 @@ import type {
 } from '../../shared/anonymization-types';
 import { AnonymizationMappingStore } from './mapping-store';
 import { LocalAnonymizationService } from './local-service';
+import { requestSystemStorageAccess, restartAppForSystemStorage } from './system-storage';
 import {
   mapStringValues,
   PLACEHOLDER_PATTERN,
@@ -50,19 +51,25 @@ class AnonymizationStorageError extends Error {}
 function storageUnavailable(): AnonymizationStorageError {
   return new AnonymizationStorageError(
     process.platform === 'darwin'
-      ? 'Accesso al Portachiavi macOS non disponibile: impossibile proteggere la chiave del matching. Sblocca il portachiavi login in Accesso Portachiavi e autorizza Aiden se richiesto, poi chiudi e riapri Aiden. Il solo riavvio del servizio di anonimizzazione non ripristina l’accesso al Portachiavi.'
-      : 'Archivio sicuro del sistema non disponibile: impossibile proteggere la chiave del matching. Ripristina l’accesso all’archivio delle credenziali, poi chiudi e riapri Aiden.'
+      ? 'Autorizzazione del Portachiavi macOS non completata: impossibile proteggere la chiave del matching. Usa il pulsante di autorizzazione per aprire la richiesta di macOS. La password viene gestita esclusivamente dal sistema. Se è necessario riavviare Aiden, il pulsante lo indica; la conversazione rimane salvata.'
+      : 'Protezione della chiave del matching non disponibile nell’account di sistema corrente. Premi “Riavvia Aiden” per ritentare l’inizializzazione. Su Windows la protezione usa automaticamente DPAPI: non è richiesta una password separata.'
   );
 }
 
 export class AnonymizationGateway extends EventEmitter {
   readonly service = new LocalAnonymizationService();
   private store?: AnonymizationMappingStore;
+  private storageAccessGranted = false;
+  private storageAccessPromise?: Promise<void>;
   private keySensitivity = new Map<string, boolean>();
   private signedThinking = new Map<string, ThinkingContent>();
   private pending = new Map<
     string,
-    { decision: AnonymizationDecision; resolve: (action: AnonymizationAction) => void }
+    {
+      decision: AnonymizationDecision;
+      resolve: (action: AnonymizationAction) => void;
+      controller: AbortController;
+    }
   >();
   constructor() {
     super();
@@ -70,6 +77,24 @@ export class AnonymizationGateway extends EventEmitter {
   }
   private publish(event: AnonymizationEvent): void {
     this.emit('event', event);
+  }
+  private async authorizeStorage(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) throw new AnonymizationCancelled();
+    if (this.store || this.storageAccessGranted) return;
+    if (!this.storageAccessPromise) {
+      this.storageAccessPromise = requestSystemStorageAccess(signal)
+        .then(() => {
+          this.storageAccessGranted = true;
+        })
+        .catch(() => {
+          throw storageUnavailable();
+        })
+        .finally(() => {
+          this.storageAccessPromise = undefined;
+        });
+    }
+    await this.storageAccessPromise;
+    if (signal?.aborted) throw new AnonymizationCancelled();
   }
   private mappingStore(): AnonymizationMappingStore {
     if (this.store) return this.store;
@@ -84,7 +109,7 @@ export class AnonymizationGateway extends EventEmitter {
         key = Buffer.from(safeStorage.decryptString(fs.readFileSync(keyFile)), 'hex');
       } catch {
         throw new AnonymizationStorageError(
-          'Impossibile aprire la chiave del matching nel portachiavi del sistema. Verifica l’autorizzazione di Aiden e riapri l’app. La chiave e il database esistenti sono stati conservati.'
+          'Impossibile aprire la chiave del matching nel portachiavi del sistema. Usa il pulsante di autorizzazione e riavvio per ritentare dall’app. La chiave e il database esistenti sono stati conservati.'
         );
       }
     } else {
@@ -102,6 +127,9 @@ export class AnonymizationGateway extends EventEmitter {
         flag: 'wx',
       });
     }
+    return this.openMappingStore(key);
+  }
+  private openMappingStore(key: Buffer): AnonymizationMappingStore {
     const candidate = new AnonymizationMappingStore(
       path.join(this.service.root, 'matching.sqlite'),
       key
@@ -129,7 +157,8 @@ export class AnonymizationGateway extends EventEmitter {
     chatId: string,
     kind: 'complex' | 'service',
     reason: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    recovery?: 'system-storage'
   ): Promise<AnonymizationAction> {
     if (signal?.aborted) throw new AnonymizationCancelled();
     const decision: AnonymizationDecision = {
@@ -142,9 +171,13 @@ export class AnonymizationGateway extends EventEmitter {
           ? ['proceed', 'cancel', 'restart']
           : ['retry', 'exclude', 'cancel', 'proceed'],
       state: 'waiting',
+      ...(recovery ? { recovery } : {}),
+      ...(recovery ? { restartApp: true } : {}),
     };
     return new Promise((resolve) => {
+      const controller = new AbortController();
       const finish = (action: AnonymizationAction) => {
+        controller.abort();
         signal?.removeEventListener('abort', abort);
         this.pending.delete(decision.id);
         this.publish({ type: 'resolved', id: decision.id });
@@ -152,7 +185,7 @@ export class AnonymizationGateway extends EventEmitter {
       };
       const abort = () => finish('cancel');
       signal?.addEventListener('abort', abort, { once: true });
-      this.pending.set(decision.id, { decision, resolve: finish });
+      this.pending.set(decision.id, { decision, resolve: finish, controller });
       this.publish({ type: 'decision', decision });
     });
   }
@@ -168,6 +201,22 @@ export class AnonymizationGateway extends EventEmitter {
     item.decision = { ...item.decision, state: 'restarting' };
     this.publish({ type: 'decision', decision: item.decision });
     try {
+      if (item.decision.recovery === 'system-storage') {
+        if (item.decision.restartApp) {
+          try {
+            await requestSystemStorageAccess(item.controller.signal);
+          } catch {
+            throw storageUnavailable();
+          }
+          if (!this.pending.has(id)) return;
+          item.resolve('cancel');
+          restartAppForSystemStorage();
+          return;
+        }
+        this.storageAccessGranted = false;
+      }
+      await this.authorizeStorage(item.controller.signal);
+      if (!this.pending.has(id)) return;
       this.mappingStore();
       await this.service.restart();
       if (this.pending.has(id)) item.resolve('retry');
@@ -241,6 +290,7 @@ export class AnonymizationGateway extends EventEmitter {
     for (;;) {
       if (signal?.aborted) throw new AnonymizationCancelled();
       try {
+        await this.authorizeStorage(signal);
         this.mappingStore();
         await this.service.start(signal);
         const copy = structuredClone(context);
@@ -325,7 +375,8 @@ export class AnonymizationGateway extends EventEmitter {
           error instanceof AnonymizationStorageError
             ? error.message
             : 'Il gateway locale non è disponibile o non ha completato la protezione della richiesta.',
-          signal
+          signal,
+          error instanceof AnonymizationStorageError ? 'system-storage' : undefined
         );
         if (action === 'cancel') throw new AnonymizationCancelled();
         if (action === 'proceed')

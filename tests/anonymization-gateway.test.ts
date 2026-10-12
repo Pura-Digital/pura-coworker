@@ -1,6 +1,6 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { safeStorage } from 'electron';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAssistantMessageEventStream,
   type AssistantMessage,
@@ -20,6 +20,18 @@ vi.mock('electron', () => ({
     decryptString: (value: Buffer) => value.toString(),
   },
 }));
+vi.mock('../src/main/anonymization/system-storage', () => ({
+  requestSystemStorageAccess: vi.fn(),
+  restartAppForSystemStorage: vi.fn(),
+}));
+import {
+  requestSystemStorageAccess,
+  restartAppForSystemStorage,
+} from '../src/main/anonymization/system-storage';
+beforeEach(() => {
+  vi.mocked(requestSystemStorageAccess).mockReset().mockResolvedValue();
+  vi.mocked(restartAppForSystemStorage).mockReset();
+});
 
 import { AnonymizationGateway, withAnonymization } from '../src/main/anonymization/gateway';
 import {
@@ -74,16 +86,21 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
-  it.each(['availability', 'encryption'] as const)(
+  it.each(['native', 'legacy'] as const)(
     'explains secure-storage %s failures without starting inference or exposing sensitive errors',
     async (failure) => {
       const gateway = makeGateway();
-      if (failure === 'availability') {
+      if (failure === 'legacy') {
+        mkdirSync(`${root}/anonymization`, { recursive: true });
+        writeFileSync(`${root}/anonymization/mapping-key.enc`, 'existing encrypted key');
         vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(false);
       } else {
-        vi.spyOn(safeStorage, 'encryptString').mockImplementation(() => {
-          throw new Error('private key material must not reach the UI');
-        });
+        // Native access is relevant on macOS; force the legacy safeStorage
+        // failure on the other platforms so this regression remains portable.
+        vi.mocked(requestSystemStorageAccess).mockRejectedValue(
+          new Error('private key material must not reach the UI')
+        );
+        vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(false);
       }
       const restart = vi.spyOn(gateway.service, 'restart').mockResolvedValue();
       const provider = vi.fn();
@@ -99,23 +116,86 @@ describe('anonymization provider boundary', () => {
       expect(event.type).toBe('decision');
       if (event.type !== 'decision') throw new Error('Missing decision');
       expect(event.decision.reason).toContain('chiave del matching');
-      expect(event.decision.reason).toContain('chiudi e riapri Aiden');
+      expect(event.decision.recovery).toBe('system-storage');
       expect(event.decision.reason).not.toContain('private key material');
       expect(gateway.service.start).not.toHaveBeenCalled();
       expect(provider).not.toHaveBeenCalled();
-      await gateway.decide(event.decision.id, 'restart');
       expect(restart).not.toHaveBeenCalled();
-      expect(gateway.decisions()[0]).toMatchObject({
-        state: 'waiting',
-        reason: event.decision.reason,
-      });
-      expect(existsSync(`${root}/anonymization/mapping-key.enc`)).toBe(false);
+      expect(existsSync(`${root}/anonymization/mapping-key.enc`)).toBe(failure === 'legacy');
       expect(existsSync(`${root}/anonymization/matching.sqlite`)).toBe(false);
       await gateway.decide(event.decision.id, 'cancel');
       expect((await stream.result()).stopReason).toBe('aborted');
       expect(provider).not.toHaveBeenCalled();
     }
   );
+
+  it('requests system storage before inference', async () => {
+    const gateway = makeGateway();
+    await gateway.prepare('chat', {
+      messages: [{ role: 'user', content: 'Mario Rossi', timestamp: 1 }],
+    });
+    expect(requestSystemStorageAccess).toHaveBeenCalled();
+    expect(existsSync(`${root}/anonymization/matching.sqlite`)).toBe(true);
+    expect(vi.mocked(requestSystemStorageAccess).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(gateway.service.start).mock.invocationCallOrder[0]
+    );
+  });
+
+  it('relaunches the app only after explicit storage-recovery authorization', async () => {
+    const gateway = makeGateway();
+    mkdirSync(`${root}/anonymization`, { recursive: true });
+    writeFileSync(`${root}/anonymization/mapping-key.enc`, 'existing encrypted key');
+    vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(false);
+    const event = new Promise<AnonymizationEvent>((resolve) =>
+      gateway.on('event', (value) => {
+        if (value.type === 'decision') resolve(value);
+      })
+    );
+    const prepared = gateway
+      .prepare('chat', { messages: [{ role: 'user', content: 'Ciao', timestamp: 1 }] })
+      .catch(() => undefined);
+    const decision = await event;
+    if (decision.type !== 'decision') throw new Error('Missing decision');
+    expect(decision.decision.restartApp).toBe(true);
+    expect(restartAppForSystemStorage).not.toHaveBeenCalled();
+    await gateway.decide(decision.decision.id, 'restart');
+    expect(requestSystemStorageAccess).toHaveBeenCalledTimes(2);
+    expect(restartAppForSystemStorage).toHaveBeenCalledTimes(1);
+    expect(await prepared).toBeUndefined();
+  });
+
+  it('does not relaunch after cancellation while waiting for native authorization', async () => {
+    const gateway = makeGateway();
+    vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(false);
+    let finish!: () => void;
+    vi.mocked(requestSystemStorageAccess)
+      .mockResolvedValueOnce()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          })
+      );
+    const event = new Promise<AnonymizationEvent>((resolve) =>
+      gateway.on('event', (value) => {
+        if (value.type === 'decision') resolve(value);
+      })
+    );
+    const controller = new AbortController();
+    const prepared = gateway
+      .prepare('chat', { messages: [] }, controller.signal)
+      .catch(() => undefined);
+    const decision = await event;
+    if (decision.type !== 'decision') throw new Error('Missing decision');
+    const recovery = gateway.decide(decision.decision.id, 'restart');
+    expect(gateway.decisions()[0].state).toBe('restarting');
+    controller.abort();
+    expect(vi.mocked(requestSystemStorageAccess).mock.calls[1][0]?.aborted).toBe(true);
+    finish();
+    await recovery;
+    expect(restartAppForSystemStorage).not.toHaveBeenCalled();
+    expect(await prepared).toBeUndefined();
+  });
 
   it.each(['text', 'resource', 'json'] as const)(
     'protects Archiveye top-k %s results while preserving readable documents and citations locally',
@@ -429,6 +509,7 @@ describe('anonymization provider boundary', () => {
     if (event.type !== 'decision') throw new Error('Expected decision');
     const restarting = gateway.decide(event.decision.id, 'restart');
     expect(gateway.decisions()[0].state).toBe('restarting');
+    await vi.waitFor(() => expect(ready).toBeTypeOf('function'));
     controller.abort();
     ready();
     await restarting;
