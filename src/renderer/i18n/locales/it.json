@@ -1232,6 +1232,7 @@
     "upToDateBody": "Aiden {{version}} è aggiornato."
   },
   "anonymization": {
+    "requestWarning": "Procedendo in chiaro, questo invio e le operazioni collegate della conversazione useranno il provider senza anonimizzazione. La scelta vale solo per l’invio corrente.",
     "authorizeAccess": "Autorizza accesso al Portachiavi",
     "authorizeRestart": "Autorizza e riavvia Aiden",
     "restartApp": "Riavvia Aiden",

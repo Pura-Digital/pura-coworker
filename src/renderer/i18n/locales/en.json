@@ -1232,6 +1232,7 @@
     "upToDateBody": "Aiden {{version}} is up to date."
   },
   "anonymization": {
+    "requestWarning": "Proceeding sends this request and its related conversation operations to the provider without anonymization. This choice applies only to the current request.",
     "authorizeAccess": "Authorize Keychain access",
     "authorizeRestart": "Authorize and restart Aiden",
     "restartApp": "Restart Aiden",

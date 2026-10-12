@@ -19,7 +19,11 @@ import type {
 } from '../../shared/anonymization-types';
 import { AnonymizationMappingStore } from './mapping-store';
 import { LocalAnonymizationService } from './local-service';
-import { requestSystemStorageAccess, restartAppForSystemStorage } from './system-storage';
+import {
+  openSystemStorageSettings,
+  requestSystemStorageAccess,
+  restartAppForSystemStorage,
+} from './system-storage';
 import {
   mapStringValues,
   PLACEHOLDER_PATTERN,
@@ -32,6 +36,8 @@ interface RunContext {
   chatId: string;
   enabled: boolean;
   choices: Map<string, AnonymizationAction>;
+  serviceDecision?: Promise<AnonymizationAction>;
+  serviceAction?: 'cancel' | 'proceed';
 }
 export const anonymizationContext = new AsyncLocalStorage<RunContext>();
 export function withAnonymization<T>(chatId: string, enabled: boolean, fn: () => T): T {
@@ -160,6 +166,32 @@ export class AnonymizationGateway extends EventEmitter {
     signal?: AbortSignal,
     recovery?: 'system-storage'
   ): Promise<AnonymizationAction> {
+    const run = anonymizationContext.getStore();
+    if (kind === 'service' && run?.enabled && run.chatId === chatId) {
+      if (signal?.aborted) throw new AnonymizationCancelled();
+      if (run.serviceAction) return run.serviceAction;
+      if (!run.serviceDecision) {
+        run.serviceDecision = this.createDecision(chatId, kind, reason, signal, recovery, 'request')
+          .then((action) => {
+            if (action === 'cancel' || action === 'proceed') run.serviceAction = action;
+            return action;
+          })
+          .finally(() => {
+            run.serviceDecision = undefined;
+          });
+      }
+      return run.serviceDecision;
+    }
+    return this.createDecision(chatId, kind, reason, signal, recovery);
+  }
+  private async createDecision(
+    chatId: string,
+    kind: 'complex' | 'service',
+    reason: string,
+    signal?: AbortSignal,
+    recovery?: 'system-storage',
+    scope?: 'request'
+  ): Promise<AnonymizationAction> {
     if (signal?.aborted) throw new AnonymizationCancelled();
     const decision: AnonymizationDecision = {
       id: randomUUID(),
@@ -171,6 +203,7 @@ export class AnonymizationGateway extends EventEmitter {
           ? ['proceed', 'cancel', 'restart']
           : ['retry', 'exclude', 'cancel', 'proceed'],
       state: 'waiting',
+      ...(scope ? { scope } : {}),
       ...(recovery ? { recovery } : {}),
       ...(recovery ? { restartApp: true } : {}),
     };
@@ -206,6 +239,18 @@ export class AnonymizationGateway extends EventEmitter {
           try {
             await requestSystemStorageAccess(item.controller.signal);
           } catch {
+            if (!this.pending.has(id)) return;
+            if (process.platform === 'darwin') {
+              const opened = await openSystemStorageSettings().then(
+                () => true,
+                () => false
+              );
+              if (opened) {
+                throw new AnonymizationStorageError(
+                  'macOS ha rifiutato la richiesta nativa di autorizzazione. Aiden ha aperto Accesso Portachiavi per consentire il recupero tramite il sistema. Dopo aver ripristinato l’accesso, premi di nuovo “Autorizza e riavvia Aiden”. La richiesta resta bloccata e nessun dato viene inviato in chiaro.'
+                );
+              }
+            }
             throw storageUnavailable();
           }
           if (!this.pending.has(id)) return;
@@ -289,6 +334,11 @@ export class AnonymizationGateway extends EventEmitter {
   ): Promise<{ context: Context; mapping: Map<string, string>; bypass: boolean }> {
     for (;;) {
       if (signal?.aborted) throw new AnonymizationCancelled();
+      const run = anonymizationContext.getStore();
+      if (run?.chatId === chatId && run.serviceAction === 'cancel')
+        throw new AnonymizationCancelled();
+      if (run?.chatId === chatId && run.serviceAction === 'proceed')
+        return { context, mapping: this.existingMapping(chatId), bypass: true };
       try {
         await this.authorizeStorage(signal);
         this.mappingStore();

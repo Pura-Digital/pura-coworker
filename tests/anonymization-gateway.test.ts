@@ -21,14 +21,17 @@ vi.mock('electron', () => ({
   },
 }));
 vi.mock('../src/main/anonymization/system-storage', () => ({
+  openSystemStorageSettings: vi.fn(),
   requestSystemStorageAccess: vi.fn(),
   restartAppForSystemStorage: vi.fn(),
 }));
 import {
+  openSystemStorageSettings,
   requestSystemStorageAccess,
   restartAppForSystemStorage,
 } from '../src/main/anonymization/system-storage';
 beforeEach(() => {
+  vi.mocked(openSystemStorageSettings).mockReset().mockResolvedValue();
   vi.mocked(requestSystemStorageAccess).mockReset().mockResolvedValue();
   vi.mocked(restartAppForSystemStorage).mockReset();
 });
@@ -86,6 +89,55 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it('shares one service-failure decision across sequential and concurrent completions of a request', async () => {
+    const gateway = makeGateway();
+    vi.mocked(gateway.service.start).mockRejectedValue(new Error('offline'));
+    const decisions: AnonymizationEvent[] = [];
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') {
+        decisions.push(event);
+        queueMicrotask(() => void gateway.decide(event.decision.id, 'proceed'));
+      }
+    });
+    const context = { messages: [{ role: 'user' as const, content: 'Ciao', timestamp: 1 }] };
+    await withAnonymization('chat', true, async () => {
+      const results = await Promise.all([
+        gateway.prepare('chat', context),
+        gateway.prepare('chat', context),
+        gateway.prepare('chat', context),
+      ]);
+      expect(results.every((result) => result.bypass)).toBe(true);
+      expect((await gateway.prepare('chat', context)).bypass).toBe(true);
+    });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]).toMatchObject({ decision: { scope: 'request' } });
+    await withAnonymization('chat', true, () => gateway.prepare('chat', context));
+    expect(decisions).toHaveLength(2);
+    await withAnonymization('other-chat', true, () => gateway.prepare('other-chat', context));
+    expect(decisions).toHaveLength(3);
+  });
+
+  it('cancels all completions of the request after a single service-failure cancellation', async () => {
+    const gateway = makeGateway();
+    vi.mocked(gateway.service.start).mockRejectedValue(new Error('offline'));
+    let count = 0;
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') {
+        count++;
+        queueMicrotask(() => void gateway.decide(event.decision.id, 'cancel'));
+      }
+    });
+    await withAnonymization('chat', true, async () => {
+      const results = await Promise.allSettled([
+        gateway.prepare('chat', { messages: [] }),
+        gateway.prepare('chat', { messages: [] }),
+      ]);
+      expect(results.every((result) => result.status === 'rejected')).toBe(true);
+      await expect(gateway.prepare('chat', { messages: [] })).rejects.toThrow('annullata');
+    });
+    expect(count).toBe(1);
+  });
+
   it.each(['native', 'legacy'] as const)(
     'explains secure-storage %s failures without starting inference or exposing sensitive errors',
     async (failure) => {
@@ -162,6 +214,32 @@ describe('anonymization provider boundary', () => {
     expect(requestSystemStorageAccess).toHaveBeenCalledTimes(2);
     expect(restartAppForSystemStorage).toHaveBeenCalledTimes(1);
     expect(await prepared).toBeUndefined();
+  });
+
+  it('keeps the same decision and opens system recovery when macOS refuses native authorization', async () => {
+    const gateway = makeGateway();
+    vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(false);
+    vi.mocked(requestSystemStorageAccess)
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new Error('denied'));
+    const event = new Promise<AnonymizationEvent>((resolve) =>
+      gateway.on('event', (value) => {
+        if (value.type === 'decision') resolve(value);
+      })
+    );
+    const request = gateway.prepare('chat', { messages: [] }).catch(() => undefined);
+    const decision = await event;
+    if (decision.type !== 'decision') throw new Error('Missing decision');
+    await gateway.decide(decision.decision.id, 'restart');
+    expect(gateway.decisions()).toHaveLength(1);
+    expect(gateway.decisions()[0]).toMatchObject({ id: decision.decision.id, state: 'waiting' });
+    if (process.platform === 'darwin') {
+      expect(openSystemStorageSettings).toHaveBeenCalledTimes(1);
+      expect(gateway.decisions()[0].reason).toContain('ha aperto Accesso Portachiavi');
+    }
+    expect(restartAppForSystemStorage).not.toHaveBeenCalled();
+    await gateway.decide(decision.decision.id, 'cancel');
+    expect(await request).toBeUndefined();
   });
 
   it('does not relaunch after cancellation while waiting for native authorization', async () => {

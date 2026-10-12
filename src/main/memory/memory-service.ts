@@ -1,4 +1,4 @@
-import { withAnonymization } from '../anonymization/gateway';
+import { anonymizationContext, withAnonymization } from '../anonymization/gateway';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
@@ -390,7 +390,17 @@ export class MemoryService {
     if (!input.session.memoryEnabled) {
       return Promise.resolve();
     }
+    // Capture the originating request at enqueue time, rather than inheriting
+    // whichever request happens to be executing when the queue drains.
+    const run = anonymizationContext.getStore();
+    const relatedRun =
+      run?.chatId === input.session.id &&
+      run.enabled === (this.getAppConfig().anonymizationEnabled === true)
+        ? run
+        : undefined;
     return this.queue.enqueue(input.session.id, async () => {
+      if (relatedRun)
+        return anonymizationContext.run(relatedRun, () => this.ingestWithPrivacy(input));
       await this.ingest(input);
     });
   }

@@ -39,7 +39,7 @@ function buildCheckList(platform, arch, options = {}) {
       ? [
           {
             label: `Native Keychain authorization (${arch})`,
-            relPath: `.bundle-resources/anonymization/darwin-${arch}/aiden-keychain-access`,
+            relPath: `.bundle-resources/anonymization/darwin-${arch}/Aiden Keychain Access.app/Contents/MacOS/aiden-keychain-access`,
             type: 'file',
             severity: 'fatal',
           },

@@ -29,7 +29,12 @@ function makeDir(dirPath: string): void {
  * Creates all artifacts that are required for a successful darwin/arm64 check.
  */
 function populateDarwinArtifacts(root: string, arch: string = 'arm64'): void {
-  makeFile(path.join(root, `.bundle-resources/anonymization/darwin-${arch}/aiden-keychain-access`));
+  makeFile(
+    path.join(
+      root,
+      `.bundle-resources/anonymization/darwin-${arch}/Aiden Keychain Access.app/Contents/MacOS/aiden-keychain-access`
+    )
+  );
   makeFile(
     path.join(root, `.bundle-resources/anonymization/darwin-${arch}/rizzo-worker/rizzo-worker`)
   );

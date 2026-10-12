@@ -98,7 +98,7 @@ export function AnonymizationDecisions() {
             first?.focus();
           }
         }}
-        className="bg-bg-primary border border-border rounded-2xl shadow-xl p-6 max-w-lg w-full space-y-4"
+        className="bg-[#070e1d] [.light_&]:bg-white text-text-primary border border-border rounded-2xl shadow-xl p-6 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto"
       >
         <h2 id="anonymization-decision-title" className="font-semibold flex items-center gap-2">
           <ShieldAlert className="w-5 h-5" />
@@ -110,7 +110,13 @@ export function AnonymizationDecisions() {
         <p id="anonymization-decision-reason" className="text-sm text-text-secondary">
           {current.reason}
         </p>
-        <p className="text-sm text-error">{t('anonymization.clearWarning')}</p>
+        <p className="text-sm text-error">
+          {t(
+            current.scope === 'request'
+              ? 'anonymization.requestWarning'
+              : 'anonymization.clearWarning'
+          )}
+        </p>
         {decisions.length > 1 && (
           <p className="text-xs text-text-muted">
             {t('anonymization.pending', { count: decisions.length })}

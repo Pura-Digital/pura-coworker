@@ -80,6 +80,7 @@ import type {
 } from '../../main/memory/memory-llm-client';
 import { MemoryService } from '../../main/memory/memory-service';
 import { configStore } from '../../main/config/config-store';
+import { anonymizationContext, withAnonymization } from '../../main/anonymization/gateway';
 
 class MockMemoryLLMClient implements MemoryLLMClientLike {
   async complete(request: MemoryCompletionRequest): Promise<{ text: string }> {
@@ -345,6 +346,7 @@ describe('MemoryService', () => {
     db = createDatabaseInstance(rawDb);
     service = new MemoryService(db, { llmClient: new MockMemoryLLMClient() });
     configStore.update({
+      anonymizationEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {
         llm: {
@@ -372,6 +374,44 @@ describe('MemoryService', () => {
   afterEach(() => {
     rawDb.close();
     fs.rmSync(storageRoot, { recursive: true, force: true });
+  });
+
+  it('retains only the originating request consent for queued memory ingestion', async () => {
+    configStore.update({ anonymizationEnabled: true });
+    const client = new MockMemoryLLMClient();
+    const complete = client.complete.bind(client);
+    const observed: unknown[] = [];
+    client.complete = async (request) => {
+      observed.push(anonymizationContext.getStore());
+      return complete(request);
+    };
+    service = new MemoryService(db, { llmClient: client });
+    const session = makeSession('privacy-chat', 'Memory', '/repo/a');
+    const messages = makeMessages(session.id, [
+      { role: 'user', text: 'My name is Jack', timestamp: 1 },
+      { role: 'assistant', text: 'Hello Jack', timestamp: 2 },
+    ]);
+    let origin: unknown;
+    await withAnonymization(session.id, true, async () => {
+      origin = anonymizationContext.getStore();
+      anonymizationContext.getStore()!.serviceAction = 'proceed';
+      await service.enqueueIngestion({ session, prompt: 'Hello', messages });
+    });
+    expect(observed.length).toBeGreaterThan(0);
+    expect(observed.every((run) => run === origin)).toBe(true);
+    observed.length = 0;
+    await service.enqueueIngestion({
+      session: makeSession('separate-chat', 'Separate', '/repo/a'),
+      prompt: 'Hello',
+      messages: makeMessages('separate-chat', [
+        { role: 'user', text: 'My name is Jack', timestamp: 1 },
+        { role: 'assistant', text: 'Hello Jack', timestamp: 2 },
+      ]),
+    });
+    expect(observed.length).toBeGreaterThan(0);
+    expect(
+      observed.every((run) => (run as { serviceAction?: string }).serviceAction === undefined)
+    ).toBe(true);
   });
 
   it('writes core and unified experience memory into JSON files', async () => {

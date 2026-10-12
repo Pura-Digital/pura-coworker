@@ -15,6 +15,7 @@ export interface AnonymizationDecision {
   state: 'waiting' | 'restarting';
   recovery?: 'system-storage';
   restartApp?: boolean;
+  scope?: 'request';
 }
 export type AnonymizationEvent =
   | { type: 'status'; status: AnonymizationStatus }
