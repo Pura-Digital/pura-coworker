@@ -22,6 +22,8 @@ Model detection is probabilistic. All supported categories are enabled, includin
 
 ## Development and packaging
 
+On macOS, model readiness does not imply that the matching database can be opened: Electron `safeStorage` also needs access to the system Keychain. If access is denied or the login keychain is unavailable, the gateway stops before inference and displays a secure-storage-specific decision. Unlock the login keychain in Keychain Access, grant access to Aiden if prompted, then fully quit and reopen Aiden. Electron 35's synchronous encryption implementation caches a failed key derivation for the process lifetime, so restarting just the Python worker cannot repair it. No unencrypted key fallback is created and existing encrypted matching is preserved. The native service smoke test covers download and inference; it does not validate system Keychain access, which must also be checked on the actual application runtime.
+
 `npm run prepare:anonymization` builds the private PyInstaller worker using Python 3.11/3.12. It is included in `dev` and `build`, and skipped when unchanged. End users need no Python installation. Build each OS/architecture natively; release CI builds Apple Silicon, Intel and Windows workers before packaging. Intel macOS uses the last compatible PyTorch wheel with eager CPU attention. The upstream source commit and license are in `resources/anonymization/vendor/`.
 
 Run `npm run test:anonymization:smoke -- --download` after preparing the worker to test the real download, integrity checks, offline inference, text extraction and restart. To reuse downloaded test weights, put them in `.cache/anonymization-model`, or set `AIDEN_PII_SMOKE_MODEL_PATH`, and omit `--download`. Tests use temporary app data and delete it afterward.

@@ -43,6 +43,18 @@ class AnonymizationCancelled extends Error {
   }
 }
 
+// Only these controlled messages may reach the UI; arbitrary inference errors
+// can contain input data and must never be shown or logged here.
+class AnonymizationStorageError extends Error {}
+
+function storageUnavailable(): AnonymizationStorageError {
+  return new AnonymizationStorageError(
+    process.platform === 'darwin'
+      ? 'Accesso al Portachiavi macOS non disponibile: impossibile proteggere la chiave del matching. Sblocca il portachiavi login in Accesso Portachiavi e autorizza Aiden se richiesto, poi chiudi e riapri Aiden. Il solo riavvio del servizio di anonimizzazione non ripristina l’accesso al Portachiavi.'
+      : 'Archivio sicuro del sistema non disponibile: impossibile proteggere la chiave del matching. Ripristina l’accesso all’archivio delle credenziali, poi chiudi e riapri Aiden.'
+  );
+}
+
 export class AnonymizationGateway extends EventEmitter {
   readonly service = new LocalAnonymizationService();
   private store?: AnonymizationMappingStore;
@@ -61,20 +73,31 @@ export class AnonymizationGateway extends EventEmitter {
   }
   private mappingStore(): AnonymizationMappingStore {
     if (this.store) return this.store;
-    if (!safeStorage.isEncryptionAvailable())
-      throw new Error('Protezione della chiave locale non disponibile.');
+    if (!safeStorage.isEncryptionAvailable()) throw storageUnavailable();
     if (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')
-      throw new Error('Portachiavi sicuro non disponibile.');
+      throw storageUnavailable();
     fs.mkdirSync(this.service.root, { recursive: true, mode: 0o700 });
     const keyFile = path.join(this.service.root, 'mapping-key.enc');
     let key: Buffer;
-    if (fs.existsSync(keyFile))
-      key = Buffer.from(safeStorage.decryptString(fs.readFileSync(keyFile)), 'hex');
-    else {
+    if (fs.existsSync(keyFile)) {
+      try {
+        key = Buffer.from(safeStorage.decryptString(fs.readFileSync(keyFile)), 'hex');
+      } catch {
+        throw new AnonymizationStorageError(
+          'Impossibile aprire la chiave del matching nel portachiavi del sistema. Verifica l’autorizzazione di Aiden e riapri l’app. La chiave e il database esistenti sono stati conservati.'
+        );
+      }
+    } else {
       if (fs.existsSync(path.join(this.service.root, 'matching.sqlite')))
-        throw new Error('Chiave del matching non disponibile.');
+        throw new AnonymizationStorageError('Chiave del matching non disponibile.');
       key = randomBytes(32);
-      fs.writeFileSync(keyFile, safeStorage.encryptString(key.toString('hex')), {
+      let encrypted: Buffer;
+      try {
+        encrypted = safeStorage.encryptString(key.toString('hex'));
+      } catch {
+        throw storageUnavailable();
+      }
+      fs.writeFileSync(keyFile, encrypted, {
         mode: 0o600,
         flag: 'wx',
       });
@@ -87,7 +110,7 @@ export class AnonymizationGateway extends EventEmitter {
       candidate.validateKey();
     } catch {
       candidate.close();
-      throw new Error('Chiave del matching non valida.');
+      throw new AnonymizationStorageError('Chiave del matching non valida.');
     }
     this.store = candidate;
     return this.store;
@@ -145,14 +168,18 @@ export class AnonymizationGateway extends EventEmitter {
     item.decision = { ...item.decision, state: 'restarting' };
     this.publish({ type: 'decision', decision: item.decision });
     try {
+      this.mappingStore();
       await this.service.restart();
       if (this.pending.has(id)) item.resolve('retry');
-    } catch {
+    } catch (error) {
       if (!this.pending.has(id)) return;
       item.decision = {
         ...item.decision,
         state: 'waiting',
-        reason: 'Riavvio non riuscito. Puoi riprovare, annullare o inviare senza anonimizzazione.',
+        reason:
+          error instanceof AnonymizationStorageError
+            ? error.message
+            : 'Riavvio non riuscito. Puoi riprovare, annullare o inviare senza anonimizzazione.',
       };
       this.publish({ type: 'decision', decision: item.decision });
     }
@@ -295,7 +322,9 @@ export class AnonymizationGateway extends EventEmitter {
         const action = await this.ask(
           chatId,
           'service',
-          'Il gateway locale non è disponibile o non ha completato la protezione della richiesta.',
+          error instanceof AnonymizationStorageError
+            ? error.message
+            : 'Il gateway locale non è disponibile o non ha completato la protezione della richiesta.',
           signal
         );
         if (action === 'cancel') throw new AnonymizationCancelled();

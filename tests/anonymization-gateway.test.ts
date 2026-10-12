@@ -1,4 +1,5 @@
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
+import { safeStorage } from 'electron';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAssistantMessageEventStream,
@@ -29,6 +30,7 @@ const gateways: AnonymizationGateway[] = [];
 afterEach(() => {
   gateways.splice(0).forEach((g) => g.dispose());
   rmSync(root, { recursive: true, force: true });
+  vi.restoreAllMocks();
 });
 const model = {
   id: 'test',
@@ -72,6 +74,49 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it.each(['availability', 'encryption'] as const)(
+    'explains secure-storage %s failures without starting inference or exposing sensitive errors',
+    async (failure) => {
+      const gateway = makeGateway();
+      if (failure === 'availability') {
+        vi.spyOn(safeStorage, 'isEncryptionAvailable').mockReturnValue(false);
+      } else {
+        vi.spyOn(safeStorage, 'encryptString').mockImplementation(() => {
+          throw new Error('private key material must not reach the UI');
+        });
+      }
+      const restart = vi.spyOn(gateway.service, 'restart').mockResolvedValue();
+      const provider = vi.fn();
+      const decision = new Promise<AnonymizationEvent>((resolve) => {
+        gateway.on('event', (event) => {
+          if (event.type === 'decision') resolve(event);
+        });
+      });
+      const stream = await gateway.stream('chat', provider)(model, {
+        messages: [{ role: 'user', content: 'Ciao', timestamp: 1 }],
+      });
+      const event = await decision;
+      expect(event.type).toBe('decision');
+      if (event.type !== 'decision') throw new Error('Missing decision');
+      expect(event.decision.reason).toContain('chiave del matching');
+      expect(event.decision.reason).toContain('chiudi e riapri Aiden');
+      expect(event.decision.reason).not.toContain('private key material');
+      expect(gateway.service.start).not.toHaveBeenCalled();
+      expect(provider).not.toHaveBeenCalled();
+      await gateway.decide(event.decision.id, 'restart');
+      expect(restart).not.toHaveBeenCalled();
+      expect(gateway.decisions()[0]).toMatchObject({
+        state: 'waiting',
+        reason: event.decision.reason,
+      });
+      expect(existsSync(`${root}/anonymization/mapping-key.enc`)).toBe(false);
+      expect(existsSync(`${root}/anonymization/matching.sqlite`)).toBe(false);
+      await gateway.decide(event.decision.id, 'cancel');
+      expect((await stream.result()).stopReason).toBe('aborted');
+      expect(provider).not.toHaveBeenCalled();
+    }
+  );
+
   it.each(['text', 'resource', 'json'] as const)(
     'protects Archiveye top-k %s results while preserving readable documents and citations locally',
     async (format) => {
