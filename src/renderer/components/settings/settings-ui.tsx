@@ -1,11 +1,14 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle, ChevronDown, type LucideIcon } from 'lucide-react';
 
 // ==================== Layout ====================
 
 export function SettingsPage({ children }: { children: ReactNode }) {
-  return <div className="space-y-6 w-full max-w-3xl min-w-0 pb-4">{children}</div>;
+  return <div className="space-y-6 w-full max-w-4xl mx-auto min-w-0 pb-4">{children}</div>;
 }
+
+export const SettingsFooterTargetContext = createContext<HTMLElement | null>(null);
 
 export function SettingsCard({
   id,
@@ -352,9 +355,11 @@ export function SettingsDisclosure({
 }
 
 export function SettingsStickyFooter({ children }: { children: ReactNode }) {
-  return (
-    <div className="sticky bottom-0 -mx-4 lg:-mx-8 px-4 lg:px-8 py-4 mt-2 bg-background/95 backdrop-blur-sm border-t border-border-muted">
+  const target = useContext(SettingsFooterTargetContext);
+  const footer = (
+    <div className="w-full max-w-4xl mx-auto rounded-2xl bg-surface border border-border-subtle px-4 py-3 shadow-card">
       {children}
     </div>
   );
+  return target ? createPortal(footer, target) : footer;
 }
