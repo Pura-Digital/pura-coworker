@@ -16,7 +16,7 @@ function TitlebarBrand() {
       <img
         src={appLogo}
         alt={t('common.appLogoAlt')}
-        className="w-7 h-7 rounded-lg object-cover border border-border-subtle bg-background/60"
+        className="w-7 h-7 rounded-lg object-cover border border-border-subtle bg-[#263247] [.light_&]:bg-background/60"
       />
       <span className="text-sm font-semibold tracking-[-0.02em] text-text-primary">Aiden</span>
     </div>
