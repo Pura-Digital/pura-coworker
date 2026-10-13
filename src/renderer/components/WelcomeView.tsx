@@ -445,7 +445,7 @@ export function WelcomeView() {
             <AidenLogoLoader
               aria-label={t('welcome.logoAlt')}
               playOnceThenEveryMs={5 * 60 * 1000}
-              className="w-16 h-16 shrink-0 overflow-visible md:h-20 md:w-20 rounded-[1.4rem] border border-border-subtle bg-background/60 p-2.5 shadow-soft"
+              className="w-16 h-16 shrink-0 overflow-visible md:h-20 md:w-20 rounded-[1.4rem] border border-border-subtle bg-[#263247] [.light_&]:bg-background/60 p-2.5 shadow-soft"
             />
             <div className="text-left">
               <h1 className="text-[2.35rem] md:text-[3.1rem] leading-none font-semibold tracking-[-0.05em] text-text-primary">
