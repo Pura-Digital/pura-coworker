@@ -357,7 +357,7 @@ export function SettingsDisclosure({
 export function SettingsStickyFooter({ children }: { children: ReactNode }) {
   const target = useContext(SettingsFooterTargetContext);
   const footer = (
-    <div className="w-full max-w-4xl mx-auto rounded-2xl bg-surface border border-border-subtle px-4 py-3 shadow-card">
+    <div className="w-full max-w-4xl mx-auto">
       {children}
     </div>
   );
