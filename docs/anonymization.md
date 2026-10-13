@@ -2,7 +2,7 @@
 
 Anonymization is enabled separately for each Pura LLM / multiple-model setup. New and cloned setups start disabled; Ollama is excluded. Model files are downloaded once from a pinned Hugging Face revision with SHA-256 validation, and shared between setups.
 
-The private CPU worker contains the pinned rizzo-pii neural detector, overlapping text chunking, and deterministic detectors. No upstream web server or dictionary files are used. The worker communicates over stdio and loads only local model files with Hugging Face telemetry/network access disabled.
+The private CPU worker contains the pinned rizzo-pii neural detector, overlapping text chunking bounded by the actual tokenizer budget (including dense URLs/code), and deterministic detectors. No upstream web server or dictionary files are used. The worker communicates over stdio and loads only local model files with Hugging Face telemetry/network access disabled.
 
 ## Data boundary
 
@@ -12,7 +12,7 @@ Archiveye retrieval follows the same MCP boundary. Searches receive the restored
 
 Matching lives in `userData/anonymization/matching.sqlite`. Each chat has a separate random token namespace; values use AES-256-GCM with chat/token binding, lookup keys use HMAC, and the encryption key is protected by Electron `safeStorage` (macOS Keychain / Windows DPAPI). No plaintext-key fallback is used. Deleting a chat removes its matching; deleting encrypted rows still works if the key is unavailable.
 
-Text files, PDFs with extractable text and text-only DOCX/PPTX/XLSX files are supported. Images, audio, scans, unreadable/encrypted/mixed-media documents, unsafe text chunks and low-confidence detections require a decision. There is no OCR or transcription. Personal values used as structured keys also require a decision, because protocol/schema keys remain stable. Response tool-argument keys are restored when the model uses a reference there. A decision applies only to unchanged content in the current chat run. New content or a new run requires a new decision.
+Text files, PDFs with extractable text and text-only DOCX/PPTX/XLSX files are supported. Images, audio, scans, unreadable/encrypted/mixed-media documents, text beyond the supported size and low-confidence detections require a decision. There is no OCR or transcription. Personal values used as structured keys also require a decision, because protocol/schema keys remain stable. Response tool-argument keys are restored when the model uses a reference there. A decision applies only to unchanged content in the current chat run. New content or a new run requires a new decision. Concurrent requests for the same complex content share one pending decision. Cancelling a decision cancels other pending decisions and follow-up operations belonging to that same request; a new request remains independent.
 
 Service failures offer proceed without anonymization, cancel and restart. Restart stays loading until it succeeds or fails. Complex inputs offer retry, exclude, cancel and proceed in clear text. Excluding all user content cancels the request. Unknown response references require a decision before releasing them; retry regenerates a protected answer, proceeding repeats that call in clear text, and exclusion prevents tool execution from that answer.
 

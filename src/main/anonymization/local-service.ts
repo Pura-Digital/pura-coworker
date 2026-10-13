@@ -219,6 +219,9 @@ export class LocalAnonymizationService extends EventEmitter {
         HF_HUB_OFFLINE: '1',
         TRANSFORMERS_OFFLINE: '1',
         HF_HUB_DISABLE_TELEMETRY: '1',
+        // Keep CPU inference from oversubscribing the desktop during long prompts.
+        OMP_NUM_THREADS: '2',
+        MKL_NUM_THREADS: '2',
       },
     });
     this.process = child;

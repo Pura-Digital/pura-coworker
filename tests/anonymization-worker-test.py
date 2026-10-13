@@ -4,11 +4,42 @@ from pathlib import Path
 import tempfile
 import unittest
 import zipfile
+import sys
 
 root = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('aiden_worker', root / 'resources/anonymization/worker.py')
 worker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(worker)
+sys.path.insert(0, str(root / 'resources/anonymization/vendor'))
+import inference
+
+
+class ChunkTests(unittest.TestCase):
+    def test_dense_text_preserves_every_character_and_global_offsets(self):
+        class Tokenizer:
+            def encode(self, text, truncation=False):
+                return list(text) + ['start', 'end']
+        text = ' '.join(['https://example.com/à😀?parameter=long-value'] * 120)
+        chunks = inference.bounded_chunks(text, Tokenizer())
+        covered = set()
+        for piece, offset in chunks:
+            self.assertEqual(text[offset:offset + len(piece)], piece)
+            self.assertLessEqual(len(Tokenizer().encode(piece)), 512)
+            covered.update(range(offset, offset + len(piece)))
+        self.assertTrue(all(i in covered for i, ch in enumerate(text) if not ch.isspace()))
+
+    def test_long_unbroken_text_is_not_truncated(self):
+        class Tokenizer:
+            def encode(self, text, truncation=False):
+                return list(text) + ['start', 'end']
+        text = 'à😀abc' * 1000
+        chunks = inference.bounded_chunks(text, Tokenizer())
+        covered = set()
+        for piece, offset in chunks:
+            self.assertEqual(text[offset:offset + len(piece)], piece)
+            self.assertLessEqual(len(Tokenizer().encode(piece)), 512)
+            covered.update(range(offset, offset + len(piece)))
+        self.assertEqual(len(covered), len(text))
 
 
 class ExtractionTests(unittest.TestCase):

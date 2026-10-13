@@ -36,6 +36,8 @@ interface RunContext {
   chatId: string;
   enabled: boolean;
   choices: Map<string, AnonymizationAction>;
+  complexDecisions?: Map<string, Promise<AnonymizationAction>>;
+  cancelled?: boolean;
   serviceDecision?: Promise<AnonymizationAction>;
   serviceAction?: 'cancel' | 'proceed';
 }
@@ -75,6 +77,7 @@ export class AnonymizationGateway extends EventEmitter {
       decision: AnonymizationDecision;
       resolve: (action: AnonymizationAction) => void;
       controller: AbortController;
+      run?: RunContext;
     }
   >();
   constructor() {
@@ -167,6 +170,7 @@ export class AnonymizationGateway extends EventEmitter {
     recovery?: 'system-storage'
   ): Promise<AnonymizationAction> {
     const run = anonymizationContext.getStore();
+    if (run?.chatId === chatId && run.cancelled) throw new AnonymizationCancelled();
     if (kind === 'service' && run?.enabled && run.chatId === chatId) {
       if (signal?.aborted) throw new AnonymizationCancelled();
       if (run.serviceAction) return run.serviceAction;
@@ -193,6 +197,7 @@ export class AnonymizationGateway extends EventEmitter {
     scope?: 'request'
   ): Promise<AnonymizationAction> {
     if (signal?.aborted) throw new AnonymizationCancelled();
+    const run = anonymizationContext.getStore();
     const decision: AnonymizationDecision = {
       id: randomUUID(),
       chatId,
@@ -210,15 +215,21 @@ export class AnonymizationGateway extends EventEmitter {
     return new Promise((resolve) => {
       const controller = new AbortController();
       const finish = (action: AnonymizationAction) => {
+        if (!this.pending.has(decision.id)) return;
         controller.abort();
         signal?.removeEventListener('abort', abort);
         this.pending.delete(decision.id);
+        if (action === 'cancel' && run?.chatId === chatId) run.cancelled = true;
         this.publish({ type: 'resolved', id: decision.id });
         resolve(action);
+        if (action === 'cancel' && run?.chatId === chatId) {
+          for (const other of this.pending.values())
+            if (other.run === run) other.resolve('cancel');
+        }
       };
       const abort = () => finish('cancel');
       signal?.addEventListener('abort', abort, { once: true });
-      this.pending.set(decision.id, { decision, resolve: finish, controller });
+      this.pending.set(decision.id, { decision, resolve: finish, controller, run });
       this.publish({ type: 'decision', decision });
     });
   }
@@ -285,13 +296,26 @@ export class AnonymizationGateway extends EventEmitter {
     fingerprint?: string
   ): Promise<AnonymizationAction> {
     const run = anonymizationContext.getStore();
+    if (run?.chatId === chatId && run.cancelled) throw new AnonymizationCancelled();
     const key = fingerprint && createHash('sha256').update(fingerprint).digest('hex');
     const existing = key && run?.chatId === chatId ? run.choices.get(key) : undefined;
     if (existing) return existing;
-    const action = await this.ask(chatId, 'complex', reason, signal);
-    if (action === 'cancel') throw new AnonymizationCancelled();
-    if (key && run?.chatId === chatId && action !== 'retry') run.choices.set(key, action);
-    return action;
+    const decide = async () => {
+      const action = await this.ask(chatId, 'complex', reason, signal);
+      if (action === 'cancel') {
+        if (run?.chatId === chatId) run.cancelled = true;
+        throw new AnonymizationCancelled();
+      }
+      if (key && run?.chatId === chatId && action !== 'retry') run.choices.set(key, action);
+      return action;
+    };
+    if (!key || run?.chatId !== chatId) return decide();
+    const pending = (run.complexDecisions ??= new Map());
+    const shared = pending.get(key);
+    if (shared) return shared;
+    const result = decide().finally(() => pending.delete(key));
+    pending.set(key, result);
+    return result;
   }
   async document(
     chatId: string,
@@ -335,7 +359,7 @@ export class AnonymizationGateway extends EventEmitter {
     for (;;) {
       if (signal?.aborted) throw new AnonymizationCancelled();
       const run = anonymizationContext.getStore();
-      if (run?.chatId === chatId && run.serviceAction === 'cancel')
+      if (run?.chatId === chatId && (run.cancelled || run.serviceAction === 'cancel'))
         throw new AnonymizationCancelled();
       if (run?.chatId === chatId && run.serviceAction === 'proceed')
         return { context, mapping: this.existingMapping(chatId), bypass: true };

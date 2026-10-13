@@ -123,11 +123,9 @@ def main():
                     text = request['text']
                     if len(text) > 2_000_000:
                         raise ValueError('text_too_large')
-                    for chunk, _ in inference.chunk_text(text):
-                        if len(inference.nlp.tokenizer.encode(chunk)) > 512:
-                            raise ValueError('text_exceeds_safe_chunk_size')
                     failure_kind = 'service'
-                    entities, _ = inference.detect_model(text)
+                    chunks = inference.bounded_chunks(text, inference.nlp.tokenizer)
+                    entities, _ = inference.detect_model(text, chunks)
                     inference.complete_time(entities, text)
                     entities = inference._merge(entities + inference.detect_regex(text), text)
                     result = {'entities': entities,

@@ -594,6 +594,51 @@ describe('anonymization provider boundary', () => {
     );
     expect(events.filter((event) => event.type === 'decision')).toHaveLength(3);
   });
+  it('shares simultaneous decisions for the same complex content within a request', async () => {
+    const gateway = makeGateway();
+    let count = 0;
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') {
+        count++;
+        queueMicrotask(() => void gateway.decide(event.decision.id, 'exclude'));
+      }
+    });
+    await withAnonymization('chat', true, async () => {
+      expect(await Promise.all([
+        gateway.complex('chat', 'text', undefined, 'same-text'),
+        gateway.complex('chat', 'text', undefined, 'same-text'),
+      ])).toEqual(['exclude', 'exclude']);
+    });
+    expect(count).toBe(1);
+  });
+
+  it('cancels pending complex and service decisions together without affecting a new request', async () => {
+    const gateway = makeGateway();
+    let release!: () => Promise<void>;
+    const result = withAnonymization('chat', true, async () => {
+      const tasks = [
+        gateway.complex('chat', 'text', undefined, 'first'),
+        gateway.complex('chat', 'image', undefined, 'second'),
+      ];
+      const settled = Promise.allSettled(tasks);
+      const first = gateway.decisions()[0];
+      // Simulate an IPC callback outside the request's AsyncLocalStorage scope.
+      release = () => gateway.decide(first.id, 'cancel');
+      await settled;
+      await expect(gateway.prepare('chat', { messages: [] })).rejects.toThrow('annullata');
+      await expect(gateway.complex('chat', 'later', undefined, 'later')).rejects.toThrow('annullata');
+    });
+    await release();
+    await result;
+    expect(gateway.decisions()).toHaveLength(0);
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') void gateway.decide(event.decision.id, 'exclude');
+    });
+    await expect(withAnonymization('chat', true, () =>
+      gateway.complex('chat', 'new', undefined, 'first')
+    )).resolves.toBe('exclude');
+  });
+
   it('keeps restart loading until ready and ignores late completion after cancellation', async () => {
     const gateway = makeGateway();
     vi.spyOn(gateway.service, 'start').mockRejectedValue(new Error('offline'));

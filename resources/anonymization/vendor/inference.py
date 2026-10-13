@@ -22,9 +22,45 @@ def chunk_text(text, max_words=MAX_WORDS, overlap=OVERLAP):
         i += step
     return chunks
 
-def detect_model(text):
+def bounded_chunks(text, tokenizer, max_tokens=512):
+    """Split dense code/URLs by the actual token budget, preserving source offsets."""
+    chunks = []
+    for block, offset in chunk_text(text):
+        start = 0
+        while start < len(block):
+            remaining = block[start:]
+            if len(tokenizer.encode(remaining, truncation=False)) <= max_tokens:
+                chunks.append((remaining, offset + start))
+                break
+            low, high = 1, len(remaining)
+            best = 0
+            while low <= high:
+                middle = (low + high) // 2
+                if len(tokenizer.encode(remaining[:middle], truncation=False)) <= max_tokens:
+                    best = middle
+                    low = middle + 1
+                else:
+                    high = middle - 1
+            if not best:
+                raise ValueError('token_budget_unavailable')
+            # Prefer a word boundary, but also handle very long unbroken strings.
+            boundaries = list(re.finditer(r'\s+', remaining[:best]))
+            if boundaries and boundaries[-1].start() > best // 2:
+                best = boundaries[-1].start()
+            piece = remaining[:best]
+            # Recheck the exact slice: tokenization need not be monotonic.
+            while len(tokenizer.encode(piece, truncation=False)) > max_tokens:
+                best -= 1
+                piece = remaining[:best]
+                if not best:
+                    raise ValueError('token_budget_unavailable')
+            chunks.append((piece, offset + start))
+            start += max(1, best - min(128, best // 4))
+    return chunks
+
+def detect_model(text, chunks=None):
     """Entita' trovate dal modello mmBERT su tutti i chunk, su offset globali."""
-    chunks = chunk_text(text)
+    chunks = chunk_text(text) if chunks is None else chunks
     ents = []
     if chunks:
         results = nlp([c for c, _ in chunks])
