@@ -115,7 +115,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
   return (
     <div className="flex h-full w-full overflow-hidden bg-transparent">
       <div
-        className={`${compactSidebar ? 'w-12' : 'w-44 lg:w-48'} app-glass border-r border-border-muted flex flex-col flex-shrink-0`}
+        className={`${compactSidebar ? 'w-12' : 'w-44 lg:w-48'} bg-transparent border-r border-border-muted flex flex-col flex-shrink-0`}
       >
         {!compactSidebar && (
           <div className="px-3 pt-3 pb-2 border-b border-border-muted">
@@ -162,7 +162,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden min-w-0">
-        <div className="app-glass px-4 lg:px-8 pt-6 pb-2 flex-shrink-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges]">
+        <div className="bg-transparent px-4 lg:px-8 pt-6 pb-2 flex-shrink-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges]">
           <div className="w-full max-w-4xl mx-auto flex items-start justify-between gap-4">
             <div>
               <h3 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-text-primary">
