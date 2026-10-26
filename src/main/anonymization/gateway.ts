@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeStorage } from 'electron';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { logCtxWarn } from '../utils/logger';
 import type {
   Context,
   AssistantMessage,
@@ -223,8 +224,7 @@ export class AnonymizationGateway extends EventEmitter {
         this.publish({ type: 'resolved', id: decision.id });
         resolve(action);
         if (action === 'cancel' && run?.chatId === chatId) {
-          for (const other of this.pending.values())
-            if (other.run === run) other.resolve('cancel');
+          for (const other of this.pending.values()) if (other.run === run) other.resolve('cancel');
         }
       };
       const abort = () => finish('cancel');
@@ -363,13 +363,45 @@ export class AnonymizationGateway extends EventEmitter {
         throw new AnonymizationCancelled();
       if (run?.chatId === chatId && run.serviceAction === 'proceed')
         return { context, mapping: this.existingMapping(chatId), bypass: true };
+      let phase = 'accesso alla protezione di sistema';
       try {
         await this.authorizeStorage(signal);
+        phase = 'apertura del matching cifrato';
         this.mappingStore();
+        phase = 'avvio del modello locale';
         await this.service.start(signal);
-        const copy = structuredClone(context);
+        phase = 'preparazione del contesto';
+        // Agent-core passes AgentTools here, including execute callbacks. Only
+        // the provider-visible Tool fields cross this boundary; executors stay
+        // on the original agent and are never cloned or sent to a provider.
+        const copy: Context = structuredClone({
+          systemPrompt: context.systemPrompt,
+          messages: context.messages.map((message) =>
+            message.role === 'toolResult'
+              ? {
+                  role: message.role,
+                  toolCallId: message.toolCallId,
+                  toolName: message.toolName,
+                  content: message.content,
+                  isError: message.isError,
+                  timestamp: message.timestamp,
+                }
+              : message
+          ),
+          ...(context.tools
+            ? {
+                tools: context.tools.map(({ name, description, parameters }) => ({
+                  name,
+                  description,
+                  parameters,
+                })),
+              }
+            : {}),
+        });
         const mask = (text: string) => this.mask(chatId, text, signal);
+        phase = 'protezione delle istruzioni';
         if (copy.systemPrompt) copy.systemPrompt = await mask(copy.systemPrompt);
+        phase = 'protezione dei messaggi';
         for (const message of copy.messages) {
           if (typeof message.content === 'string') {
             message.content = await mask(message.content);
@@ -435,20 +467,36 @@ export class AnonymizationGateway extends EventEmitter {
         ) {
           throw new AnonymizationCancelled();
         }
+        phase = 'protezione degli schemi degli strumenti';
         for (const tool of copy.tools || []) {
           tool.description = await mask(tool.description);
           tool.parameters = await this.maskSchema(chatId, tool.parameters, signal);
         }
         copy.systemPrompt = `${copy.systemPrompt || ''}\n\nPreserve opaque AIDEN anonymization tokens exactly in prose and tool argument string values. Never rename, renumber, expand, or guess their hidden values. Do not use these tokens as JSON keys, tool names, or numeric values. Use local tools for computations that require hidden values.`;
+        phase = 'lettura del matching cifrato';
         return { context: copy, mapping: this.mappingStore().entries(chatId), bypass: false };
       } catch (error) {
         if (error instanceof AnonymizationCancelled || signal?.aborted) throw error;
+        const status = this.service.status();
+        // Never log the context or arbitrary exception messages: both can
+        // contain personal values. These diagnostics are controlled metadata.
+        logCtxWarn('[Anonymization] Preparation failed', {
+          phase,
+          model: status.model,
+          service: status.service,
+          failure:
+            error instanceof AnonymizationStorageError
+              ? 'system-storage'
+              : error instanceof Error && error.name === 'DataCloneError'
+                ? 'non-serializable-context'
+                : 'protection-failed',
+        });
         const action = await this.ask(
           chatId,
           'service',
           error instanceof AnonymizationStorageError
             ? error.message
-            : 'Il gateway locale non è disponibile o non ha completato la protezione della richiesta.',
+            : `Anonimizzazione interrotta durante la fase: ${phase}. ${status.error || 'Questa richiesta non è stata inviata al provider.'}`,
           signal,
           error instanceof AnonymizationStorageError ? 'system-storage' : undefined
         );

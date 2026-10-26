@@ -9,6 +9,7 @@ import {
 } from '@mariozechner/pi-ai';
 import type { StreamFn } from '@mariozechner/pi-agent-core';
 import type { AnonymizationEvent } from '../src/shared/anonymization-types';
+import * as logger from '../src/main/utils/logger';
 
 const root = vi.hoisted(() => `/tmp/aiden-gateway-tests-${process.pid}`);
 vi.mock('electron', () => ({
@@ -93,6 +94,68 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it('reports the failing phase without logging context or exception contents', async () => {
+    const gateway = makeGateway();
+    const warning = vi.spyOn(logger, 'logCtxWarn').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'structuredClone').mockImplementationOnce(() => {
+      throw new Error('private customer Mario Rossi in a library exception');
+    });
+    let reason = '';
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') {
+        reason = event.decision.reason;
+        void gateway.decide(event.decision.id, 'cancel');
+      }
+    });
+    await expect(gateway.prepare('chat', { messages: [] })).rejects.toThrow('annullata');
+    expect(reason).toContain('preparazione del contesto');
+    expect(warning).toHaveBeenCalled();
+    expect(JSON.stringify(warning.mock.calls)).not.toContain('Mario Rossi');
+    expect(reason).not.toContain('Mario Rossi');
+  });
+  it('protects real SDK tool definitions while leaving local executors on the agent', async () => {
+    const gateway = makeGateway();
+    const execute = vi.fn();
+    const tool = {
+      name: 'lookup',
+      label: 'Local lookup',
+      execute,
+      description: 'Look up Mario Rossi',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Mario Rossi' },
+        },
+      },
+    };
+    const context: Context = {
+      systemPrompt: 'Assist Mario Rossi',
+      messages: [
+        { role: 'user', content: 'Mario Rossi', timestamp: 1 },
+        {
+          role: 'toolResult',
+          toolCallId: 'lookup-1',
+          toolName: 'lookup',
+          content: [{ type: 'text', text: 'Mario Rossi' }],
+          isError: false,
+          timestamp: 2,
+          details: { localCallback: execute },
+        },
+      ],
+      tools: [tool],
+    };
+    const result = await gateway.prepare('chat', context);
+    expect(result.bypass).toBe(false);
+    expect(JSON.stringify(result.context)).not.toContain('Mario Rossi');
+    expect(result.context.tools?.[0]).not.toHaveProperty('execute');
+    expect(result.context.tools?.[0]).not.toHaveProperty('label');
+    expect(result.context.messages[1]).not.toHaveProperty('details');
+    expect(context.tools?.[0]).toBe(tool);
+    expect(tool.execute).toBe(execute);
+    expect(tool.description).toContain('Mario Rossi');
+    expect(execute).not.toHaveBeenCalled();
+    expect(gateway.decisions()).toHaveLength(0);
+  });
   it('retains request consent when an SDK invokes the stream outside its originating async context', async () => {
     const gateway = makeGateway();
     vi.mocked(gateway.service.start).mockRejectedValue(new Error('offline'));
@@ -604,10 +667,12 @@ describe('anonymization provider boundary', () => {
       }
     });
     await withAnonymization('chat', true, async () => {
-      expect(await Promise.all([
-        gateway.complex('chat', 'text', undefined, 'same-text'),
-        gateway.complex('chat', 'text', undefined, 'same-text'),
-      ])).toEqual(['exclude', 'exclude']);
+      expect(
+        await Promise.all([
+          gateway.complex('chat', 'text', undefined, 'same-text'),
+          gateway.complex('chat', 'text', undefined, 'same-text'),
+        ])
+      ).toEqual(['exclude', 'exclude']);
     });
     expect(count).toBe(1);
   });
@@ -626,7 +691,9 @@ describe('anonymization provider boundary', () => {
       release = () => gateway.decide(first.id, 'cancel');
       await settled;
       await expect(gateway.prepare('chat', { messages: [] })).rejects.toThrow('annullata');
-      await expect(gateway.complex('chat', 'later', undefined, 'later')).rejects.toThrow('annullata');
+      await expect(gateway.complex('chat', 'later', undefined, 'later')).rejects.toThrow(
+        'annullata'
+      );
     });
     await release();
     await result;
@@ -634,9 +701,9 @@ describe('anonymization provider boundary', () => {
     gateway.on('event', (event) => {
       if (event.type === 'decision') void gateway.decide(event.decision.id, 'exclude');
     });
-    await expect(withAnonymization('chat', true, () =>
-      gateway.complex('chat', 'new', undefined, 'first')
-    )).resolves.toBe('exclude');
+    await expect(
+      withAnonymization('chat', true, () => gateway.complex('chat', 'new', undefined, 'first'))
+    ).resolves.toBe('exclude');
   });
 
   it('keeps restart loading until ready and ignores late completion after cancellation', async () => {

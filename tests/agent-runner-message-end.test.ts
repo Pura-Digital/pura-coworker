@@ -8,6 +8,21 @@ import {
 } from '../src/main/claude/agent-runner-message-end';
 
 describe('resolveMessageEndPayload', () => {
+  it('does not report a cancelled privacy decision as an empty provider success', () => {
+    const result = resolveMessageEndPayload({
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: 'aborted',
+        errorMessage: 'Richiesta annullata durante l’anonimizzazione.',
+      },
+      streamedText: '',
+    });
+    expect(result.errorText).toBeUndefined();
+    expect(result.shouldEmitMessage).toBe(false);
+    expect(result.effectiveContent).toEqual([]);
+  });
+
   it('falls back to accumulated streamed text when message_end content is empty', () => {
     const result = resolveMessageEndPayload({
       message: {
@@ -21,9 +36,7 @@ describe('resolveMessageEndPayload', () => {
     expect(result.nextStreamedText).toBe('');
     expect(result.errorText).toBeUndefined();
     expect(result.shouldEmitMessage).toBe(true);
-    expect(result.effectiveContent).toEqual([
-      { type: 'text', text: 'streamed fallback' },
-    ]);
+    expect(result.effectiveContent).toEqual([{ type: 'text', text: 'streamed fallback' }]);
   });
 
   it('surfaces user-facing error text when message_end stops with error', () => {
@@ -41,7 +54,7 @@ describe('resolveMessageEndPayload', () => {
     expect(result.shouldEmitMessage).toBe(false);
     expect(result.effectiveContent).toEqual([]);
     expect(result.errorText).toBe(
-      'Model response timed out: no upstream response received for a long time. Retry later or check model/gateway load.',
+      'Model response timed out: no upstream response received for a long time. Retry later or check model/gateway load.'
     );
   });
 
@@ -59,7 +72,7 @@ describe('resolveMessageEndPayload', () => {
     expect(result.shouldEmitMessage).toBe(false);
     expect(result.effectiveContent).toEqual([]);
     expect(result.errorText).toBe(
-      'The model returned an empty success result. The current model or gateway may be incompatible. Retry or switch protocol.',
+      'The model returned an empty success result. The current model or gateway may be incompatible. Retry or switch protocol.'
     );
   });
 
@@ -114,7 +127,7 @@ describe('toUserFacingErrorText', () => {
 
   it('still maps first_response_timeout correctly (regression)', () => {
     expect(toUserFacingErrorText('first_response_timeout')).toBe(
-      'Model response timed out: no upstream response received for a long time. Retry later or check model/gateway load.',
+      'Model response timed out: no upstream response received for a long time. Retry later or check model/gateway load.'
     );
   });
 
