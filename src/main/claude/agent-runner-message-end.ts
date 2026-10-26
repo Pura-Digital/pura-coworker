@@ -130,6 +130,12 @@ export function resolveMessageEndPayload(
   const { message, streamedText, provider, receivedFirstStreamEvent } = options;
   const nextStreamedText = '';
 
+  // A privacy decision can cancel before any provider request is sent. This is
+  // an intentional abort, not a successful but incompatible empty response.
+  if (message?.stopReason === 'aborted' && !message.content?.length && !streamedText) {
+    return { effectiveContent: [], nextStreamedText, shouldEmitMessage: false };
+  }
+
   if (message?.stopReason === 'error' && message.errorMessage) {
     return {
       effectiveContent: [],

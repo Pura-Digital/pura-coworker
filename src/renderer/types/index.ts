@@ -644,6 +644,7 @@ export interface ProviderProfile {
 }
 
 export interface ApiConfigSet {
+  anonymizationEnabled?: boolean;
   id: ConfigSetId;
   name: string;
   isSystem?: boolean;
@@ -651,6 +652,7 @@ export interface ApiConfigSet {
   customProtocol: CustomProtocolType;
   activeProfileKey: ProviderProfileKey;
   profiles: Partial<Record<ProviderProfileKey, ProviderProfile>>;
+  puraAuthMode?: 'subscription' | 'apiKey';
   enableThinking: boolean;
   updatedAt: string;
 }
@@ -686,6 +688,9 @@ export interface MemoryRuntimeConfig {
 }
 
 export interface AppConfig {
+  /** Installation-level completion; independent of credentials and app versions. */
+  onboardingCompleted?: boolean;
+  anonymizationEnabled?: boolean;
   provider: ProviderType;
   apiKey: string;
   baseUrl?: string;
@@ -702,12 +707,14 @@ export interface AppConfig {
   globalSkillsPath?: string;
   theme?: AppTheme;
   uiZoom?: number;
+  uiZoomVersion?: 1;
   alwaysOn?: boolean;
   launchAtStartup?: boolean;
   sandboxEnabled?: boolean;
   memoryEnabled?: boolean;
   memoryRuntime?: MemoryRuntimeConfig;
   enableThinking?: boolean;
+  puraAuthMode?: 'subscription' | 'apiKey';
   isConfigured: boolean;
 }
 
@@ -739,6 +746,7 @@ export interface ApiTestInput {
   baseUrl?: string;
   customProtocol?: AppConfig['customProtocol'];
   model?: string;
+  puraAuthMode?: AppConfig['puraAuthMode'];
   useLiveRequest?: boolean;
   verificationLevel?: DiagnosticVerificationLevel;
 }

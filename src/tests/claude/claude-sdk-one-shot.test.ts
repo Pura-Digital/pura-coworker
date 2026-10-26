@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const completeSimpleMock = vi.hoisted(() => vi.fn());
+const privacy = vi.hoisted(() => ({
+  run: undefined as { chatId: string; enabled: boolean } | undefined,
+  status: vi.fn(),
+  stream: vi.fn(),
+}));
+vi.mock('../../main/anonymization/gateway', () => ({
+  anonymizationContext: { getStore: () => privacy.run },
+  getAnonymizationGateway: () => ({ service: { status: privacy.status }, stream: privacy.stream }),
+}));
 
 vi.mock('@mariozechner/pi-ai', () => ({
   completeSimple: completeSimpleMock,
@@ -70,11 +79,24 @@ function makeConfig(): AppConfig {
 
 describe('runPiAiOneShot', () => {
   beforeEach(() => {
+    privacy.run = undefined;
+    privacy.status.mockReset().mockReturnValue({ service: 'ready' });
+    privacy.stream.mockReset();
     completeSimpleMock.mockReset();
     completeSimpleMock.mockResolvedValue({
       content: [{ type: 'text', text: 'ok' }],
       stopReason: 'stop',
     });
+  });
+
+  it('suspends protected auxiliary completions when the service is unavailable without reopening a decision', async () => {
+    privacy.run = { chatId: 'chat', enabled: true };
+    privacy.status.mockReturnValue({ service: 'error' });
+    await expect(runPiAiOneShot('title', 'system', makeConfig())).rejects.toThrow(
+      'ausiliaria sospesa'
+    );
+    expect(privacy.stream).not.toHaveBeenCalled();
+    expect(completeSimpleMock).not.toHaveBeenCalled();
   });
 
   it('passes generation options through to completeSimple', async () => {

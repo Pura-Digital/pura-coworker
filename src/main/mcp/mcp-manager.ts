@@ -1553,7 +1553,7 @@ export class MCPManager {
   /**
    * Call an MCP tool with timeout and retry
    */
-  async callTool(toolName: string, args: Record<string, unknown>): Promise<unknown> {
+  async callTool(toolName: string, args: Record<string, unknown>, options?: { signal?: AbortSignal; waitForHuman?: boolean }): Promise<unknown> {
     const tool = this.tools.get(toolName);
     if (!tool) {
       throw new Error(`MCP tool not found: ${toolName}`);
@@ -1572,7 +1572,7 @@ export class MCPManager {
     logCtx(`[MCPManager] Calling tool ${actualToolName} on server ${tool.serverName}`);
 
     const callStartTime = Date.now();
-    const maxRetries = 2;
+    const maxRetries = options?.waitForHuman ? 0 : 2;
     let lastError: unknown;
     let compatHotReloadTried = false;
 
@@ -1587,13 +1587,13 @@ export class MCPManager {
 
         // Add timeout for tool call
         const timeoutMs = 30000; // 30 second timeout
-        const callPromise = client.callTool({
-          name: actualToolName,
-          arguments: args,
-        });
+        const callParameters = { name: actualToolName, arguments: args };
+        const callPromise = options?.waitForHuman
+          ? client.callTool(callParameters, undefined, { signal: options.signal, timeout: 2_147_483_647 })
+          : client.callTool(callParameters);
         let callTimeoutId: ReturnType<typeof setTimeout>;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          callTimeoutId = setTimeout(
+          if (!options?.waitForHuman) callTimeoutId = setTimeout(
             () => reject(new Error(`Tool call timeout after ${timeoutMs}ms`)),
             timeoutMs
           );

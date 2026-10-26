@@ -1,3 +1,4 @@
+import { AnonymizationIndicator } from './AnonymizationIndicator';
 import { ChatApiConfigSelector } from './ChatApiConfigSelector';
 import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect } from 'react';
@@ -445,7 +446,7 @@ export function WelcomeView() {
             <AidenLogoLoader
               aria-label={t('welcome.logoAlt')}
               playOnceThenEveryMs={5 * 60 * 1000}
-              className="w-16 h-16 shrink-0 overflow-visible md:h-20 md:w-20 rounded-[1.4rem] border border-border-subtle bg-background/60 p-2.5 shadow-soft"
+              className="w-16 h-16 shrink-0 overflow-visible md:h-20 md:w-20 rounded-[1.4rem] border border-border-subtle bg-[#263247] [.light_&]:bg-background/60 p-2.5 shadow-soft"
             />
             <div className="text-left">
               <h1 className="text-[2.35rem] md:text-[3.1rem] leading-none font-semibold tracking-[-0.05em] text-text-primary">
@@ -623,6 +624,7 @@ export function WelcomeView() {
 
             <div className="ml-auto flex min-w-0 max-w-full items-center justify-end gap-2">
               <ChatApiConfigSelector {...configSetSelector} />
+              <AnonymizationIndicator />
               <button
                 type="submit"
                 disabled={!canSubmit || isSubmitting || isSwitchingConfigSet}

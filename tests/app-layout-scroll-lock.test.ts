@@ -19,6 +19,7 @@ describe('App layout scroll lock', () => {
 
   it('uses a full-height root app container instead of viewport-sized screen classes', () => {
     expect(appContent).not.toContain('h-screen w-screen');
-    expect(appContent).toMatch(/className="[^"]*h-full[^"]*w-full[^"]*min-h-0[^"]*flex[^"]*flex-col[^"]*overflow-hidden[^"]*bg-background[^"]*"/);
+    // Root color is independent of scroll containment (native glass is transparent).
+    expect(appContent).toMatch(/className="[^"]*h-full[^"]*w-full[^"]*min-h-0[^"]*flex[^"]*flex-col[^"]*overflow-hidden[^"]*"/);
   });
 });

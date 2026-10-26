@@ -1,3 +1,4 @@
+import { useAppStore } from '../store';
 import { useCallback, useRef, useState } from 'react';
 
 export type PuraVoiceUiStatus = 'idle' | 'connecting' | 'connected' | 'listening' | 'error';
@@ -94,7 +95,7 @@ export function usePuraRealtimeVoice() {
     }
     setErrorMessage(null);
     setStatus('connecting');
-    const result = await api();
+    const result = await api(useAppStore.getState().activeSessionId || undefined);
     if (!result.ok) {
       setErrorMessage(result.message ?? result.error);
       setStatus('error');

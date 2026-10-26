@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Pura subscription usage in settings: horizontal progress bars (aligned with other Pura apps), with reset and billing period dates
+- Composer model selector shows **PuraLLM Subscription** when the active set uses a connected Pura subscription
+- Global, sandbox sync, update, and settings feedback toasts use opaque frosted panels (same treatment as the in-chat model picker)
+
+## [3.5.0] - 2026-10-26
+
+### Added
+
+- Pura Connect OAuth: sign in with a Pura subscription to use cloud LLM without managing an API key
+- First-run onboarding for API configuration, Pura account, and anonymization
+- Native window glass/vibrancy on macOS for a more integrated desktop look
+- Pura usage panel in settings when connected via subscription
+
+### Changed
+
+- Pura LLM account settings: connection status beside the section title and clearer subscription copy
+- Auto-updater and build tooling updates for local macOS packaging
+
+### Fixed
+
+- MCP and Pura OAuth deep-link protocol registration and lifecycle edge cases
+
 ## [3.4.10] - 2026-10-06
 
 ### Fixed

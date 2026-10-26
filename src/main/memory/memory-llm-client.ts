@@ -1,3 +1,5 @@
+import { anonymizationContext, getAnonymizationGateway } from '../anonymization/gateway';
+import { logStorage } from '../utils/logger';
 import OpenAI from 'openai';
 import type { AppConfig, CustomProtocolType, ProviderType } from '../config/config-store';
 import { configStore } from '../config/config-store';
@@ -178,9 +180,18 @@ export class MemoryLLMClient implements MemoryLLMClientLike {
       baseURL: resolved?.baseUrl || normalizeOpenAICompatibleBaseUrl(embedConfig.baseUrl),
       timeout: embedConfig.timeoutMs,
     });
+    let protectedInput = trimmed;
+    const privacy = anonymizationContext.getStore();
+    if (privacy?.enabled ?? appConfig.anonymizationEnabled === true) {
+      const chatId = privacy?.chatId || logStorage.getStore()?.sessionId;
+      if (!chatId) throw new Error('Contesto chat mancante per embedding protetto.');
+      const prepared = await getAnonymizationGateway().prepare(chatId, { messages: [{ role: 'user', content: trimmed, timestamp: Date.now() }] });
+      const content = prepared.context.messages[0].content;
+      protectedInput = typeof content === 'string' ? content : content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    }
     const response = await client.embeddings.create({
       model: embedConfig.model,
-      input: trimmed,
+      input: protectedInput,
     });
     return response.data[0]?.embedding || [];
   }

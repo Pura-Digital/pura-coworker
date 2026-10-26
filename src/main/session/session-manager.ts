@@ -1,3 +1,4 @@
+import { getAnonymizationGateway, withAnonymization } from '../anonymization/gateway';
 /**
  * @module main/session/session-manager
  *
@@ -675,7 +676,7 @@ export class SessionManager {
   ): Promise<void> {
     session = this.syncSessionWorkspaceFromProject(session);
     const traceId = generateTraceId();
-    return runWithLogContext({ sessionId: session.id, traceId }, async () => {
+    return runWithLogContext({ sessionId: session.id, traceId }, () => withAnonymization(session.id, configStore.getAll().anonymizationEnabled === true, async () => {
       logCtx('[SessionManager] Processing prompt for session:', session.id, 'traceId:', traceId);
       logCtx(
         '[SessionManager] Received content:',
@@ -711,13 +712,21 @@ export class SessionManager {
           (c) => c.type === 'file_attachment'
         ) as FileAttachmentContent[];
         if (fileAttachments.length > 0) {
-          const fileInfo = fileAttachments
-            .map(
-              (f) => `- ${f.filename} (${(f.size / 1024).toFixed(1)} KB) at path: ${f.relativePath}`
-            )
-            .join('\n');
+          const fileParts: string[] = [];
+          for (const file of fileAttachments) {
+            if (configStore.getAll().anonymizationEnabled === true) {
+              const extracted = await getAnonymizationGateway().document(session.id, path.resolve(session.cwd || process.cwd(), file.relativePath), this.activeSessions.get(session.id)?.signal);
+              if (extracted.excluded) continue;
+              if (extracted.text) {
+                fileParts.push(`Document ${file.filename}:\n${extracted.text}`);
+                continue;
+              }
+            }
+            fileParts.push(`- ${file.filename} (${(file.size / 1024).toFixed(1)} KB) at path: ${file.relativePath}`);
+          }
+          const fileInfo = fileParts.join('\n');
           enhancedPrompt = `${prompt}\n\n[Attached files - use Read tool to access them]:\n${fileInfo}`;
-          logCtx('[SessionManager] Enhanced prompt with file info:', enhancedPrompt);
+          logCtx('[SessionManager] Prepared attached documents:', fileParts.length);
         }
 
         // Save user message to database for persistence
@@ -812,7 +821,7 @@ export class SessionManager {
           payload: { message: errorText },
         });
       }
-    }); // end runWithLogContext
+    })); // end runWithLogContext
   }
 
   /**
@@ -918,7 +927,7 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
             return null;
           }
           const title = await this.withTimeout(
-            this.generateTitleWithConfig(titlePrompt),
+            runWithLogContext({ sessionId: session.id }, () => this.generateTitleWithConfig(titlePrompt)),
             TITLE_GENERATION_TIMEOUT_MS,
             session.id
           );
@@ -1098,6 +1107,7 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
     log('[SessionManager] Stopping session:', sessionId);
     this.titleGenerationTokens.delete(sessionId);
     this.agentRunner.cancel(sessionId);
+    getAnonymizationGateway().cancelChat(sessionId);
     // Cancel any pending sudo password requests for this session
     for (const [toolUseId, entry] of this.pendingSudoPasswords) {
       if (entry.sessionId === sessionId) {
@@ -1136,6 +1146,7 @@ Return ONLY the updated MEMORY.md content in Markdown. Be concise. Merge new ins
     }
 
     // Delete from database (messages will be deleted automatically via CASCADE)
+    getAnonymizationGateway().deleteChat(sessionId);
     this.db.sessions.delete(sessionId);
     this.messageCache.delete(sessionId);
     this.sessionTitleAttempts.delete(sessionId);

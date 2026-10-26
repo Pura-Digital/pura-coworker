@@ -1,3 +1,4 @@
+import { anonymizationContext, withAnonymization } from '../anonymization/gateway';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app } from 'electron';
@@ -389,7 +390,17 @@ export class MemoryService {
     if (!input.session.memoryEnabled) {
       return Promise.resolve();
     }
+    // Capture the originating request at enqueue time, rather than inheriting
+    // whichever request happens to be executing when the queue drains.
+    const run = anonymizationContext.getStore();
+    const relatedRun =
+      run?.chatId === input.session.id &&
+      run.enabled === (this.getAppConfig().anonymizationEnabled === true)
+        ? run
+        : undefined;
     return this.queue.enqueue(input.session.id, async () => {
+      if (relatedRun)
+        return anonymizationContext.run(relatedRun, () => this.ingestWithPrivacy(input));
       await this.ingest(input);
     });
   }
@@ -476,6 +487,10 @@ export class MemoryService {
   }
 
   private async ingest(input: MemoryIngestionInput): Promise<void> {
+    return withAnonymization(input.session.id, this.getAppConfig().anonymizationEnabled === true, () => this.ingestWithPrivacy(input));
+  }
+
+  private async ingestWithPrivacy(input: MemoryIngestionInput): Promise<void> {
     const { session, messages } = input;
     if (!session.memoryEnabled || !messages.length) {
       return;
@@ -552,6 +567,10 @@ export class MemoryService {
   }
 
   private async ingestExtractedBundle(bundle: ExtractionBundle): Promise<void> {
+    return withAnonymization(bundle.session.id, this.getAppConfig().anonymizationEnabled === true, () => this.ingestExtractedBundleWithPrivacy(bundle));
+  }
+
+  private async ingestExtractedBundleWithPrivacy(bundle: ExtractionBundle): Promise<void> {
     await this.updateCoreMemory(bundle.session.id, bundle.sessionDate, bundle.fullTurns);
     if (bundle.fullTurns.length) {
       await this.storeExperienceSession({
@@ -577,7 +596,7 @@ export class MemoryService {
 
   private async extractExperienceBundles(sessionRows: SessionRow[]): Promise<ExtractionBundle[]> {
     const concurrency = this.getAppConfig().memoryRuntime.ingestionConcurrency;
-    const tasks = sessionRows.map((sessionRow) => async () => {
+    const tasks = sessionRows.map((sessionRow) => async () => withAnonymization(sessionRow.id, this.getAppConfig().anonymizationEnabled === true, async () => {
       const session = this.sessionRowToSession(sessionRow);
       const fullMessages = this.getMessagesForSession(sessionRow.id);
       const fullTurns = messagesToTranscript(fullMessages);
@@ -599,7 +618,7 @@ export class MemoryService {
         fullTurns,
         extracted,
       } satisfies ExtractionBundle;
-    });
+    }));
 
     const bundles: ExtractionBundle[] = [];
     let cursor = 0;

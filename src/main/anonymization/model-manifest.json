@@ -1,0 +1,32 @@
+{
+  "repository": "rizzoaiacademy/rizzo-pii-0.3B",
+  "revision": "a1c3c83827eca22e9675e30c1111c4641caf5901",
+  "version": "1.5.0",
+  "files": [
+    {
+      "name": "config.json",
+      "bytes": 3137,
+      "sha256": "6b9d5bdd4a194d40fb40c53fdc302e225514cd7940d97f657c4082454ee7e91b"
+    },
+    {
+      "name": "model.safetensors",
+      "bytes": 1230273700,
+      "sha256": "b1e046e3aec52c3cd74eaf166b034644a4dac0c91128bf06803e1478657fcd9f"
+    },
+    {
+      "name": "special_tokens_map.json",
+      "bytes": 1051,
+      "sha256": "6e3204c5a4004719c185007a745d1940471a6fb02521cfa0a00306dbb6bc5903"
+    },
+    {
+      "name": "tokenizer.json",
+      "bytes": 34363286,
+      "sha256": "a0ab5772a8c5450f45a66c95985d6df2205bf09449ba7ff7bb46de034eaa118a"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "bytes": 46469,
+      "sha256": "3b66ca84514d9aacf4b90c65a61e561127c6c21d81bbf4e8ba9d46a4c15ac82d"
+    }
+  ]
+}

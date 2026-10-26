@@ -1,3 +1,7 @@
+import { createVisionConsentScope } from '../anonymization/vision-consent';
+import { streamSimple } from '@mariozechner/pi-ai';
+import { getAnonymizationGateway, anonymizationContext } from '../anonymization/gateway';
+import { anonymizationCompactionExtension } from '../anonymization/compaction-extension';
 /**
  * @module main/claude/agent-runner
  *
@@ -58,6 +62,8 @@ import { PluginRuntimeService } from '../skills/plugin-runtime-service';
 import type { SkillsAdapter } from '../skills/skills-adapter';
 import { AgentRuntimeExtensionManager } from '../extensions/agent-runtime-extension-manager';
 import { configStore } from '../config/config-store';
+import { resolvePuraCredentialsAsync } from '../pura/resolve-pura-credentials';
+import { installPuraSubscriptionPayloadPatch } from '../pura/pura-subscription-agent-patch';
 import { applyBffWebEnvToProcess, getBffEnvForSpawn, resolveBffWebEnv } from '../tools/bff-web-env';
 import { bffWebToolsPromptHint } from '../tools/web-client';
 import { buildWebCustomTools } from '../tools/web-custom-tools';
@@ -311,7 +317,17 @@ function buildMcpCustomTools(mcpManager: MCPManager): ToolDefinition[] {
       parameters,
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
         try {
-          const result = await mcpManager.callTool(mcpTool.name, params as Record<string, unknown>);
+          const run = anonymizationContext.getStore();
+          const consent = run?.enabled && isGuiOperateServerName(mcpTool.serverName)
+            ? await createVisionConsentScope(run.chatId, _signal) : undefined;
+          let result: unknown;
+          try {
+            const argumentsForTool = consent
+              ? { ...params as Record<string, unknown>, __aidenPrivacy: consent.capability }
+              : params as Record<string, unknown>;
+            result = await mcpManager.callTool(mcpTool.name, argumentsForTool,
+              consent ? { signal: _signal, waitForHuman: true } : undefined);
+          } finally { consent?.dispose(); }
           const normalizedResult = normalizeMcpToolResultForModel(result);
           return {
             content: [{ type: 'text' as const, text: normalizedResult.text }],
@@ -1426,6 +1442,11 @@ ${hints.join('\n')}
 
       // Resolve model via pi-ai
       const runtimeConfig = configStore.getAll();
+      const puraCreds = await resolvePuraCredentialsAsync(runtimeConfig);
+      const puraSubscriptionActive =
+        puraCreds.active &&
+        puraCreds.mode === 'subscription' &&
+        Boolean(puraCreds.accessToken && puraCreds.inferenceBaseUrl);
       const modelString = this.getCurrentModelString(runtimeConfig.model);
       const configProtocol = resolvePiRouteProtocol(
         runtimeConfig.provider,
@@ -1484,6 +1505,17 @@ ${hints.join('\n')}
       }
       logCtx('[ClaudeAgentRunner] Resolved pi-ai model:', piModel.provider, piModel.id);
 
+      if (puraSubscriptionActive && puraCreds.inferenceBaseUrl) {
+        piModel = {
+          ...piModel,
+          baseUrl: puraCreds.inferenceBaseUrl,
+          id: piModel.id || 'pura-subscription',
+          provider: 'openai',
+          api: 'openai-completions',
+        };
+        logCtx('[ClaudeAgentRunner] Using Pura subscription inference base:', puraCreds.inferenceBaseUrl);
+      }
+
       // For Ollama: query actual context window from /api/show if user hasn't configured one
       const provider = runtimeConfig.provider || 'anthropic';
       if (provider === 'ollama' && !runtimeConfig.contextWindow) {
@@ -1517,7 +1549,10 @@ ${hints.join('\n')}
 
       // Set up API keys via AuthStorage
       const authStorage = getSharedAuthStorage();
-      const apiKey = runtimeConfig.apiKey?.trim();
+      let apiKey = runtimeConfig.apiKey?.trim();
+      if (puraSubscriptionActive && puraCreds.accessToken) {
+        apiKey = puraCreds.accessToken;
+      }
       if (apiKey) {
         // Map our config provider to pi-ai provider name
         const piProvider =
@@ -1658,6 +1693,7 @@ ${hints.join('\n')}
       const thinkingLevel: PiThinkingLevel = enableThinking ? 'medium' : 'off';
       const sessionRuntimeSignature = buildPiSessionRuntimeSignature({
         configProvider: runtimeConfig.provider,
+        anonymizationEnabled: anonymizationContext.getStore()?.enabled ?? runtimeConfig.anonymizationEnabled,
         customProtocol: runtimeConfig.customProtocol,
         modelProvider: piModel.provider,
         modelApi: piModel.api,
@@ -2087,6 +2123,7 @@ Tool routing:
           agentDir: getAgentDir(),
           additionalSkillPaths: skillPaths,
           appendSystemPrompt: [coworkAppendPrompt],
+          extensionFactories: [anonymizationCompactionExtension],
         });
         await resourceLoader.reload();
 
@@ -2138,6 +2175,9 @@ Tool routing:
           cwd: effectiveCwd,
         });
         piSession = newPiSession;
+        if (puraSubscriptionActive) {
+          installPuraSubscriptionPayloadPatch(piSession);
+        }
 
         // Store session for reuse — evict oldest if cache is full
         if (this.piSessions.size >= ClaudeAgentRunner.MAX_CACHED_SESSIONS) {
@@ -2200,6 +2240,10 @@ Tool routing:
 
         logTiming('pi-coding-agent session created', runStartTime);
       }
+
+      piSession.agent.streamFn = (anonymizationContext.getStore()?.enabled ?? runtimeConfig.anonymizationEnabled) && runtimeConfig.provider !== 'ollama'
+        ? getAnonymizationGateway().stream(session.id, streamSimple)
+        : streamSimple;
 
       // Set up event handler to bridge pi-coding-agent events → our ServerEvent protocol
 

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const indexPath = path.resolve(process.cwd(), 'src/main/index.ts');
-const lifecyclePath = path.resolve(process.cwd(), 'src/main/mcp/mcp-oauth-lifecycle.ts');
+const puraLifecyclePath = path.resolve(process.cwd(), 'src/main/pura/pura-oauth-lifecycle.ts');
 const builderPath = path.resolve(process.cwd(), 'electron-builder.yml');
 const preloadPath = path.resolve(process.cwd(), 'src/preload/index.ts');
 
@@ -16,11 +16,12 @@ describe('MCP OAuth protocol wiring', () => {
 
   it('registers lifecycle handlers in main process', () => {
     const indexSource = fs.readFileSync(indexPath, 'utf8');
-    const lifecycleSource = fs.readFileSync(lifecyclePath, 'utf8');
+    const puraLifecycleSource = fs.readFileSync(puraLifecyclePath, 'utf8');
     expect(indexSource).toContain('registerMcpOAuthProtocolHandlers');
-    expect(indexSource).toContain('captureSecondInstanceMcpOAuthCallback');
+    expect(indexSource).toContain('registerPuraConnectProtocolHandlers');
+    expect(indexSource).toContain('captureSecondInstanceDeepLinks');
     expect(indexSource).toContain('processMcpOAuthCallbacks');
-    expect(lifecycleSource).toContain("app.on('open-url'");
+    expect(puraLifecycleSource).toContain("app.on('open-url'");
   });
 
   it('exposes OAuth IPC methods in preload', () => {

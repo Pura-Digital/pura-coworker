@@ -1,11 +1,14 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle, ChevronDown, type LucideIcon } from 'lucide-react';
 
 // ==================== Layout ====================
 
 export function SettingsPage({ children }: { children: ReactNode }) {
-  return <div className="space-y-6 w-full max-w-3xl min-w-0 pb-4">{children}</div>;
+  return <div className="space-y-6 w-full max-w-4xl mx-auto min-w-0 pb-4">{children}</div>;
 }
+
+export const SettingsFooterTargetContext = createContext<HTMLElement | null>(null);
 
 export function SettingsCard({
   id,
@@ -27,19 +30,22 @@ export function SettingsCardHeader({
   title,
   description,
   icon: Icon,
+  badge,
   action,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
+  badge?: ReactNode;
   action?: ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {Icon && <Icon className="w-4 h-4 text-accent flex-shrink-0" />}
           <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
+          {badge}
         </div>
         {description && <p className="text-xs leading-5 text-text-muted">{description}</p>}
       </div>
@@ -109,6 +115,7 @@ export function SettingsToggle({
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={enabled}
+      aria-label={label}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
         enabled ? 'bg-accent' : 'bg-surface-muted'
       }`}
@@ -240,7 +247,7 @@ export function SettingsFeedbackToast({
 
   return (
     <div
-      className={`fixed right-6 bottom-6 z-[80] max-w-md rounded-lg border bg-surface px-4 py-3 shadow-elevated ${tone.border}`}
+      className={`app-floating-toast fixed right-6 bottom-6 z-[80] max-w-md rounded-[1.4rem] border px-4 py-3 shadow-elevated ${tone.border}`}
       role="status"
       aria-live="polite"
     >
@@ -352,9 +359,11 @@ export function SettingsDisclosure({
 }
 
 export function SettingsStickyFooter({ children }: { children: ReactNode }) {
-  return (
-    <div className="sticky bottom-0 -mx-4 lg:-mx-8 px-4 lg:px-8 py-4 mt-2 bg-background/95 backdrop-blur-sm border-t border-border-muted">
+  const target = useContext(SettingsFooterTargetContext);
+  const footer = (
+    <div className="w-full max-w-4xl mx-auto">
       {children}
     </div>
   );
+  return target ? createPortal(footer, target) : footer;
 }

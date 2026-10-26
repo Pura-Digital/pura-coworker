@@ -1,3 +1,9 @@
+import { requireVisionConsent, VisionConsentDenied } from '../anonymization/vision-consent-client';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash } from 'node:crypto';
+import type { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
+
+const visionPrivacy = new AsyncLocalStorage<{ url: string; token: string }>();
 /**
  * GUI Operate MCP Server
  *
@@ -4119,6 +4125,11 @@ async function performWait(duration: number, reason?: string): Promise<string> {
 /**
  * Call vision API to analyze images with timeout and retry
  */
+async function ensureVisionConsent(image: string, prompt: string): Promise<void> {
+  const privacy = visionPrivacy.getStore();
+  if (privacy) await requireVisionConsent(privacy, createHash('sha256').update(image).update('\0').update(prompt).digest('hex'));
+}
+
 async function callVisionAPI(
   base64Image: string,
   prompt: string,
@@ -4146,9 +4157,11 @@ async function callVisionAPI(
         TIMEOUT_MS
       );
 
+      await ensureVisionConsent(base64Image, prompt);
       writeMCPLog(`${logPrefix} Attempt ${attempt}/${MAX_RETRIES} - Success`, 'API Request');
       return result;
     } catch (error: unknown) {
+      if (error instanceof VisionConsentDenied) throw error;
       const isLastAttempt = attempt === MAX_RETRIES;
       const errorMessage = String(error instanceof Error ? error.message : error || '');
 
@@ -4170,6 +4183,7 @@ async function callVisionAPI(
               true,
               errorMessage
             );
+            await ensureVisionConsent(base64Image, prompt);
             writeMCPLog(`${logPrefix} Compatibility fallback succeeded`, 'API Request');
             return compatResult;
           } catch (compatError: unknown) {
@@ -4288,6 +4302,7 @@ async function callVisionAPIWithTimeout(
   compatibilityMode: boolean = false,
   previousErrorMessage?: string
 ): Promise<string> {
+  await ensureVisionConsent(base64Image, prompt);
   // Get API configuration from environment (supports Anthropic/OpenRouter/OpenAI-compatible)
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN;
   const openAIApiKey = process.env.OPENAI_API_KEY;
@@ -6479,7 +6494,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // Handle tool calls
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+async function handleGuiToolRequest(request: CallToolRequest) {
   const { name, arguments: args } = request.params;
 
   try {
@@ -6795,6 +6810,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       isError: true,
     };
   }
+}
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const args = { ...request.params.arguments };
+  const capability = args.__aidenPrivacy as { url?: unknown; token?: unknown } | undefined;
+  delete args.__aidenPrivacy;
+  const cleanRequest = { ...request, params: { ...request.params, arguments: args } };
+  if (!capability) return handleGuiToolRequest(cleanRequest);
+  if (typeof capability.url !== 'string' || !/^http:\/\/127\.0\.0\.1:\d+\/vision-consent$/.test(capability.url)
+    || typeof capability.token !== 'string' || !/^[a-f0-9]{48}$/.test(capability.token)) throw new Error('Invalid local privacy capability');
+  return visionPrivacy.run({ url: capability.url, token: capability.token }, () => handleGuiToolRequest(cleanRequest));
 });
 
 // Start the server

@@ -1,3 +1,4 @@
+import { AnonymizationSettings } from '../AnonymizationSettings';
 import { useTranslation } from 'react-i18next';
 import {
   Key,
@@ -8,13 +9,13 @@ import {
   Edit3,
   CheckCircle,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import { useApiConfigState } from '../../hooks/useApiConfigState';
 import { ApiConfigSetManager } from '../ApiConfigSetManager';
 import { ProviderLogoBadge, protocolTabToLogoId, providerTabToLogoId } from '../ProviderLogoBadge';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from '../ProviderGuidance';
 import ApiDiagnosticsPanel from '../ApiDiagnosticsPanel';
+import { PuraDigitalConnection } from './PuraDigitalConnection';
 import {
   SettingsPage,
   SettingsCard,
@@ -37,6 +38,8 @@ interface ModelOptionItem {
 export function SettingsAPI() {
   const { t } = useTranslation();
   const {
+    anonymizationEnabled,
+    setAnonymizationEnabled,
     provider,
     customProtocol,
     apiKey,
@@ -52,6 +55,8 @@ export function SettingsAPI() {
     currentPreset,
     modelOptions,
     isSaving,
+    isTesting,
+    testResult,
     isLoadingConfig,
     error,
     successMessage,
@@ -98,6 +103,9 @@ export function SettingsAPI() {
     applyPuraDigitalSetup,
     applyCustomModelsSetup,
     discoverPuraDigitalModels,
+    puraAuthMode,
+    setPuraAuthMode,
+    handleTest,
     diagnosticResult,
     isDiagnosing,
     handleDiagnose,
@@ -177,6 +185,32 @@ export function SettingsAPI() {
         />
       </SettingsCard>
 
+      {isPuraMode ? (
+        <PuraDigitalConnection
+          configSetId={activeConfigSetId}
+          puraAuthMode={puraAuthMode}
+          onPuraAuthModeChange={setPuraAuthMode}
+          apiKey={apiKey}
+          baseUrl={baseUrl}
+          model={model}
+          customModel={customModel}
+          useCustomModel={useCustomModel}
+          modelOptions={modelOptions as ModelOptionItem[]}
+          isRefreshingModels={isRefreshingModels}
+          isDiscoveringPuraModels={isDiscoveringPuraModels}
+          isTesting={isTesting}
+          testResult={testResult}
+          onApiKeyChange={setApiKey}
+          onModelChange={setModel}
+          onCustomModelChange={setCustomModel}
+          onToggleCustomModel={toggleCustomModel}
+          onRefreshModels={() => void refreshModelOptions()}
+          onDiscoverPuraModels={() => void discoverPuraDigitalModels()}
+          onTestConnection={() => void handleTest()}
+          modelInputPlaceholder={modelInputPlaceholder}
+          modelInputHint={modelInputHint}
+        />
+      ) : (
       <SettingsCard>
         <SettingsCardHeader title={t('api.sectionConnection')} icon={Key} />
         {provider === 'custom' && !isPuraMode && (
@@ -260,7 +294,9 @@ export function SettingsAPI() {
           )}
         </SettingsField>
       </SettingsCard>
+      )}
 
+      {!isPuraMode && (
       <SettingsCard>
         <SettingsCardHeader
           title={t('api.sectionModel')}
@@ -280,21 +316,6 @@ export function SettingsAPI() {
                 {isRefreshingModels ? t('api.refreshingModels') : t('api.refreshModels')}
               </button>
             )}
-            {isPuraMode && (
-              <button
-                type="button"
-                onClick={() => {
-                  void discoverPuraDigitalModels();
-                }}
-                disabled={isDiscoveringPuraModels}
-                className="flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors active:scale-95 bg-accent-muted text-accent hover:bg-accent-muted/80 disabled:opacity-50"
-              >
-                <Sparkles className={`w-3 h-3 ${isDiscoveringPuraModels ? 'animate-pulse' : ''}`} />
-                {isDiscoveringPuraModels
-                  ? t('api.discoveringPuraModels')
-                  : t('api.discoverPuraModels')}
-              </button>
-            )}
             {shouldShowOllamaManualModelToggle && (
               <button
                 type="button"
@@ -306,7 +327,7 @@ export function SettingsAPI() {
                 }`}
               >
                 <Edit3 className="w-3 h-3" />
-                {isOllamaMode || isPuraMode
+                {isOllamaMode
                   ? useCustomModel
                     ? t('api.useDetectedModels')
                     : t('api.manualModel')
@@ -378,6 +399,7 @@ export function SettingsAPI() {
           </SettingsDisclosure>
         )}
       </SettingsCard>
+      )}
 
       {provider === 'custom' && !isPuraMode && (
         <SettingsCard>
@@ -400,6 +422,13 @@ export function SettingsAPI() {
           onToggle={() => setEnableThinking(!enableThinking)}
         />
       </SettingsCard>
+
+      {provider !== 'ollama' && (
+        <AnonymizationSettings
+          enabled={anonymizationEnabled}
+          onChange={setAnonymizationEnabled}
+        />
+      )}
 
       <SettingsDisclosure title={t('api.sectionDiagnostics')}>
         <ApiDiagnosticsPanel

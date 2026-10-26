@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { closeLogFile, getLogFilePath, shouldPersistLogLevel } from '../src/main/utils/logger';
 
 describe('shouldPersistLogLevel', () => {
+  it('persists privacy audit counters without enabling detailed logs', () => {
+    expect(shouldPersistLogLevel('AUDIT', false)).toBe(true);
+  });
   it('keeps info logs behind the detailed log toggle', () => {
     expect(shouldPersistLogLevel('INFO', true)).toBe(true);
     expect(shouldPersistLogLevel('INFO', false)).toBe(false);
