@@ -27,7 +27,11 @@ For a dedicated Apple Silicon Mac:
 
 1. Register a repository runner with the custom label `pura-release-arm64`.
 2. Install ARM64 Python 3.11+ (available as `python`), Xcode Command Line Tools,
-   and Homebrew. Ensure Node.js, Git, and the runner can access the network.
+   and Homebrew. Use a relocatable Python build whose shared library supports
+   macOS 14 or older, such as python-build-standalone. A locally compiled Python
+   can silently raise the application's minimum OS version; setting
+   `MACOSX_DEPLOYMENT_TARGET` does not change an existing Python library.
+   Ensure Node.js, Git, and the runner can access the network.
 3. Keep the runner online under a dedicated build account. Allow enough disk space
    for two application bundles, Python/PyTorch runtimes, dependencies, and archives.
 4. Set `MACOS_ARM64_RUNNER=pura-release-arm64` in the repository's Actions variables
@@ -52,3 +56,7 @@ does not guarantee capacity; a dedicated runner avoids that shared hosted queue.
 Runtime builds must complete before the final packaging jobs start. The ARM64
 worker is built natively because it bundles architecture-specific Python and
 PyTorch binaries; the final macOS job packages both ARM64 and Intel applications.
+
+Runtimes travel between jobs inside `tar.gz` archives. Uploading their directories
+directly loses executable permissions and framework symbolic links, which can
+cause `codesign` to reject `Python.framework` as an ambiguous bundle.
