@@ -277,7 +277,13 @@
       "usageUnavailable": "无法获取用量：{{error}}",
       "monthly": "每月",
       "weekly": "每周",
-      "remaining": "剩余 {{percent}}%"
+      "monthlyUsage": "月度用量",
+      "weeklyUsage": "周度用量",
+      "weeklyReset": "周重置：{{date}}",
+      "periodEnd": "账单周期结束：{{date}}",
+      "usagePeriodMeta": "{{weeklyReset}} · {{periodEnd}}",
+      "remaining": "剩余 {{percent}}%",
+      "subscriptionModelLabel": "PuraLLM Subscription"
     },
     "discoverPuraModels": "查找模型",
     "discoveringPuraModels": "查找中...",

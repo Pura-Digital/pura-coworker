@@ -277,7 +277,13 @@
       "usageUnavailable": "Utilizzo non disponibile: {{error}}",
       "monthly": "Mensile",
       "weekly": "Settimanale",
-      "remaining": "{{percent}}% rimanente"
+      "monthlyUsage": "Utilizzo mensile",
+      "weeklyUsage": "Utilizzo settimanale",
+      "weeklyReset": "Reset settimanale: {{date}}",
+      "periodEnd": "Fine periodo di fatturazione: {{date}}",
+      "usagePeriodMeta": "{{weeklyReset}} · {{periodEnd}}",
+      "remaining": "{{percent}}% rimanente",
+      "subscriptionModelLabel": "PuraLLM Subscription"
     },
     "discoverPuraModels": "Trova modelli",
     "discoveringPuraModels": "Ricerca modelli...",

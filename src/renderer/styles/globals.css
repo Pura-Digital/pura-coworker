@@ -328,24 +328,36 @@
     backdrop-filter: none !important;
   }
 
-  /* Small portaled popovers — cheap to blur vs full-window shell */
-  .chat-config-popover {
-    background-color: color-mix(in srgb, var(--color-background) 94%, black);
+  /*
+   * Portaled popovers + floating toasts: opaque fill + blur on the layer behind.
+   * Semi-transparent rgba + backdrop-filter reads as “too glassy” over native vibrancy.
+   */
+  .chat-config-popover,
+  .app-floating-toast {
+    background-color: #070e1d;
     -webkit-backdrop-filter: blur(40px) saturate(1.2);
     backdrop-filter: blur(40px) saturate(1.2);
   }
 
-  html.native-os-glass:not(.light) .chat-config-popover {
-    background-color: rgba(6, 11, 23, 0.9);
+  html.light .chat-config-popover,
+  html.light .app-floating-toast {
+    background-color: #ffffff;
   }
 
-  html.native-os-glass.light .chat-config-popover {
-    background-color: rgba(255, 255, 255, 0.9);
-  }
-
-  html.native-os-glass .chat-config-popover {
+  html.native-os-glass .chat-config-popover,
+  html.native-os-glass .app-floating-toast {
     -webkit-backdrop-filter: blur(40px) saturate(1.2) !important;
     backdrop-filter: blur(40px) saturate(1.2) !important;
+  }
+
+  html.native-os-glass:not(.light) .chat-config-popover,
+  html.native-os-glass:not(.light) .app-floating-toast {
+    background-color: #060b17;
+  }
+
+  html.native-os-glass.light .chat-config-popover,
+  html.native-os-glass.light .app-floating-toast {
+    background-color: #ffffff;
   }
 
   /* Window drag region for custom titlebar */

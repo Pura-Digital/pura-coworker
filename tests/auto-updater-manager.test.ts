@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   quitAndInstall: vi.fn(),
 }));
 const updater = Object.assign(new EventEmitter(), mocks);
-vi.mock('electron', () => ({ app: { isPackaged: true, getVersion: () => '3.4.10' } }));
+vi.mock('electron', () => ({ app: { isPackaged: true, getVersion: () => '3.5.0' } }));
 vi.mock('electron-updater', () => ({ autoUpdater: updater }));
 vi.mock('../src/main/utils/logger', () => ({ log: vi.fn(), logWarn: vi.fn(), logError: vi.fn() }));
 
@@ -44,12 +44,12 @@ describe('system menu update actions', () => {
   });
 
   it('reopens the ready toast from the menu and installs only via the toast action', () => {
-    updater.emit('update-downloaded', { version: '3.4.11' });
+    updater.emit('update-downloaded', { version: '3.5.1' });
     send.mockClear();
     manager.handleMenuAction();
     expect(send).toHaveBeenCalledWith({
       type: 'updater.status',
-      payload: expect.objectContaining({ phase: 'downloaded', version: '3.4.11', userInitiated: true }),
+      payload: expect.objectContaining({ phase: 'downloaded', version: '3.5.1', userInitiated: true }),
     });
     expect(mocks.quitAndInstall).not.toHaveBeenCalled();
     manager.quitAndInstall();
@@ -57,7 +57,7 @@ describe('system menu update actions', () => {
   });
 
   it('starts downloading from the menu after an update is available', () => {
-    updater.emit('update-available', { version: '3.4.11' });
+    updater.emit('update-available', { version: '3.5.1' });
     manager.handleMenuAction();
     expect(manager.getSnapshot().phase).toBe('downloading');
     expect(mocks.downloadUpdate).toHaveBeenCalledOnce();

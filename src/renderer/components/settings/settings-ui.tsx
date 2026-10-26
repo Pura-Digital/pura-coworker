@@ -247,7 +247,7 @@ export function SettingsFeedbackToast({
 
   return (
     <div
-      className={`fixed right-6 bottom-6 z-[80] max-w-md rounded-lg border bg-surface px-4 py-3 shadow-elevated ${tone.border}`}
+      className={`app-floating-toast fixed right-6 bottom-6 z-[80] max-w-md rounded-[1.4rem] border px-4 py-3 shadow-elevated ${tone.border}`}
       role="status"
       aria-live="polite"
     >
