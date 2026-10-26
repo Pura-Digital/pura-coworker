@@ -131,9 +131,11 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
-          cache: npm
+          cache: ${{ (inputs.arm64_runner || vars.MACOS_ARM64_RUNNER) != 'pura-release-arm64' && 'npm' || '' }}
+          package-manager-cache: ${{ (inputs.arm64_runner || vars.MACOS_ARM64_RUNNER) != 'pura-release-arm64' }}
 
       - name: Cache Electron
+        if: (inputs.arm64_runner || vars.MACOS_ARM64_RUNNER) != 'pura-release-arm64'
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/Library/Caches/electron
