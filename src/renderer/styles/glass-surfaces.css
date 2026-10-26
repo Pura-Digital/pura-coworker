@@ -1,19 +1,24 @@
 /* Glass belongs to the window shell, never to the ordinary theme palette.
-   These unlayered rules also override native glass's layered base styles. */
+   These unlayered rules also override native glass's layered base styles.
+   Values must stay translucent so macOS vibrancy / Windows Mica can show through. */
 html.native-os-glass {
-  --color-background: #060b17;
-  --color-background-secondary: #0a1122;
-  --color-surface: #070e1d;
-  --color-surface-hover: #141e33;
-  --color-surface-active: #1a2540;
-  --color-surface-muted: #0a1120;
+  --color-background: rgba(6, 11, 23, 0.58);
+  --color-background-secondary: rgba(10, 17, 34, 0.52);
+  --color-surface: rgba(7, 14, 29, 0.65);
+  --color-surface-hover: rgba(20, 30, 51, 0.72);
+  --color-surface-active: rgba(26, 37, 64, 0.78);
+  --color-surface-muted: rgba(10, 17, 32, 0.6);
+  --color-app-shell: rgba(6, 11, 23, 0.42);
+  --color-app-shell-elevated: rgba(7, 14, 29, 0.52);
 }
 
 html.native-os-glass.light {
-  --color-background: #ffffff;
-  --color-background-secondary: #f5f9ff;
-  --color-surface: #ffffff;
-  --color-surface-hover: #eff5ff;
-  --color-surface-active: #e4eeff;
-  --color-surface-muted: #f7faff;
+  --color-background: rgba(255, 255, 255, 0.16);
+  --color-background-secondary: rgba(245, 249, 255, 0.14);
+  --color-surface: rgba(255, 255, 255, 0.22);
+  --color-surface-hover: rgba(239, 245, 255, 0.3);
+  --color-surface-active: rgba(228, 238, 255, 0.36);
+  --color-surface-muted: rgba(247, 250, 255, 0.2);
+  --color-app-shell: rgba(255, 255, 255, 0.14);
+  --color-app-shell-elevated: rgba(247, 250, 255, 0.22);
 }

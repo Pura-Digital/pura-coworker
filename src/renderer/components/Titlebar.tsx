@@ -92,7 +92,7 @@ export function Titlebar() {
 
   return (
     <div
-      className={`h-10 bg-background flex items-center shrink-0 ${
+      className={`h-10 bg-background/75 [.native-os-glass_&]:bg-transparent flex items-center shrink-0 ${
         macPadForTrafficLights ? 'titlebar-drag' : isMac ? 'pl-3 titlebar-drag' : 'titlebar-drag'
       }`}
       style={macPadForTrafficLights ? { paddingLeft: macTrafficLightPadPx } : undefined}

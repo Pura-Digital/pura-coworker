@@ -1,3 +1,4 @@
+import { AnonymizationIndicator } from './AnonymizationIndicator';
 import { ChatApiConfigSelector } from './ChatApiConfigSelector';
 import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect } from 'react';
@@ -623,6 +624,7 @@ export function WelcomeView() {
 
             <div className="ml-auto flex min-w-0 max-w-full items-center justify-end gap-2">
               <ChatApiConfigSelector {...configSetSelector} />
+              <AnonymizationIndicator />
               <button
                 type="submit"
                 disabled={!canSubmit || isSubmitting || isSwitchingConfigSet}

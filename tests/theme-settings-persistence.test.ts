@@ -10,16 +10,15 @@ describe('theme settings persistence', () => {
   it('persists theme updates in the main process and applies them to native window state', () => {
     const source = fs.readFileSync(mainIndexPath, 'utf8');
 
-    expect(source).toContain("const DARK_BG = '#060b17';");
-    expect(source).toContain("const LIGHT_BG = '#f5f3ee';");
+    expect(source).toContain("from './window-glass'");
+    expect(source).toContain('syncNativeOsWindowGlass');
     expect(source).toContain('updates.theme = nextTheme;');
     expect(source).toContain('toElectronZoomFactor');
     expect(source).toContain('mainWindow.webContents.setZoomFactor(factor);');
     expect(source).toContain('configStore.update(updates);');
     expect(source).toContain('nativeTheme.themeSource = theme;');
-    expect(source).toContain('mainWindow.setBackgroundColor(');
     expect(source).toContain("getSavedThemePreference() === 'system'");
-    expect(source).toContain('nativeTheme.shouldUseDarkColors ? DARK_BG : LIGHT_BG');
+    expect(source).toContain('nativeTheme.shouldUseDarkColors ? \'dark\' : \'light\'');
     expect(source).not.toContain("case 'settings.update':\n      // TODO: Implement settings update");
   });
 

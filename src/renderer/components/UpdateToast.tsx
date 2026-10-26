@@ -39,7 +39,7 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
 
   const { version, progress, transferred, total, error } = status;
 
-  if (phase === 'disabled' || phase === 'idle' || phase === 'checking') {
+  if (phase === 'disabled' || phase === 'idle' || (phase === 'checking' && !status.userInitiated)) {
     return null;
   }
 
@@ -60,8 +60,8 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
           >
             {phase === 'up-to-date' ? (
               <CheckCircle2 className="h-4 w-4" />
-            ) : phase === 'downloaded' ? (
-              <RefreshCw className="h-4 w-4" />
+            ) : phase === 'downloaded' || phase === 'checking' ? (
+              <RefreshCw className={`h-4 w-4${phase === 'checking' ? ' animate-spin' : ''}`} />
             ) : (
               <Download className="h-4 w-4" />
             )}
@@ -69,6 +69,8 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-text-primary">
+              {phase === 'checking' &&
+                t('updater.checkingTitle', { defaultValue: 'Checking for updates…' })}
               {phase === 'available' &&
                 t('updater.availableTitle', {
                   version: versionLabel,
@@ -90,6 +92,8 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
             </p>
 
             <p className="mt-0.5 text-xs text-text-muted">
+              {phase === 'checking' &&
+                t('updater.checkingBody', { defaultValue: 'Looking for the latest version of Aiden.' })}
               {phase === 'available' &&
                 t('updater.availableBody', {
                   defaultValue: 'Click download to get the latest version.',

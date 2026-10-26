@@ -163,7 +163,7 @@ export function ChatApiConfigSelector({
               selectedSet ? `${selectedSet.name} · ${t('api.model')}` : t('api.configSet')
             }
             style={position}
-            className="fixed z-[100] overflow-y-auto rounded-2xl border border-border-muted bg-background p-2 shadow-xl"
+            className="chat-config-popover fixed z-[100] overflow-y-auto rounded-2xl border border-border-subtle backdrop-blur-xl p-2 shadow-elevated"
             onBlur={(event) => {
               if (
                 event.relatedTarget &&

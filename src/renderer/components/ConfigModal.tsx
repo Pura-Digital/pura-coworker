@@ -18,6 +18,7 @@ import { useApiConfigState } from '../hooks/useApiConfigState';
 import { ApiConfigSetManager } from './ApiConfigSetManager';
 import { ProviderLogoBadge, protocolTabToLogoId, providerTabToLogoId } from './ProviderLogoBadge';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from './ProviderGuidance';
+import { PuraDigitalConnection } from './settings/PuraDigitalConnection';
 
 interface ConfigModalProps {
   isOpen: boolean;
@@ -69,6 +70,7 @@ export function ConfigModal({
     isTesting,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringPuraModels,
     testResult,
     friendlyTestDetails,
     isOllamaMode,
@@ -96,6 +98,9 @@ export function ConfigModal({
     changeProtocol,
     applyPuraDigitalSetup,
     applyCustomModelsSetup,
+    discoverPuraDigitalModels,
+    puraAuthMode,
+    setPuraAuthMode,
     requestConfigSetSwitch,
     requestCreateBlankConfigSet,
     cancelPendingConfigSetAction,
@@ -293,6 +298,33 @@ export function ConfigModal({
             </div>
           )}
 
+          {isPuraMode ? (
+            <PuraDigitalConnection
+              configSetId={activeConfigSetId}
+              puraAuthMode={puraAuthMode}
+              onPuraAuthModeChange={setPuraAuthMode}
+              apiKey={apiKey}
+              baseUrl={baseUrl}
+              model={model}
+              customModel={customModel}
+              useCustomModel={useCustomModel}
+              modelOptions={modelOptions}
+              isRefreshingModels={isRefreshingModels}
+              isDiscoveringPuraModels={isDiscoveringPuraModels}
+              isTesting={isTesting}
+              testResult={testResult}
+              onApiKeyChange={setApiKey}
+              onModelChange={setModel}
+              onCustomModelChange={setCustomModel}
+              onToggleCustomModel={toggleCustomModel}
+              onRefreshModels={() => void refreshModelOptions()}
+              onDiscoverPuraModels={() => void discoverPuraDigitalModels()}
+              onTestConnection={() => void handleTest()}
+              modelInputPlaceholder={modelInputPlaceholder}
+              modelInputHint={modelInputHint}
+            />
+          ) : (
+            <>
           {/* Base URL - Editable for custom provider */}
           {(provider === 'custom' || provider === 'ollama') && (
             <div className="space-y-2">
@@ -444,6 +476,8 @@ export function ConfigModal({
               setups={commonProviderSetups}
               onApplySetup={applyCommonProviderSetup}
             />
+          )}
+            </>
           )}
 
           {/* Error Message */}

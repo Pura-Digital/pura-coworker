@@ -232,8 +232,27 @@ function main() {
 
   if (hasFatal) {
     console.log(
-      `\n${RED}Build aborted. Fix the above issues before running electron-builder.${RESET}\n`
+      `\n${RED}Build aborted. Fix the above issues before running electron-builder.${RESET}`
     );
+    if (
+      process.platform === 'darwin' &&
+      checkAllDarwinArches &&
+      process.arch === 'arm64' &&
+      failed > 0
+    ) {
+      const x64Anon = path.join(
+        PROJECT_ROOT,
+        '.bundle-resources/anonymization/darwin-x64/rizzo-worker/rizzo-worker'
+      );
+      if (!fs.existsSync(x64Anon)) {
+        console.log(
+          `\n${YELLOW}On Apple Silicon, darwin-x64 PII runtimes are built on CI (Intel runner).` +
+            ` For a local DMG for this Mac only, run:${RESET}\n` +
+            `  npm run build\n`
+        );
+      }
+    }
+    console.log('');
     process.exit(1);
   }
 

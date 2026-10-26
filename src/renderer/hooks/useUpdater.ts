@@ -30,6 +30,7 @@ export function useUpdater() {
       }
       setStatus(event.payload);
       if (
+        event.payload.userInitiated ||
         event.payload.phase === 'available' ||
         event.payload.phase === 'downloaded' ||
         event.payload.phase === 'up-to-date'

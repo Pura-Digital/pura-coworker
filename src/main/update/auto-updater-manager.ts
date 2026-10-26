@@ -72,7 +72,7 @@ export class AutoUpdaterManager {
     };
 
     autoUpdater.on('checking-for-update', () => {
-      this.setSnapshot({ phase: 'checking', error: null });
+      this.setSnapshot({ phase: 'checking', error: null, userInitiated: this.userInitiatedCheck });
     });
 
     autoUpdater.on('update-available', (info: UpdateInfo) => {
@@ -148,7 +148,8 @@ export class AutoUpdaterManager {
   handleMenuAction(): void {
     switch (this.snapshot.phase) {
       case 'downloaded':
-        this.quitAndInstall();
+        // Reopen the ready toast; its restart button performs the installation.
+        this.setSnapshot({ userInitiated: true });
         break;
       case 'available':
         void this.downloadUpdate();
@@ -165,6 +166,7 @@ export class AutoUpdaterManager {
     }
     if (options?.userInitiated) {
       this.userInitiatedCheck = true;
+      this.setSnapshot({ userInitiated: true });
     }
     try {
       await autoUpdater.checkForUpdates();

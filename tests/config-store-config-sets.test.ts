@@ -223,3 +223,63 @@ describe('ConfigStore config sets', () => {
     expect(invalidStore.get('theme')).toBe('light');
   });
 });
+
+describe('installation onboarding completion', () => {
+  beforeEach(() => { mocks.seed = {}; });
+  it('starts unfinished on a clean installation', () => {
+    expect(new ConfigStore().getAll().onboardingCompleted).toBe(false);
+  });
+  it('migrates users of an older configured version as completed', () => {
+    mocks.seed = { isConfigured: true };
+    const store = new ConfigStore();
+    expect(store.getAll().onboardingCompleted).toBe(true);
+  });
+  it('migrates legacy credentials even if the configured flag is stale', () => {
+    mocks.seed = { provider: 'openai', apiKey: 'legacy-key', model: 'model', isConfigured: false };
+    expect(new ConfigStore().getAll().onboardingCompleted).toBe(true);
+  });
+  it('preserves completion through settings, provider changes and restarts after an update', () => {
+    const store = new ConfigStore();
+    store.update({ onboardingCompleted: true });
+    store.update({ apiKey: '', isConfigured: false, theme: 'dark', onboardingCompleted: false });
+    const alternate = store.createSet({ name: 'Other', mode: 'blank' });
+    store.switchSet({ id: alternate.activeConfigSetId });
+    mocks.seed = { ...store.getAll() };
+    const reopened = new ConfigStore();
+    expect(reopened.getAll().onboardingCompleted).toBe(true);
+    expect(reopened.getAll().theme).toBe('dark');
+  });
+});
+
+describe('UI zoom persistence', () => {
+  beforeEach(() => { mocks.seed = {}; });
+
+  it.each([0.8, 0.9, 1, 1.1, 1.25, 1.5])('keeps selected display scale %s through confirmation, unrelated saves and restart', (value) => {
+    const store = new ConfigStore();
+    store.update({ uiZoom: value });
+    expect(store.getAll().uiZoom).toBe(value);
+    expect(store.get('uiZoom')).toBe(value);
+    // A later settings/config save must not run the legacy conversion again.
+    store.update({ theme: 'dark' });
+    store.update({ memoryEnabled: false });
+    expect(store.getAll().uiZoom).toBe(value);
+    mocks.seed = { ...store.getAll() };
+    const reopened = new ConfigStore();
+    expect(reopened.getAll().uiZoom).toBe(value);
+    expect(reopened.get('uiZoom')).toBe(value);
+  });
+
+  it('converts an old absolute zoom only once', () => {
+    mocks.seed = { uiZoom: 0.8 };
+    const store = new ConfigStore();
+    expect(store.getAll().uiZoom).toBe(0.89);
+    expect(store.getAll().uiZoomVersion).toBe(1);
+    mocks.seed = { ...store.getAll() };
+    expect(new ConfigStore().getAll().uiZoom).toBe(0.89);
+  });
+
+  it('does not reinterpret a current 90% choice as legacy browser zoom', () => {
+    mocks.seed = { uiZoom: 0.9, uiZoomVersion: 1 };
+    expect(new ConfigStore().getAll().uiZoom).toBe(0.9);
+  });
+});

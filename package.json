@@ -1,7 +1,7 @@
 {
   "name": "aiden",
   "version": "3.4.10",
-  "description": "Open-source AI agent desktop app for Windows & macOS \u2014 one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
+  "description": "Open-source AI agent desktop app for Windows & macOS — one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
   "keywords": [
     "ai-agent",
     "claude",
@@ -39,7 +39,9 @@
   "scripts": {
     "dev": "npm run prepare:anonymization && npm run download:node && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
     "dev:with-python": "npm run prepare:anonymization && npm run download:node && npm run prepare:python && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
-    "build": "npm run prepare:anonymization && npm run download:node:darwin-all && npm run prepare:gui-tools:all && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js --all-darwin && electron-builder",
+    "build": "node scripts/build-mac-local.js",
+    "build:mac:local": "node scripts/build-mac-local.js",
+    "build:mac:universal": "npm run prepare:anonymization && npm run download:node:darwin-all && npm run prepare:gui-tools:all && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js --all-darwin && electron-builder --mac dmg zip --arm64 --x64 --publish never",
     "build:win": "node scripts/build-windows.js",
     "build:wsl-agent": "tsc -p src/main/sandbox/wsl-agent/tsconfig.json",
     "build:lima-agent": "tsc -p src/main/sandbox/lima-agent/tsconfig.json",
@@ -75,6 +77,8 @@
     "@mariozechner/pi-coding-agent": "0.73.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@opentelemetry/api": "1.9.0",
+    "@pura-ai/react": "0.1.1",
+    "@pura-ai/sdk": "0.1.1",
     "@slack/bolt": "4.7.0",
     "@slack/web-api": "7.15.1",
     "archiver": "^7.0.1",

@@ -1,5 +1,7 @@
+import { shouldShowOnboarding } from './utils/onboarding-setup';
+import { syncNativeGlassDocumentClass } from './utils/native-glass-document';
 import { AnonymizationDecisions } from './components/AnonymizationDecisions';
-import { Suspense, lazy, useEffect, useRef, useCallback } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from './store';
 import {
   useActiveSessionId,
@@ -37,6 +39,9 @@ import type { GlobalNoticeAction } from './store';
 const ContextPanel = lazy(() =>
   import('./components/ContextPanel').then((module) => ({ default: module.ContextPanel }))
 );
+const Onboarding = lazy(() =>
+  import('./components/Onboarding').then((module) => ({ default: module.Onboarding }))
+);
 const ConfigModal = lazy(() =>
   import('./components/ConfigModal').then((module) => ({ default: module.ConfigModal }))
 );
@@ -62,6 +67,20 @@ function ContextPanelFallback() {
 }
 
 function App() {
+  const [previewOnboarding, setPreviewOnboarding] = useState(false);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const preview = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewOnboarding(false);
+    };
+    const openPreview = () => setPreviewOnboarding(true);
+    window.addEventListener('aiden:preview-onboarding', openPreview);
+    window.addEventListener('keydown', preview);
+    return () => {
+      window.removeEventListener('keydown', preview);
+      window.removeEventListener('aiden:preview-onboarding', openPreview);
+    };
+  }, []);
   // --- Store state via selectors (each subscription is minimally scoped) ---
   const activeSessionId = useActiveSessionId();
   const activeProjectId = useActiveProjectId();
@@ -105,7 +124,9 @@ function App() {
       window.electronAPI?.project
         ?.list()
         .then((projects) => setProjects(projects))
-        .catch(() => {/* non-critical */});
+        .catch(() => {
+          /* non-critical */
+        });
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only init
@@ -128,6 +149,8 @@ function App() {
     } else {
       document.documentElement.classList.remove('light');
     }
+
+    syncNativeGlassDocumentClass(effectiveTheme, window.electronAPI?.platform);
   }, [settings.theme, systemDarkMode]);
 
   // Auto-collapse panels based on window width
@@ -157,6 +180,9 @@ function App() {
       }
 
       const result = await window.electronAPI.config.save(newConfig);
+      if (!result.success || !result.config?.isConfigured) {
+        throw new Error('Failed to save configuration. Please try again.');
+      }
       if (result.success) {
         setIsConfigured(Boolean(result.config?.isConfigured));
         setAppConfig(result.config);
@@ -168,6 +194,7 @@ function App() {
   // Handle config modal close
   const handleConfigClose = useCallback(() => {
     setShowConfigModal(false);
+    setPreviewOnboarding(false);
   }, [setShowConfigModal]);
 
   // Handle sandbox setup complete
@@ -185,68 +212,83 @@ function App() {
     [clearGlobalNotice, setShowConfigModal]
   );
 
+  const showOnboarding = previewOnboarding || shouldShowOnboarding(appConfig);
+
   // Determine if we should show the sandbox setup dialog
   // Show if there's progress and setup is not complete
   const showSandboxSetup = sandboxSetupProgress && !isSandboxSetupComplete;
 
   return (
-    <div className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-background">
+    <div className="native-window-root app-glass h-full w-full min-h-0 flex flex-col overflow-hidden">
       {/* Titlebar - draggable region */}
       <Titlebar />
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Sidebar */}
-        <PanelErrorBoundary name="Sidebar" fallback={<div className="w-0" />}>
-          <Sidebar />
-        </PanelErrorBoundary>
+        {showOnboarding && appConfig ? (
+          <Suspense fallback={<MainPanelFallback />}>
+            <Onboarding
+              preview={previewOnboarding}
+              initialConfig={appConfig}
+              onSave={handleConfigSave}
+              onClose={handleConfigClose}
+            />
+          </Suspense>
+        ) : (
+          <>
+            {/* Sidebar */}
+            <PanelErrorBoundary name="Sidebar" fallback={<div className="w-0" />}>
+              <Sidebar />
+            </PanelErrorBoundary>
 
-        {/* Main Content Area */}
-        <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background">
-          {showSettings ? (
-            <PanelErrorBoundary
-              name="SettingsPanel"
-              resetKey="settings"
-              fallback={<MainPanelFallback />}
-            >
-              <Suspense fallback={<MainPanelFallback />}>
-                <SettingsPanel onClose={() => setShowSettings(false)} />
-              </Suspense>
-            </PanelErrorBoundary>
-          ) : activeSessionId ? (
-            <PanelErrorBoundary
-              name="ChatView"
-              resetKey={activeSessionId}
-              fallback={<ChatLoadingView />}
-            >
-              <ChatSessionGate sessionId={activeSessionId}>
-                <ChatView />
-              </ChatSessionGate>
-            </PanelErrorBoundary>
-          ) : activeProjectId ? (
-            <PanelErrorBoundary
-              name="ProjectView"
-              resetKey={activeProjectId}
-              fallback={<MainPanelFallback />}
-            >
-              <ProjectView />
-            </PanelErrorBoundary>
-          ) : (
-            <WelcomeView />
-          )}
-        </main>
+            {/* Main Content Area */}
+            <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background [.native-os-glass_&]:bg-transparent">
+              {showSettings ? (
+                <PanelErrorBoundary
+                  name="SettingsPanel"
+                  resetKey="settings"
+                  fallback={<MainPanelFallback />}
+                >
+                  <Suspense fallback={<MainPanelFallback />}>
+                    <SettingsPanel onClose={() => setShowSettings(false)} />
+                  </Suspense>
+                </PanelErrorBoundary>
+              ) : activeSessionId ? (
+                <PanelErrorBoundary
+                  name="ChatView"
+                  resetKey={activeSessionId}
+                  fallback={<ChatLoadingView />}
+                >
+                  <ChatSessionGate sessionId={activeSessionId}>
+                    <ChatView />
+                  </ChatSessionGate>
+                </PanelErrorBoundary>
+              ) : activeProjectId ? (
+                <PanelErrorBoundary
+                  name="ProjectView"
+                  resetKey={activeProjectId}
+                  fallback={<MainPanelFallback />}
+                >
+                  <ProjectView />
+                </PanelErrorBoundary>
+              ) : (
+                <WelcomeView />
+              )}
+            </main>
 
-        {/* Context Panel - only show when in session and not in settings */}
-        {activeSessionId && !showSettings && (
-          <PanelErrorBoundary
-            name="ContextPanel"
-            resetKey={activeSessionId}
-            fallback={<ContextPanelFallback />}
-          >
-            <Suspense fallback={<ContextPanelFallback />}>
-              <ContextPanel />
-            </Suspense>
-          </PanelErrorBoundary>
+            {/* Context Panel - only show when in session and not in settings */}
+            {activeSessionId && !showSettings && (
+              <PanelErrorBoundary
+                name="ContextPanel"
+                resetKey={activeSessionId}
+                fallback={<ContextPanelFallback />}
+              >
+                <Suspense fallback={<ContextPanelFallback />}>
+                  <ContextPanel />
+                </Suspense>
+              </PanelErrorBoundary>
+            )}
+          </>
         )}
       </div>
 
@@ -262,7 +304,7 @@ function App() {
       <PanelErrorBoundary name="ConfigModal" fallback={null}>
         <Suspense fallback={null}>
           <ConfigModal
-            isOpen={showConfigModal}
+            isOpen={showConfigModal && !showOnboarding}
             onClose={handleConfigClose}
             onSave={handleConfigSave}
             initialConfig={appConfig}

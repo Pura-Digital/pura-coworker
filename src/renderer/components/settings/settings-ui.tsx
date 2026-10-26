@@ -30,19 +30,22 @@ export function SettingsCardHeader({
   title,
   description,
   icon: Icon,
+  badge,
   action,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
+  badge?: ReactNode;
   action?: ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {Icon && <Icon className="w-4 h-4 text-accent flex-shrink-0" />}
           <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
+          {badge}
         </div>
         {description && <p className="text-xs leading-5 text-text-muted">{description}</p>}
       </div>
@@ -112,6 +115,7 @@ export function SettingsToggle({
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={enabled}
+      aria-label={label}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
         enabled ? 'bg-accent' : 'bg-surface-muted'
       }`}

@@ -62,6 +62,8 @@ import { PluginRuntimeService } from '../skills/plugin-runtime-service';
 import type { SkillsAdapter } from '../skills/skills-adapter';
 import { AgentRuntimeExtensionManager } from '../extensions/agent-runtime-extension-manager';
 import { configStore } from '../config/config-store';
+import { resolvePuraCredentialsAsync } from '../pura/resolve-pura-credentials';
+import { installPuraSubscriptionPayloadPatch } from '../pura/pura-subscription-agent-patch';
 import { applyBffWebEnvToProcess, getBffEnvForSpawn, resolveBffWebEnv } from '../tools/bff-web-env';
 import { bffWebToolsPromptHint } from '../tools/web-client';
 import { buildWebCustomTools } from '../tools/web-custom-tools';
@@ -1440,6 +1442,11 @@ ${hints.join('\n')}
 
       // Resolve model via pi-ai
       const runtimeConfig = configStore.getAll();
+      const puraCreds = await resolvePuraCredentialsAsync(runtimeConfig);
+      const puraSubscriptionActive =
+        puraCreds.active &&
+        puraCreds.mode === 'subscription' &&
+        Boolean(puraCreds.accessToken && puraCreds.inferenceBaseUrl);
       const modelString = this.getCurrentModelString(runtimeConfig.model);
       const configProtocol = resolvePiRouteProtocol(
         runtimeConfig.provider,
@@ -1498,6 +1505,17 @@ ${hints.join('\n')}
       }
       logCtx('[ClaudeAgentRunner] Resolved pi-ai model:', piModel.provider, piModel.id);
 
+      if (puraSubscriptionActive && puraCreds.inferenceBaseUrl) {
+        piModel = {
+          ...piModel,
+          baseUrl: puraCreds.inferenceBaseUrl,
+          id: piModel.id || 'pura-subscription',
+          provider: 'openai',
+          api: 'openai-completions',
+        };
+        logCtx('[ClaudeAgentRunner] Using Pura subscription inference base:', puraCreds.inferenceBaseUrl);
+      }
+
       // For Ollama: query actual context window from /api/show if user hasn't configured one
       const provider = runtimeConfig.provider || 'anthropic';
       if (provider === 'ollama' && !runtimeConfig.contextWindow) {
@@ -1531,7 +1549,10 @@ ${hints.join('\n')}
 
       // Set up API keys via AuthStorage
       const authStorage = getSharedAuthStorage();
-      const apiKey = runtimeConfig.apiKey?.trim();
+      let apiKey = runtimeConfig.apiKey?.trim();
+      if (puraSubscriptionActive && puraCreds.accessToken) {
+        apiKey = puraCreds.accessToken;
+      }
       if (apiKey) {
         // Map our config provider to pi-ai provider name
         const piProvider =
@@ -2154,6 +2175,9 @@ Tool routing:
           cwd: effectiveCwd,
         });
         piSession = newPiSession;
+        if (puraSubscriptionActive) {
+          installPuraSubscriptionPayloadPatch(piSession);
+        }
 
         // Store session for reuse — evict oldest if cache is full
         if (this.piSessions.size >= ClaudeAgentRunner.MAX_CACHED_SESSIONS) {

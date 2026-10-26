@@ -167,7 +167,7 @@ dmg:
   # Explicit size to avoid dmgbuild "No space left on device" for large apps.
   # The temporary writable DMG is auto-shrunk after copying, so this doesn't
   # affect final DMG size. Our ULMO compression hook further reduces it.
-  size: '3g'
+  size: '5g'
   window:
     width: 600
     height: 440

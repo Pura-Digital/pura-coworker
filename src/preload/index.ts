@@ -207,6 +207,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('puraDigital.realtimeSession', chatId),
   },
 
+  puraConnect: {
+    isProtocolRegistered: (): Promise<boolean> => ipcRenderer.invoke('pura-is-protocol-registered'),
+    getConnectionState: (configSetId?: string) =>
+      ipcRenderer.invoke('pura-get-connection-state', configSetId),
+    startConnection: (payload?: { locale?: string; configSetId?: string }) =>
+      ipcRenderer.invoke('pura-start-connection', payload),
+    disconnect: (configSetId?: string) => ipcRenderer.invoke('pura-disconnect', configSetId),
+    testConnection: (configSetId?: string) =>
+      ipcRenderer.invoke('pura-test-connection', configSetId),
+    fetchUsage: (configSetId?: string) => ipcRenderer.invoke('pura-fetch-usage', configSetId),
+    onConnectionChanged: (callback: (payload: { configSetId: string }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, payload: { configSetId: string }) => {
+        callback(payload);
+      };
+      ipcRenderer.on('pura-connection-changed', handler);
+      return () => {
+        ipcRenderer.removeListener('pura-connection-changed', handler);
+      };
+    },
+  },
+
   // Window control methods
   window: {
     minimize: () => ipcRenderer.send('window.minimize'),
@@ -566,6 +587,28 @@ declare global {
       };
       puraDigital: {
         createRealtimeSession: (chatId?: string) => Promise<PuraRealtimeSessionResult>;
+      };
+      puraConnect: {
+        isProtocolRegistered: () => Promise<boolean>;
+        getConnectionState: (configSetId?: string) => Promise<{
+          configured: boolean;
+          connected: boolean;
+          puraUserId: number | null;
+        }>;
+        startConnection: (payload?: {
+          locale?: string;
+          configSetId?: string;
+        }) => Promise<{ success: boolean; error?: string }>;
+        disconnect: (configSetId?: string) => Promise<{ success: boolean }>;
+        testConnection: (configSetId?: string) => Promise<{
+          ok: boolean;
+          error?: string;
+          latencyMs?: number;
+          puraUserId?: number | null;
+          message?: string;
+        }>;
+        fetchUsage: (configSetId?: string) => Promise<{ ok: boolean; error?: string; usage?: unknown }>;
+        onConnectionChanged: (callback: (payload: { configSetId: string }) => void) => () => void;
       };
       window: {
         minimize: () => void;
