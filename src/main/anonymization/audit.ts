@@ -3,6 +3,7 @@ import { PLACEHOLDER_PATTERN } from './restore';
 /** Aggregate evidence only: never return text, tokens, values, or their hashes. */
 export function summarizeProtection(value: unknown, mapping: Map<string, string>) {
   let serialized: string;
+  
   try {
     serialized = JSON.stringify(value) || '';
   } catch {
