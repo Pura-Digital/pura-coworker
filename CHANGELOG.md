@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composer model selector shows **PuraLLM Subscription** when the active set uses a connected Pura subscription
 - Global, sandbox sync, update, and settings feedback toasts use opaque frosted panels (same treatment as the in-chat model picker)
 
+## [3.5.1] - 2026-10-26
+
+### Fixed
+
+- Release and Homebrew workflows now use macOS 15 ARM64 runners to avoid queues and scheduled interruptions on the deprecated macOS 14 image
+- Anonymization protection summaries handle JSON serialization errors
+
 ## [3.5.0] - 2026-10-26
 
 ### Added
