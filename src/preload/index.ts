@@ -1,3 +1,4 @@
+import type { AnonymizationAPI, AnonymizationEvent } from '../shared/anonymization-types';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { PuraRealtimeSessionResult } from '../shared/pura-digital';
 import type {
@@ -70,6 +71,18 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent['type']>(
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
+  anonymization: {
+    status: () => ipcRenderer.invoke('anonymization.status'),
+    download: () => ipcRenderer.invoke('anonymization.download'),
+    cancelDownload: () => ipcRenderer.invoke('anonymization.cancelDownload'),
+    decisions: () => ipcRenderer.invoke('anonymization.decisions'),
+    decide: (id: string, action: string) => ipcRenderer.invoke('anonymization.decide', id, action),
+    onEvent: (callback: (event: AnonymizationEvent) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, event: AnonymizationEvent) => callback(event);
+      ipcRenderer.on('anonymization.event', listener);
+      return () => ipcRenderer.removeListener('anonymization.event', listener);
+    },
+  },
   // Send events to main process
   send: (event: ClientEvent) => {
     if (!ALLOWED_CLIENT_EVENTS.has(event.type)) {
@@ -190,8 +203,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   puraDigital: {
-    createRealtimeSession: (): Promise<PuraRealtimeSessionResult> =>
-      ipcRenderer.invoke('puraDigital.realtimeSession'),
+    createRealtimeSession: (chatId?: string): Promise<PuraRealtimeSessionResult> =>
+      ipcRenderer.invoke('puraDigital.realtimeSession', chatId),
+  },
+
+  puraConnect: {
+    isProtocolRegistered: (): Promise<boolean> => ipcRenderer.invoke('pura-is-protocol-registered'),
+    getConnectionState: (configSetId?: string) =>
+      ipcRenderer.invoke('pura-get-connection-state', configSetId),
+    startConnection: (payload?: { locale?: string; configSetId?: string }) =>
+      ipcRenderer.invoke('pura-start-connection', payload),
+    disconnect: (configSetId?: string) => ipcRenderer.invoke('pura-disconnect', configSetId),
+    testConnection: (configSetId?: string) =>
+      ipcRenderer.invoke('pura-test-connection', configSetId),
+    fetchUsage: (configSetId?: string) => ipcRenderer.invoke('pura-fetch-usage', configSetId),
+    onConnectionChanged: (callback: (payload: { configSetId: string }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, payload: { configSetId: string }) => {
+        callback(payload);
+      };
+      ipcRenderer.on('pura-connection-changed', handler);
+      return () => {
+        ipcRenderer.removeListener('pura-connection-changed', handler);
+      };
+    },
   },
 
   // Window control methods
@@ -504,6 +538,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 declare global {
   interface Window {
     electronAPI: {
+      anonymization: AnonymizationAPI;
       send: (event: ClientEvent) => void;
       on: (callback: (event: ServerEvent) => void) => () => void;
       invoke: <T>(event: ClientEvent) => Promise<T>;
@@ -551,7 +586,29 @@ declare global {
         discoverLocal: (payload?: { baseUrl?: string }) => Promise<LocalOllamaDiscoveryResult>;
       };
       puraDigital: {
-        createRealtimeSession: () => Promise<PuraRealtimeSessionResult>;
+        createRealtimeSession: (chatId?: string) => Promise<PuraRealtimeSessionResult>;
+      };
+      puraConnect: {
+        isProtocolRegistered: () => Promise<boolean>;
+        getConnectionState: (configSetId?: string) => Promise<{
+          configured: boolean;
+          connected: boolean;
+          puraUserId: number | null;
+        }>;
+        startConnection: (payload?: {
+          locale?: string;
+          configSetId?: string;
+        }) => Promise<{ success: boolean; error?: string }>;
+        disconnect: (configSetId?: string) => Promise<{ success: boolean }>;
+        testConnection: (configSetId?: string) => Promise<{
+          ok: boolean;
+          error?: string;
+          latencyMs?: number;
+          puraUserId?: number | null;
+          message?: string;
+        }>;
+        fetchUsage: (configSetId?: string) => Promise<{ ok: boolean; error?: string; usage?: unknown }>;
+        onConnectionChanged: (callback: (payload: { configSetId: string }) => void) => () => void;
       };
       window: {
         minimize: () => void;

@@ -1,3 +1,9 @@
+// Theme variables may contain hex or rgba colors. color-mix keeps Tailwind's
+// opacity modifiers valid for both, without changing the opaque base token.
+const themeColor = (name) => ({ opacityValue }) => opacityValue === undefined
+  ? `var(${name})`
+  : `color-mix(in srgb, var(${name}) calc(100% * ${opacityValue}), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',
@@ -7,39 +13,40 @@ module.exports = {
   ],
   theme: {
     extend: {
+      opacity: { 88: '0.88', 92: '0.92' },
       colors: {
         // Use CSS variables for theme-aware colors
         background: {
-          DEFAULT: 'var(--color-background)',
-          secondary: 'var(--color-background-secondary)',
+          DEFAULT: themeColor('--color-background'),
+          secondary: themeColor('--color-background-secondary'),
         },
         surface: {
-          DEFAULT: 'var(--color-surface)',
-          hover: 'var(--color-surface-hover)',
-          active: 'var(--color-surface-active)',
-          muted: 'var(--color-surface-muted)',
+          DEFAULT: themeColor('--color-surface'),
+          hover: themeColor('--color-surface-hover'),
+          active: themeColor('--color-surface-active'),
+          muted: themeColor('--color-surface-muted'),
         },
         border: {
-          DEFAULT: 'var(--color-border)',
-          muted: 'var(--color-border-muted)',
-          subtle: 'var(--color-border-subtle)',
+          DEFAULT: themeColor('--color-border'),
+          muted: themeColor('--color-border-muted'),
+          subtle: themeColor('--color-border-subtle'),
         },
         accent: {
-          DEFAULT: 'var(--color-accent)',
-          hover: 'var(--color-accent-hover)',
-          muted: 'var(--color-accent-muted)',
+          DEFAULT: themeColor('--color-accent'),
+          hover: themeColor('--color-accent-hover'),
+          muted: themeColor('--color-accent-muted'),
         },
         mcp: {
-          DEFAULT: 'var(--color-mcp)',
+          DEFAULT: themeColor('--color-mcp'),
         },
         text: {
-          primary: 'var(--color-text-primary)',
-          secondary: 'var(--color-text-secondary)',
-          muted: 'var(--color-text-muted)',
+          primary: themeColor('--color-text-primary'),
+          secondary: themeColor('--color-text-secondary'),
+          muted: themeColor('--color-text-muted'),
         },
-        success: 'var(--color-success)',
-        warning: 'var(--color-warning)',
-        error: 'var(--color-error)',
+        success: themeColor('--color-success'),
+        warning: themeColor('--color-warning'),
+        error: themeColor('--color-error'),
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],

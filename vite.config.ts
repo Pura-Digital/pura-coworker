@@ -49,6 +49,7 @@ export default defineConfig({
                 'glob',
                 'dotenv',
                 'grammy',
+                '@pura-ai/sdk',
               ],
               output: {
                 // Ensure consistent interop for CJS/ESM

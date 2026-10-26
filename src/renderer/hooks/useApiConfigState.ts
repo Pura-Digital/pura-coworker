@@ -35,6 +35,8 @@ import {
   resolveProviderGuidanceErrorHint,
   type CommonProviderSetup,
 } from '../../shared/api-provider-guidance';
+import type { PuraAuthMode } from '../../shared/pura-connect';
+import { usePuraLlm } from './usePuraLlm';
 export { getModelInputGuidance } from '../../shared/api-model-presets';
 
 interface UseApiConfigStateOptions {
@@ -57,6 +59,7 @@ interface ConfigStateSnapshot {
   activeProfileKey: ProviderProfileKey;
   profiles: Record<ProviderProfileKey, UIProviderProfile>;
   enableThinking: boolean;
+  anonymizationEnabled: boolean;
 }
 
 interface ApiConfigBootstrap {
@@ -326,6 +329,7 @@ export function buildApiConfigSnapshot(
     activeProfileKey,
     profiles,
     enableThinking: Boolean(config?.enableThinking),
+    anonymizationEnabled: Boolean(config?.anonymizationEnabled),
   };
 }
 
@@ -352,12 +356,14 @@ function toPersistedProfiles(
 export function buildApiConfigDraftSignature(
   activeProfileKey: ProviderProfileKey,
   profiles: Record<ProviderProfileKey, UIProviderProfile>,
-  enableThinking: boolean
+  enableThinking: boolean,
+  anonymizationEnabled = false
 ): string {
   const persisted = toPersistedProfiles(profiles);
   return JSON.stringify({
     activeProfileKey,
     enableThinking,
+    anonymizationEnabled,
     profiles: PROFILE_KEYS.map((key) => ({
       key,
       apiKey: persisted[key]?.apiKey || '',
@@ -560,6 +566,7 @@ interface ApiConfigState {
   pendingConfigSetAction: PendingConfigSetAction | null;
   // Extended thinking flag
   enableThinking: boolean;
+  anonymizationEnabled: boolean;
   // Remember last custom protocol so switching back to custom restores it
   lastCustomProtocol: CustomProtocolType;
   // Signature of the last persisted state (used for dirty-check)
@@ -602,6 +609,7 @@ type ApiConfigAction =
         profiles: Record<ProviderProfileKey, UIProviderProfile>;
         activeProfileKey: ProviderProfileKey;
         enableThinking: boolean;
+  anonymizationEnabled: boolean;
         configSets: ApiConfigSet[];
         activeConfigSetId: string;
         lastCustomProtocol: CustomProtocolType;
@@ -612,6 +620,7 @@ type ApiConfigAction =
   | { type: 'SET_ACTIVE_PROFILE_KEY'; payload: ProviderProfileKey }
   // Enable thinking toggle
   | { type: 'SET_ENABLE_THINKING'; payload: boolean }
+  | { type: 'SET_ANONYMIZATION'; payload: boolean }
   // Patch one profile in the profiles map
   | { type: 'PATCH_PROFILE'; profileKey: ProviderProfileKey; patch: Partial<UIProviderProfile> }
   // Replace a profile using a functional updater
@@ -671,6 +680,7 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
         profiles: action.payload.profiles,
         activeProfileKey: action.payload.activeProfileKey,
         enableThinking: action.payload.enableThinking,
+        anonymizationEnabled: action.payload.anonymizationEnabled,
         configSets: action.payload.configSets,
         activeConfigSetId: action.payload.activeConfigSetId,
         pendingConfigSetAction: null,
@@ -680,6 +690,9 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
 
     case 'SET_ACTIVE_PROFILE_KEY':
       return { ...state, activeProfileKey: action.payload };
+
+    case 'SET_ANONYMIZATION':
+      return { ...state, anonymizationEnabled: action.payload };
 
     case 'SET_ENABLE_THINKING':
       return { ...state, enableThinking: action.payload };
@@ -835,6 +848,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       isMutatingConfigSet: false,
       lastCustomProtocol: initialLastCustomProtocol,
       enableThinking: Boolean(initialConfig?.enableThinking),
+      anonymizationEnabled: Boolean(initialConfig?.anonymizationEnabled),
       discoveredModels: {},
       isLoadingConfig: true,
       savedDraftSignature: '',
@@ -867,6 +881,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isMutatingConfigSet,
     lastCustomProtocol,
     enableThinking,
+    anonymizationEnabled,
     discoveredModels,
     isLoadingConfig,
     savedDraftSignature,
@@ -942,6 +957,24 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const currentConfigSet = useMemo(
     () => configSets.find((set) => set.id === activeConfigSetId) || null,
     [configSets, activeConfigSetId]
+  );
+  const puraLlm = usePuraLlm(activeConfigSetId);
+  const puraAuthMode: PuraAuthMode = isPuraMode
+    ? currentConfigSet?.puraAuthMode ?? 'subscription'
+    : 'apiKey';
+  const puraSubscriptionConnected =
+    isPuraMode && puraAuthMode === 'subscription' && puraLlm.connection.connected;
+
+  const setPuraAuthMode = useCallback(
+    (mode: PuraAuthMode) => {
+      dispatch({
+        type: 'SET_CONFIG_SETS',
+        payload: configSets.map((set) =>
+          set.id === activeConfigSetId ? { ...set, puraAuthMode: mode } : set
+        ),
+      });
+    },
+    [activeConfigSetId, configSets]
   );
   const pendingConfigSet = useMemo(
     () =>
@@ -1101,6 +1134,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   ]);
 
   const allowEmptyApiKey =
+    puraSubscriptionConnected ||
     provider === 'ollama' ||
     (provider === 'custom' &&
       ((customProtocol === 'anthropic' && isCustomAnthropicLoopbackGateway(baseUrl)) ||
@@ -1108,8 +1142,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         (customProtocol === 'gemini' && isCustomGeminiLoopbackGateway(baseUrl))));
   const requiresApiKey = !allowEmptyApiKey;
   const currentDraftSignature = useMemo(
-    () => buildApiConfigDraftSignature(activeProfileKey, profiles, enableThinking),
-    [activeProfileKey, profiles, enableThinking]
+    () => buildApiConfigDraftSignature(activeProfileKey, profiles, enableThinking, anonymizationEnabled),
+    [activeProfileKey, profiles, enableThinking, anonymizationEnabled]
   );
   const hasUnsavedChanges =
     savedDraftSignature !== '' && currentDraftSignature !== savedDraftSignature;
@@ -1135,13 +1169,15 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
           profiles: bootstrap.snapshot.profiles,
           activeProfileKey: bootstrap.snapshot.activeProfileKey,
           enableThinking: bootstrap.snapshot.enableThinking,
+          anonymizationEnabled: bootstrap.snapshot.anonymizationEnabled,
           configSets: bootstrap.configSets,
           activeConfigSetId: bootstrap.activeConfigSetId,
           lastCustomProtocol: resolvedLastCustomProtocol,
           savedDraftSignature: buildApiConfigDraftSignature(
             bootstrap.snapshot.activeProfileKey,
             bootstrap.snapshot.profiles,
-            bootstrap.snapshot.enableThinking
+            bootstrap.snapshot.enableThinking,
+            bootstrap.snapshot.anonymizationEnabled
           ),
         },
       });
@@ -1285,6 +1321,10 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [updateActiveProfile]);
 
   // Public setter exposed to consumers — wraps dispatch so the interface stays stable
+  const setAnonymizationEnabled = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_ANONYMIZATION', payload: value });
+  }, []);
+
   const setEnableThinking = useCallback((value: boolean) => {
     dispatch({ type: 'SET_ENABLE_THINKING', payload: value });
   }, []);
@@ -1369,6 +1409,37 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [activeProfileKey, baseUrl, discoveredModels]);
 
   const handleTest = useCallback(async () => {
+    if (isPuraMode && puraAuthMode === 'subscription') {
+      clearError();
+      dispatch({ type: 'SET_IS_TESTING', payload: true });
+      dispatch({ type: 'SET_TEST_RESULT', payload: null });
+      try {
+        const result = await window.electronAPI.puraConnect.testConnection(activeConfigSetId);
+        dispatch({
+          type: 'SET_TEST_RESULT',
+          payload: result.ok
+            ? { ok: true, latencyMs: result.latencyMs ?? 0 }
+            : {
+                ok: false,
+                errorType: result.error === 'not_connected' ? 'missing_key' : 'unknown',
+                details: result.message || result.error,
+              },
+        });
+      } catch (testError) {
+        dispatch({
+          type: 'SET_TEST_RESULT',
+          payload: {
+            ok: false,
+            errorType: 'unknown',
+            details: testError instanceof Error ? testError.message : String(testError),
+          },
+        });
+      } finally {
+        dispatch({ type: 'SET_IS_TESTING', payload: false });
+      }
+      return;
+    }
+
     if (requiresApiKey && !apiKey.trim()) {
       showErrorKey('api.testError.missing_key');
       return;
@@ -1860,7 +1931,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       }
 
       const finalModel = useCustomModel ? customModel.trim() : model;
-      if (!finalModel) {
+      if (!finalModel && !puraSubscriptionConnected) {
         showErrorKey('api.selectModelRequired');
         return false;
       }
@@ -1890,6 +1961,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
           profiles: persistedProfiles,
           activeConfigSetId,
           enableThinking,
+          anonymizationEnabled,
+          ...(isPuraMode ? { puraAuthMode } : {}),
         };
 
         if (onSave) {
@@ -1928,6 +2001,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       customModel,
       customProtocol,
       enableThinking,
+    anonymizationEnabled,
       model,
       onSave,
       presets,
@@ -1941,6 +2015,9 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       showSuccessKey,
       t,
       useCustomModel,
+      isPuraMode,
+      puraAuthMode,
+      puraSubscriptionConnected,
     ]
   );
 
@@ -2205,6 +2282,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     modelInputPlaceholder: modelInputGuidance.placeholder,
     modelInputHint: modelInputGuidance.hint,
     enableThinking,
+    anonymizationEnabled,
     isSaving,
     isTesting,
     isRefreshingModels,
@@ -2220,6 +2298,9 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     handleDeepDiagnose,
     isOllamaMode: provider === 'ollama',
     isPuraMode,
+    puraAuthMode,
+    setPuraAuthMode,
+    puraSubscriptionConnected,
     isDiscoveringPuraModels,
     supportsModelDiscovery,
     shouldShowOllamaManualModelToggle,
@@ -2246,6 +2327,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     setMaxTokens,
     toggleCustomModel,
     setEnableThinking,
+    setAnonymizationEnabled,
     applyCommonProviderSetup,
     changeProvider,
     changeProtocol,

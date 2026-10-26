@@ -16,7 +16,7 @@ function TitlebarBrand() {
       <img
         src={appLogo}
         alt={t('common.appLogoAlt')}
-        className="w-7 h-7 rounded-lg object-cover border border-border-subtle bg-background/60"
+        className="w-7 h-7 rounded-lg object-cover border border-border-subtle bg-[#263247] [.light_&]:bg-background/60"
       />
       <span className="text-sm font-semibold tracking-[-0.02em] text-text-primary">Aiden</span>
     </div>
@@ -92,7 +92,7 @@ export function Titlebar() {
 
   return (
     <div
-      className={`h-10 bg-background flex items-center shrink-0 ${
+      className={`h-10 bg-background/75 [.native-os-glass_&]:bg-transparent flex items-center shrink-0 ${
         macPadForTrafficLights ? 'titlebar-drag' : isMac ? 'pl-3 titlebar-drag' : 'titlebar-drag'
       }`}
       style={macPadForTrafficLights ? { paddingLeft: macTrafficLightPadPx } : undefined}

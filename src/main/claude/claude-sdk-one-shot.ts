@@ -1,3 +1,5 @@
+import { anonymizationContext, getAnonymizationGateway } from '../anonymization/gateway';
+import { logStorage } from '../utils/logger';
 import { completeSimple, type UserMessage as PiUserMessage } from '@mariozechner/pi-ai';
 import type { ApiTestInput, ApiTestResult } from '../../renderer/types';
 import { PROVIDER_PRESETS, type AppConfig, type CustomProtocolType } from '../config/config-store';
@@ -128,6 +130,7 @@ function buildProbeConfig(input: ApiTestInput, config: AppConfig): AppConfig {
   );
   return {
     ...config,
+    anonymizationEnabled: false,
     provider: input.provider,
     customProtocol: resolvedCustomProtocol,
     apiKey: effectiveApiKey,
@@ -287,7 +290,17 @@ export async function runPiAiOneShot(
     'api:',
     resolvedModel.api
   );
-  const response = await completeSimple(
+  const privacyRun = anonymizationContext.getStore();
+  const protectedCall = privacyRun?.enabled ?? config.anonymizationEnabled === true;
+  const chatId = privacyRun?.chatId || logStorage.getStore()?.sessionId;
+  if (protectedCall && !chatId) throw new Error('Contesto chat mancante: chiamata ausiliaria protetta sospesa.');
+  // Titles and memory completions are optional auxiliary calls. They must not
+  // reopen a foreground service-failure dialog or request Keychain access.
+  if (protectedCall && getAnonymizationGateway().service.status().service !== 'ready')
+    throw new Error('Servizio di anonimizzazione non disponibile: chiamata ausiliaria sospesa.');
+  const response = protectedCall
+    ? await (await getAnonymizationGateway().stream(chatId!)(resolvedModel, { systemPrompt, messages: [userMsg] }, { ...options, apiKey: apiKey || undefined })).result()
+    : await completeSimple(
     resolvedModel,
     {
       systemPrompt,
@@ -319,7 +332,7 @@ export async function runPiAiOneShot(
   );
   log(
     '[OneShot] Response:',
-    text ? text.substring(0, 200) : '(empty)',
+    protectedCall ? '(protected response)' : text ? text.substring(0, 200) : '(empty)',
     'blocks:',
     response.content.length,
     'textBlocks:',

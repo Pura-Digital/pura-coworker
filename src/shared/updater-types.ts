@@ -15,6 +15,7 @@ export interface UpdaterSnapshot {
   transferred: number | null;
   total: number | null;
   error: string | null;
+  userInitiated: boolean;
 }
 
 export const INITIAL_UPDATER_SNAPSHOT: UpdaterSnapshot = {
@@ -24,4 +25,5 @@ export const INITIAL_UPDATER_SNAPSHOT: UpdaterSnapshot = {
   transferred: null,
   total: null,
   error: null,
+  userInitiated: false,
 };

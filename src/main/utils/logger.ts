@@ -61,7 +61,7 @@ const MAX_LOG_ARRAY_ITEMS = 20;
 
 // Developer logs enabled flag (can be toggled by user)
 let devLogsEnabled = true;
-const ALWAYS_PERSIST_LOG_LEVELS = new Set(['WARN', 'ERROR']);
+const ALWAYS_PERSIST_LOG_LEVELS = new Set(['WARN', 'ERROR', 'AUDIT']);
 
 function clearLogStreamState(): void {
   logStream = null;
@@ -421,6 +421,13 @@ export function logCtxWarn(...args: unknown[]): void {
   const prefix = formatCtxPrefix();
   safeConsoleWarn(`[${getTimestamp()}]`, prefix, ...args);
   writeToFile('WARN', ...args);
+}
+
+/** Persist non-sensitive security counters even when detailed logs are disabled. */
+export function logCtxAudit(...args: unknown[]): void {
+  const prefix = formatCtxPrefix();
+  safeConsoleLog(`[${getTimestamp()}]`, prefix, ...args);
+  writeToFile('AUDIT', ...args);
 }
 
 export function logCtxError(...args: unknown[]): void {

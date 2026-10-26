@@ -1,8 +1,17 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { isPuraDigitalActive } from '../../shared/pura-digital';
 import type { ApiConfigSet, ProviderModelInfo } from '../types';
+
+function isPuraSubscriptionSet(set: ApiConfigSet): boolean {
+  if (set.puraAuthMode !== 'subscription') {
+    return false;
+  }
+  const profile = set.profiles[set.activeProfileKey];
+  return isPuraDigitalActive(set.provider, set.customProtocol, profile?.baseUrl);
+}
 
 interface ChatApiConfigSelectorProps {
   configSets: ApiConfigSet[];
@@ -35,7 +44,38 @@ export function ChatApiConfigSelector({
   const [query, setQuery] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [position, setPosition] = useState({ left: 0, top: 0, width: 320, maxHeight: 360 });
+  const [puraConnectedSetIds, setPuraConnectedSetIds] = useState<Set<string>>(() => new Set());
   const selectedSet = configSets.find((set) => set.id === selectedSetId);
+  const subscriptionModelLabel = t('api.puraConnect.subscriptionModelLabel');
+
+  const refreshPuraConnections = useCallback(async () => {
+    const getState = window.electronAPI?.puraConnect?.getConnectionState;
+    if (!getState) {
+      setPuraConnectedSetIds(new Set());
+      return;
+    }
+    const subscriptionSets = configSets.filter(isPuraSubscriptionSet);
+    const connectedIds = (
+      await Promise.all(
+        subscriptionSets.map(async (set) => {
+          const state = await getState(set.id);
+          return state?.connected ? set.id : null;
+        })
+      )
+    ).filter((id): id is string => Boolean(id));
+    setPuraConnectedSetIds(new Set(connectedIds));
+  }, [configSets]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    void refreshPuraConnections();
+    const unsubscribe = window.electronAPI?.puraConnect?.onConnectionChanged?.(() => {
+      void refreshPuraConnections();
+    });
+    return () => unsubscribe?.();
+  }, [open, refreshPuraConnections]);
 
   const close = () => {
     setOpen(false);
@@ -122,6 +162,15 @@ export function ChatApiConfigSelector({
   const filteredModels = availableModels.filter((item) =>
     `${item.name} ${item.id}`.toLowerCase().includes(query.trim().toLowerCase())
   );
+  const activeShowsSubscription =
+    activeConfigSet &&
+    isPuraSubscriptionSet(activeConfigSet) &&
+    puraConnectedSetIds.has(activeConfigSet.id);
+  const displayModel = activeShowsSubscription ? subscriptionModelLabel : model;
+  const selectedShowsSubscription =
+    selectedSet &&
+    isPuraSubscriptionSet(selectedSet) &&
+    puraConnectedSetIds.has(selectedSet.id);
   const rowClass =
     'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 disabled:cursor-not-allowed';
 
@@ -137,8 +186,8 @@ export function ChatApiConfigSelector({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        aria-label={`${t('api.configSet')}: ${activeConfigSet.name}${model ? ` · ${model}` : ''}`}
-        title={`${activeConfigSet.name}${model ? ` · ${model}` : ''}`}
+        aria-label={`${t('api.configSet')}: ${activeConfigSet.name}${displayModel ? ` · ${displayModel}` : ''}`}
+        title={`${activeConfigSet.name}${displayModel ? ` · ${displayModel}` : ''}`}
         disabled={disabled}
         onClick={() => {
           setSelectedSetId(null);
@@ -148,8 +197,8 @@ export function ChatApiConfigSelector({
         className="flex min-w-0 max-w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="min-w-0 truncate text-text-primary">{activeConfigSet.name}</span>
-        {model && (
-          <span className="hidden min-w-0 truncate text-text-muted sm:inline">{model}</span>
+        {displayModel && (
+          <span className="hidden min-w-0 truncate text-text-muted sm:inline">{displayModel}</span>
         )}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-muted" />
       </button>
@@ -163,7 +212,7 @@ export function ChatApiConfigSelector({
               selectedSet ? `${selectedSet.name} · ${t('api.model')}` : t('api.configSet')
             }
             style={position}
-            className="fixed z-[100] overflow-y-auto rounded-2xl border border-border-muted bg-background p-2 shadow-xl"
+            className="chat-config-popover fixed z-[100] overflow-y-auto rounded-2xl border border-border-subtle backdrop-blur-xl p-2 shadow-elevated"
             onBlur={(event) => {
               if (
                 event.relatedTarget &&
@@ -227,44 +276,55 @@ export function ChatApiConfigSelector({
                     <RefreshCw className="h-4 w-4" />
                   </button>
                 </div>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  aria-label={t('api.model')}
-                  placeholder={t('api.model')}
-                  className="mb-2 w-full rounded-lg border border-border-muted bg-transparent px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
-                />
-                {loading && (
-                  <p role="status" className="flex items-center gap-2 p-3 text-xs text-text-muted">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    {t('common.loading')}
-                  </p>
+                {selectedShowsSubscription ? (
+                  <div className={`${rowClass} mx-1 cursor-default hover:bg-transparent`}>
+                    <span className="min-w-0 flex-1 truncate">{subscriptionModelLabel}</span>
+                    <Check className="h-4 w-4 shrink-0 text-accent" />
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      aria-label={t('api.model')}
+                      placeholder={t('api.model')}
+                      className="mb-2 w-full rounded-lg border border-border-muted bg-transparent px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
+                    />
+                    {loading && (
+                      <p role="status" className="flex items-center gap-2 p-3 text-xs text-text-muted">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        {t('common.loading')}
+                      </p>
+                    )}
+                    {failed && (
+                      <p role="alert" className="p-3 text-xs text-error">
+                        {t('api.refreshModelsFailed')}
+                      </p>
+                    )}
+                    {!loading && !failed && filteredModels.length === 0 && (
+                      <p className="p-3 text-xs text-text-muted">{t('api.noModelsAvailable')}</p>
+                    )}
+                    {filteredModels.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        disabled={disabled}
+                        className={rowClass}
+                        aria-pressed={item.id === currentModel}
+                        title={item.id}
+                        onClick={async () => {
+                          if (await onModelChange(selectedSet.id, item.id)) close();
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{item.name || item.id}</span>
+                        {item.id === currentModel && (
+                          <Check className="h-4 w-4 shrink-0 text-accent" />
+                        )}
+                      </button>
+                    ))}
+                  </>
                 )}
-                {failed && (
-                  <p role="alert" className="p-3 text-xs text-error">
-                    {t('api.refreshModelsFailed')}
-                  </p>
-                )}
-                {!loading && !failed && filteredModels.length === 0 && (
-                  <p className="p-3 text-xs text-text-muted">{t('api.noModelsAvailable')}</p>
-                )}
-                {filteredModels.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    disabled={disabled}
-                    className={rowClass}
-                    aria-pressed={item.id === currentModel}
-                    title={item.id}
-                    onClick={async () => {
-                      if (await onModelChange(selectedSet.id, item.id)) close();
-                    }}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{item.name || item.id}</span>
-                    {item.id === currentModel && <Check className="h-4 w-4 shrink-0 text-accent" />}
-                  </button>
-                ))}
               </>
             ) : (
               <>

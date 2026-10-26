@@ -183,7 +183,7 @@ export function PuraVoiceFloatingButton() {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-2xl border border-border-subtle bg-surface/95 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.15)] backdrop-blur-xl"
+            className="w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-2xl border border-border-subtle bg-surface p-4 shadow-[0_12px_40px_rgba(0,0,0,0.15)] backdrop-blur-xl"
             id="pura-voice-fab-panel"
           >
             <div className="flex flex-col gap-2">
@@ -193,7 +193,7 @@ export function PuraVoiceFloatingButton() {
                   {t('puraVoiceFab.title')}
                 </span>
               </div>
-              <p className="text-xs leading-snug text-text-muted">{t('puraVoiceFab.badge')}</p>
+              <p className="text-xs leading-snug text-text-muted">{t(appConfig?.anonymizationEnabled && (status === 'connected' || status === 'listening') ? 'anonymization.voiceClear' : 'puraVoiceFab.badge')}</p>
 
               {isPura ? (
                 <>

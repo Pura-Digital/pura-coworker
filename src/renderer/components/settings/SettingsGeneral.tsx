@@ -78,7 +78,10 @@ export function SettingsGeneral({ isActive }: { isActive: boolean }) {
   return (
     <SettingsPage>
       <SettingsCard>
-        <SettingsCardHeader title={t('general.appearance')} description={t('general.appearanceDesc')} />
+        <SettingsCardHeader
+          title={t('general.appearance')}
+          description={t('general.appearanceDesc')}
+        />
         <div className="space-y-5">
           <div className="space-y-2">
             <p className="text-xs font-medium text-text-muted">{t('general.theme')}</p>
@@ -132,6 +135,16 @@ export function SettingsGeneral({ isActive }: { isActive: boolean }) {
       </SettingsCard>
 
       <SettingsLogs isActive={isActive} />
+
+      {import.meta.env.DEV && (
+        <button
+          type="button"
+          className="btn text-xs border border-border-subtle text-text-secondary"
+          onClick={() => window.dispatchEvent(new Event('aiden:preview-onboarding'))}
+        >
+          {t('onboarding.previewTitle')}
+        </button>
+      )}
 
       {appVer && (
         <p className="text-xs text-text-muted text-center pt-2">Aiden v{appVer} — Pura Digital</p>

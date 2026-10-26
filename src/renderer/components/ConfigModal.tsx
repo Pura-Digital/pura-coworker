@@ -1,3 +1,4 @@
+import { AnonymizationSettings } from './AnonymizationSettings';
 import { useEffect } from 'react';
 import {
   X,
@@ -17,6 +18,7 @@ import { useApiConfigState } from '../hooks/useApiConfigState';
 import { ApiConfigSetManager } from './ApiConfigSetManager';
 import { ProviderLogoBadge, protocolTabToLogoId, providerTabToLogoId } from './ProviderLogoBadge';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from './ProviderGuidance';
+import { PuraDigitalConnection } from './settings/PuraDigitalConnection';
 
 interface ConfigModalProps {
   isOpen: boolean;
@@ -47,6 +49,8 @@ export function ConfigModal({
 }: ConfigModalProps) {
   const { t } = useTranslation();
   const {
+    anonymizationEnabled,
+    setAnonymizationEnabled,
     provider,
     customProtocol,
     apiKey,
@@ -66,6 +70,7 @@ export function ConfigModal({
     isTesting,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringPuraModels,
     testResult,
     friendlyTestDetails,
     isOllamaMode,
@@ -93,6 +98,9 @@ export function ConfigModal({
     changeProtocol,
     applyPuraDigitalSetup,
     applyCustomModelsSetup,
+    discoverPuraDigitalModels,
+    puraAuthMode,
+    setPuraAuthMode,
     requestConfigSetSwitch,
     requestCreateBlankConfigSet,
     cancelPendingConfigSetAction,
@@ -255,6 +263,8 @@ export function ConfigModal({
           </div>
 
           {/* Custom Protocol */}
+          {provider !== 'ollama' && <AnonymizationSettings enabled={anonymizationEnabled} onChange={setAnonymizationEnabled} />}
+
           {provider === 'custom' && !isPuraMode && (
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
@@ -288,6 +298,33 @@ export function ConfigModal({
             </div>
           )}
 
+          {isPuraMode ? (
+            <PuraDigitalConnection
+              configSetId={activeConfigSetId}
+              puraAuthMode={puraAuthMode}
+              onPuraAuthModeChange={setPuraAuthMode}
+              apiKey={apiKey}
+              baseUrl={baseUrl}
+              model={model}
+              customModel={customModel}
+              useCustomModel={useCustomModel}
+              modelOptions={modelOptions}
+              isRefreshingModels={isRefreshingModels}
+              isDiscoveringPuraModels={isDiscoveringPuraModels}
+              isTesting={isTesting}
+              testResult={testResult}
+              onApiKeyChange={setApiKey}
+              onModelChange={setModel}
+              onCustomModelChange={setCustomModel}
+              onToggleCustomModel={toggleCustomModel}
+              onRefreshModels={() => void refreshModelOptions()}
+              onDiscoverPuraModels={() => void discoverPuraDigitalModels()}
+              onTestConnection={() => void handleTest()}
+              modelInputPlaceholder={modelInputPlaceholder}
+              modelInputHint={modelInputHint}
+            />
+          ) : (
+            <>
           {/* Base URL - Editable for custom provider */}
           {(provider === 'custom' || provider === 'ollama') && (
             <div className="space-y-2">
@@ -339,7 +376,7 @@ export function ConfigModal({
               {isOllamaMode && (
                 <p className="text-xs text-text-muted">{t('api.discoverLocalOllamaHint')}</p>
               )}
-              {provider === 'custom' && <GuidanceInlineHint text={baseUrlGuidanceText} />}
+              {provider !== 'ollama' && <GuidanceInlineHint text={baseUrlGuidanceText} />}
             </div>
           )}
 
@@ -439,6 +476,8 @@ export function ConfigModal({
               setups={commonProviderSetups}
               onApplySetup={applyCommonProviderSetup}
             />
+          )}
+            </>
           )}
 
           {/* Error Message */}

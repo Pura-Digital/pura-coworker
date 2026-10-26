@@ -1,5 +1,3 @@
-import { app } from 'electron';
-import { MCP_OAUTH_SCHEME } from '../../shared/mcp-oauth';
 import {
   drainPendingMcpOAuthCallbacks,
   enqueueMcpOAuthCallback,
@@ -19,23 +17,9 @@ export function setMcpOAuthManagerResolver(resolver: McpManagerResolver): void {
   managerResolver = resolver;
 }
 
+/** Protocol client registration lives in pura-oauth-lifecycle (shared scheme router). */
 export function registerMcpOAuthProtocolHandlers(): void {
-  if (process.defaultApp) {
-    if (process.argv.length >= 2) {
-      app.setAsDefaultProtocolClient(MCP_OAUTH_SCHEME, process.execPath, [
-        process.argv[1]!,
-      ]);
-    }
-  } else {
-    app.setAsDefaultProtocolClient(MCP_OAUTH_SCHEME);
-  }
-
-  app.on('open-url', (event, url) => {
-    event.preventDefault();
-    log('[McpOAuth] Received open-url callback');
-    enqueueMcpOAuthCallback(url);
-    void processMcpOAuthCallbacks();
-  });
+  // no-op: kept for tests that assert the symbol exists
 }
 
 export function captureStartupMcpOAuthCallback(argv: string[] = process.argv): void {

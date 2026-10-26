@@ -1,0 +1,32 @@
+<svg width="64" height="64" viewBox="-32 -24 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="veil-seal-body" x1="-20%" y1="0%" x2="120%" y2="100%">
+      <stop stop-color="#96adff" />
+      <stop offset="0.45" stop-color="#7f93ee" />
+      <stop offset="1" stop-color="#4a5fd4" />
+    </linearGradient>
+    <linearGradient id="veil-seal-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#ffffff" stop-opacity="0.55" />
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.08" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <filter id="veil-seal-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  <g filter="url(#veil-seal-shadow)">
+    <path
+      d="M0 -15 C11 -15 18 -9 17 -1 C22 4 20 12 10 16 C4 18 -2 17 -8 13 C-18 8 -20 -2 -14 -9 C-12 -14 -6 -15 0 -15 Z"
+      fill="url(#veil-seal-body)"
+    />
+    <path
+      d="M0 -15 C11 -15 18 -9 17 -1 C22 4 20 12 10 16 C4 18 -2 17 -8 13 C-18 8 -20 -2 -14 -9 C-12 -14 -6 -15 0 -15 Z"
+      fill="url(#veil-seal-sheen)"
+    />
+    <path
+      d="M-9 -6 C-4 -11 6 -11 10 -5 C12 -1 9 3 5 5 C2 7 -3 7 -6 4 C-10 1 -11 -3 -9 -6 Z"
+      fill="#ffffff"
+      fill-opacity="0.14"
+    />
+  </g>
+</svg>

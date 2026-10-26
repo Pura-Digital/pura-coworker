@@ -1,3 +1,5 @@
+import { getAnonymizationGateway } from './anonymization/gateway';
+import { registerAnonymizationIpc } from './anonymization/ipc';
 /**
  * @module main/index
  *
@@ -53,12 +55,21 @@ import { normalizeDisplayScale, toElectronZoomFactor } from '../shared/ui-zoom';
 import type { MCPServerConfig } from './mcp/mcp-manager';
 import { isMcpAuthRequiredError } from './mcp/mcp-oauth-errors';
 import {
-  captureSecondInstanceMcpOAuthCallback,
-  captureStartupMcpOAuthCallback,
   processMcpOAuthCallbacks,
   registerMcpOAuthProtocolHandlers,
   setMcpOAuthManagerResolver,
 } from './mcp/mcp-oauth-lifecycle';
+import {
+  captureSecondInstanceDeepLinks,
+  captureStartupDeepLinks,
+  isPuraProtocolRegistered,
+  processPuraOAuthCallbacks,
+  ensureAidenCustomProtocolRegistered,
+  registerPuraConnectProtocolHandlers,
+} from './pura/pura-oauth-lifecycle';
+import * as puraOAuthManager from './pura/pura-oauth-manager';
+import { getClientForSet } from './pura/pura-inference-service';
+import { isPuraConnectConfigured } from './pura/pura-oauth-config';
 import { getMcpOAuthService } from './mcp/mcp-oauth-service';
 import type {
   ClientEvent,
@@ -115,6 +126,14 @@ import {
   initProjectManager,
   tryGetProjectManager,
 } from './project/project-manager';
+import {
+  DARK_BG,
+  LIGHT_BG,
+  applyNativeOsWindowGlassToOptions,
+  refreshNativeOsWindowGlass,
+  syncNativeOsWindowGlass,
+  windowBackgroundColorForTheme,
+} from './window-glass';
 import type {
   IpcProjectCreateInput,
   IpcProjectUpdateInput,
@@ -219,15 +238,16 @@ if (isDev) {
 }
 
 registerMcpOAuthProtocolHandlers();
-captureStartupMcpOAuthCallback(process.argv);
+registerPuraConnectProtocolHandlers();
+captureStartupDeepLinks(process.argv);
 
-const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   logWarn('[App] Another instance is already running, quitting this instance');
   app.quit();
-} else if (!isDev) {
+} else {
   app.on('second-instance', (_event, argv) => {
-    captureSecondInstanceMcpOAuthCallback(argv);
+    captureSecondInstanceDeepLinks(argv);
     const existingWindow =
       mainWindow && !mainWindow.isDestroyed()
         ? mainWindow
@@ -253,14 +273,19 @@ if (!hasSingleInstanceLock) {
 
 // Tray instance (kept alive to prevent GC)
 let tray: Tray | null = null;
-const DARK_BG = '#060b17';
-const LIGHT_BG = '#f5f3ee';
 
 function createUpdateMenuItem(): Electron.MenuItemConstructorOptions {
   return {
     label: autoUpdaterManager.getMenuLabel(),
     enabled: autoUpdaterManager.isMenuEnabled(),
-    click: () => autoUpdaterManager.handleMenuAction(),
+    click: () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      autoUpdaterManager.handleMenuAction();
+    },
   };
 }
 
@@ -498,16 +523,17 @@ function createWindow() {
   const savedTheme = getSavedThemePreference();
   applyNativeThemePreference(savedTheme);
   const effectiveTheme = resolveEffectiveTheme(savedTheme);
+  const opaqueBg = effectiveTheme === 'dark' ? DARK_BG : LIGHT_BG;
   const THEME =
     effectiveTheme === 'dark'
       ? {
-          background: DARK_BG,
-          titleBar: DARK_BG,
+          background: windowBackgroundColorForTheme('dark'),
+          titleBar: opaqueBg,
           titleBarSymbol: '#f1ece4',
         }
       : {
-          background: LIGHT_BG,
-          titleBar: LIGHT_BG,
+          background: windowBackgroundColorForTheme('light'),
+          titleBar: opaqueBg,
           titleBarSymbol: '#1a1a1a',
         };
 
@@ -549,7 +575,10 @@ function createWindow() {
     windowOptions.frame = false;
   }
 
+  applyNativeOsWindowGlassToOptions(windowOptions, process.platform, effectiveTheme);
+
   mainWindow = new BrowserWindow(windowOptions);
+  syncNativeOsWindowGlass(mainWindow, effectiveTheme);
 
   const allowedOrigins = new Set<string>();
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -658,12 +687,21 @@ function createWindow() {
   mainWindow.on('leave-full-screen', pushWindowChromeState);
 
   // Notify renderer about config status after window is ready
+  const reapplyNativeWindowGlass = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+    refreshNativeOsWindowGlass(mainWindow, resolveEffectiveTheme(getSavedThemePreference()));
+  };
+
   mainWindow.webContents.on('dom-ready', () => {
     applyConfiguredUiZoom();
+    reapplyNativeWindowGlass();
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
     applyConfiguredUiZoom();
+    reapplyNativeWindowGlass();
     const isConfigured = configStore.isConfigured();
     log('[Config] Notifying renderer, isConfigured:', isConfigured);
     sendToRenderer({
@@ -677,7 +715,7 @@ function createWindow() {
     // Send current working directory to renderer
     sendToRenderer({
       type: 'workdir.changed',
-      payload: { path: currentWorkingDir || '' },
+      payload: { path: getWorkingDir() || '' },
     });
 
     // Start sandbox bootstrap after window is loaded
@@ -712,6 +750,12 @@ function initializeDefaultWorkingDir(): string {
  * Get current working directory
  */
 function getWorkingDir(): string | null {
+  const preferredDir = configStore.get('defaultWorkdir');
+  try {
+    if (preferredDir && fs.statSync(preferredDir).isDirectory()) return preferredDir;
+  } catch {
+    // A moved or deleted folder falls back to the app-managed workspace.
+  }
   return currentWorkingDir;
 }
 
@@ -984,7 +1028,9 @@ app
     // This avoids session.start racing the startup path and hitting a null manager.
     sessionManager = new SessionManager(db, sendToRenderer, pluginRuntimeService, extensionManager);
     setMcpOAuthManagerResolver(() => sessionManager?.getMCPManager() ?? null);
+    ensureAidenCustomProtocolRegistered();
     await processMcpOAuthCallbacks();
+    await processPuraOAuthCallbacks();
     skillsManager = new SkillsManager(db, {
       getConfiguredGlobalSkillsPath: () => configStore.get('globalSkillsPath') || '',
       setConfiguredGlobalSkillsPath: (nextPath: string) => {
@@ -1048,7 +1094,10 @@ app
         payload: { shouldUseDarkColors: nativeTheme.shouldUseDarkColors },
       });
       if (getSavedThemePreference() === 'system' && mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.setBackgroundColor(nativeTheme.shouldUseDarkColors ? DARK_BG : LIGHT_BG);
+        syncNativeOsWindowGlass(
+          mainWindow,
+          nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+        );
       }
     });
 
@@ -1307,6 +1356,8 @@ ipcMain.on('client-event', async (_event, data: ClientEvent) => {
 ipcMain.handle('client-invoke', async (_event, data: ClientEvent) => {
   return handleClientEvent(data);
 });
+
+app.whenReady().then(() => registerAnonymizationIpc());
 
 ipcMain.handle('get-version', () => {
   try {
@@ -1691,7 +1742,7 @@ ipcMain.handle('config.isConfigured', () => {
   }
 });
 
-ipcMain.handle('puraDigital.realtimeSession', async (): Promise<PuraRealtimeSessionResult> => {
+ipcMain.handle('puraDigital.realtimeSession', async (_event, chatId?: unknown): Promise<PuraRealtimeSessionResult> => {
   try {
     const cfg = configStore.getAll();
     if (!isPuraDigitalFromAppConfig(cfg)) {
@@ -1703,6 +1754,16 @@ ipcMain.handle('puraDigital.realtimeSession', async (): Promise<PuraRealtimeSess
     const apiKey = (profile?.apiKey ?? cfg.apiKey ?? '').trim();
     if (!apiKey) {
       return { ok: false, error: 'missing_key' };
+    }
+    if (cfg.anonymizationEnabled === true) {
+      let action;
+      do {
+        action = await getAnonymizationGateway().complex(
+          typeof chatId === 'string' && chatId.length <= 128 ? chatId : 'voice-session',
+          'La voce realtime non è anonimizzabile in questa versione. Procedi comunque avvia questa connessione vocale in chiaro fino alla disconnessione; le richieste della chat testuale restano protette.'
+        );
+      } while (action === 'retry');
+      if (action === 'exclude') return { ok: false, error: 'anonymization_excluded', message: 'Connessione vocale esclusa.' };
     }
     const normalizedBase = baseUrl.replace(/\/+$/, '');
     const sessionUrl = `${normalizedBase}/realtime/sessions`;
@@ -1751,6 +1812,86 @@ ipcMain.handle('puraDigital.realtimeSession', async (): Promise<PuraRealtimeSess
     return {
       ok: false,
       error: 'network',
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+ipcMain.handle('pura-is-protocol-registered', () => isPuraProtocolRegistered());
+
+ipcMain.handle('pura-get-connection-state', (_event, configSetId?: unknown) => {
+  const setId =
+    typeof configSetId === 'string' && configSetId.trim()
+      ? configSetId.trim()
+      : configStore.getAll().activeConfigSetId;
+  return puraOAuthManager.getConnectionState(setId);
+});
+
+ipcMain.handle(
+  'pura-start-connection',
+  async (_event, payload?: { locale?: string; configSetId?: string }) => {
+    const locale = payload?.locale === 'en' ? 'en' : 'it';
+    const setId = payload?.configSetId?.trim() || configStore.getAll().activeConfigSetId;
+    return puraOAuthManager.startConnection(locale, setId);
+  }
+);
+
+ipcMain.handle('pura-disconnect', (_event, configSetId?: unknown) => {
+  const setId =
+    typeof configSetId === 'string' && configSetId.trim()
+      ? configSetId.trim()
+      : configStore.getAll().activeConfigSetId;
+  return puraOAuthManager.disconnect(setId);
+});
+
+ipcMain.handle('pura-fetch-usage', async (_event, configSetId?: unknown) => {
+  const setId =
+    typeof configSetId === 'string' && configSetId.trim()
+      ? configSetId.trim()
+      : configStore.getAll().activeConfigSetId;
+  const client = await getClientForSet(setId);
+  if (!client) {
+    return { ok: false as const, error: 'not_connected' };
+  }
+  try {
+    const usage = await client.usage();
+    return { ok: true as const, usage };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+ipcMain.handle('pura-test-connection', async (_event, configSetId?: unknown) => {
+  const setId =
+    typeof configSetId === 'string' && configSetId.trim()
+      ? configSetId.trim()
+      : configStore.getAll().activeConfigSetId;
+  if (!isPuraConnectConfigured()) {
+    return { ok: false, error: 'not_configured' };
+  }
+  const state = puraOAuthManager.getConnectionState(setId);
+  if (!state.connected) {
+    return { ok: false, error: 'not_connected' };
+  }
+  const started = Date.now();
+  const client = await getClientForSet(setId);
+  if (!client) {
+    return { ok: false, error: 'not_connected' };
+  }
+  try {
+    await client.capabilities();
+    return {
+      ok: true,
+      latencyMs: Date.now() - started,
+      puraUserId: state.puraUserId,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: 'test_failed',
       message: error instanceof Error ? error.message : String(error),
     };
   }
@@ -3187,8 +3328,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         updates.theme = nextTheme;
         applyNativeThemePreference(nextTheme);
         if (mainWindow && !mainWindow.isDestroyed()) {
-          const effectiveTheme = resolveEffectiveTheme(nextTheme);
-          mainWindow.setBackgroundColor(effectiveTheme === 'dark' ? DARK_BG : LIGHT_BG);
+          syncNativeOsWindowGlass(mainWindow, resolveEffectiveTheme(nextTheme));
         }
       }
 

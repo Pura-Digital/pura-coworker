@@ -1,3 +1,4 @@
+import { AnonymizationIndicator } from './AnonymizationIndicator';
 import { ChatApiConfigSelector } from './ChatApiConfigSelector';
 import { useChatConfigSet } from '../hooks/useChatConfigSet';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -17,7 +18,8 @@ import { MessageCard } from './MessageCard';
 import { UserMessageNav, buildUserMessageNavItems, userMessageAnchorId } from './UserMessageNav';
 import type { Message, ContentBlock } from '../types';
 import { coalesceAssistantMessagesForDisplay } from '../utils/message-display-groups';
-import { Send, Square, Plus, Plug, X, Clock, FolderOpen } from 'lucide-react';
+import { Square, Plus, Plug, X, Clock, FolderOpen } from 'lucide-react';
+import { ChatSendButton } from './chat/ChatSendButton';
 import { AidenLogoLoader } from './AidenLogoLoader';
 import { ChatProcessingStatus } from './ChatProcessingStatus';
 
@@ -731,11 +733,11 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+    <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
       {/* Header */}
       <div
         ref={headerRef}
-        className="relative h-12 border-b border-border-muted grid grid-cols-[1fr_auto_1fr] items-center px-4 lg:px-8 bg-background/88 backdrop-blur-md"
+        className="relative h-12 border-b border-border-muted grid grid-cols-[1fr_auto_1fr] items-center px-4 lg:px-8 bg-transparent"
       >
         <div className="min-w-0 flex items-center justify-self-start">
           {activeProject && (
@@ -844,7 +846,7 @@ export function ChatView() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-border-muted bg-background/92 backdrop-blur-md">
+      <div className="bg-transparent">
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 py-5">
           <form
             onSubmit={handleSubmit}
@@ -954,21 +956,18 @@ export function ChatView() {
                     <Square className="w-4 h-4" />
                   </button>
                 )}
-                <button
-                  type="submit"
+                <AnonymizationIndicator />
+                <ChatSendButton
+                  title={t('chat.sendMessage')}
+                  isSubmitting={isSubmitting || isSwitchingConfigSet}
                   disabled={
                     (!prompt.trim() &&
                       !textareaRef.current?.value.trim() &&
                       pastedImages.length === 0 &&
                       attachedFiles.length === 0) ||
-                    isSubmitting ||
                     isSwitchingConfigSet
                   }
-                  className="w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover transition-colors"
-                  title={t('chat.sendMessage')}
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                />
               </div>
             </div>
 

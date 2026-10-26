@@ -35,7 +35,23 @@ function buildCheckList(platform, arch, options = {}) {
   const strictDarwinResources = options.strictDarwinResources === true;
   /** @type {CheckSpec[]} */
   const checks = [
+    ...(platform === 'darwin'
+      ? [
+          {
+            label: `Native Keychain authorization (${arch})`,
+            relPath: `.bundle-resources/anonymization/darwin-${arch}/Aiden Keychain Access.app/Contents/MacOS/aiden-keychain-access`,
+            type: 'file',
+            severity: 'fatal',
+          },
+        ]
+      : []),
     // Common checks (all platforms, FATAL)
+    {
+      label: `Local anonymization runtime (${platform}/${arch})`,
+      relPath: `.bundle-resources/anonymization/${platform}-${arch}/rizzo-worker/rizzo-worker${platform === 'win32' ? '.exe' : ''}`,
+      type: 'file',
+      severity: 'fatal',
+    },
     {
       label: 'GUI Operate MCP server bundle',
       relPath: '.bundle-resources/mcp/gui-operate-server.js',
@@ -212,14 +228,31 @@ function main() {
     hasFatal = hasFatal || result.hasFatal;
   }
 
-  console.log(
-    `\nPre-build check: ${passed} passed, ${warnings} warnings, ${failed} failed`
-  );
+  console.log(`\nPre-build check: ${passed} passed, ${warnings} warnings, ${failed} failed`);
 
   if (hasFatal) {
     console.log(
-      `\n${RED}Build aborted. Fix the above issues before running electron-builder.${RESET}\n`
+      `\n${RED}Build aborted. Fix the above issues before running electron-builder.${RESET}`
     );
+    if (
+      process.platform === 'darwin' &&
+      checkAllDarwinArches &&
+      process.arch === 'arm64' &&
+      failed > 0
+    ) {
+      const x64Anon = path.join(
+        PROJECT_ROOT,
+        '.bundle-resources/anonymization/darwin-x64/rizzo-worker/rizzo-worker'
+      );
+      if (!fs.existsSync(x64Anon)) {
+        console.log(
+          `\n${YELLOW}On Apple Silicon, darwin-x64 PII runtimes are built on CI (Intel runner).` +
+            ` For a local DMG for this Mac only, run:${RESET}\n` +
+            `  npm run build\n`
+        );
+      }
+    }
+    console.log('');
     process.exit(1);
   }
 

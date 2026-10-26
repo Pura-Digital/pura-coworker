@@ -33,6 +33,13 @@ import {
 } from './auth-utils';
 import { API_PROVIDER_PRESETS } from '../../shared/api-model-presets';
 import { migrateLegacyUiZoom, normalizeDisplayScale } from '../../shared/ui-zoom';
+import { isPuraDigitalActive } from '../../shared/pura-digital';
+import {
+  inferPuraAuthModeForDigitalSet,
+  isPuraAuthMode,
+  type PuraAuthMode,
+} from '../../shared/pura-connect';
+import * as puraOAuthManager from '../pura/pura-oauth-manager';
 
 /**
  * Application configuration schema
@@ -74,11 +81,17 @@ export interface ApiConfigSet {
   customProtocol: CustomProtocolType;
   activeProfileKey: ProviderProfileKey;
   profiles: Partial<Record<ProviderProfileKey, ProviderProfile>>;
+  anonymizationEnabled?: boolean;
+  /** Pura Digital: subscription OAuth vs platform API key. */
+  puraAuthMode?: PuraAuthMode;
   enableThinking: boolean;
   updatedAt: string;
 }
 
 export interface AppConfig {
+  /** Installation-level completion; independent of credentials and app versions. */
+  onboardingCompleted?: boolean;
+  anonymizationEnabled?: boolean;
   // API Provider
   provider: ProviderType;
 
@@ -121,6 +134,8 @@ export interface AppConfig {
 
   // UI display scale (1 = standard Aiden density, rendered at 90% Electron zoom)
   uiZoom: number;
+  /** 1 stores display scale; missing identifies legacy absolute Electron zoom. */
+  uiZoomVersion?: 1;
 
   // Prevent system sleep while Aiden is actively working
   alwaysOn: boolean;
@@ -139,6 +154,9 @@ export interface AppConfig {
 
   // Enable thinking mode (show thinking steps)
   enableThinking: boolean;
+
+  /** Applied to the active config set on save (not stored at root). */
+  puraAuthMode?: PuraAuthMode;
 
   // First run flag
   isConfigured: boolean;
@@ -190,6 +208,7 @@ const DIRECT_READ_KEYS = new Set<keyof AppConfig>([
   'memoryEnabled',
   'enableThinking',
   'isConfigured',
+  'onboardingCompleted',
 ]);
 
 const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
@@ -730,6 +749,7 @@ export class ConfigStore {
     contextWindow?: number;
     maxTokens?: number;
     enableThinking: boolean;
+    anonymizationEnabled: boolean;
   } {
     const profiles = this.cloneProfiles(configSet.profiles);
     const activeProfileKey = isProfileKey(configSet.activeProfileKey)
@@ -748,6 +768,7 @@ export class ConfigStore {
       contextWindow: activeProfile.contextWindow,
       maxTokens: activeProfile.maxTokens,
       enableThinking: toBoolean(configSet.enableThinking, false),
+      anonymizationEnabled: configSet.provider !== 'ollama' && configSet.anonymizationEnabled === true,
     };
   }
 
@@ -784,6 +805,15 @@ export class ConfigStore {
     const name = toNonEmptyString(rawSet?.name) || fallback.name;
     const updatedAt = toNonEmptyString(rawSet?.updatedAt) || nowISO();
 
+    const activeProfile = profiles[activeProfileKey] || this.getDefaultProfile(activeProfileKey);
+    const puraAuthMode = inferPuraAuthModeForDigitalSet({
+      puraAuthMode: rawSet?.puraAuthMode,
+      provider,
+      customProtocol,
+      baseUrl: activeProfile.baseUrl,
+      apiKey: activeProfile.apiKey,
+    });
+
     return {
       id,
       name,
@@ -792,7 +822,9 @@ export class ConfigStore {
       customProtocol,
       activeProfileKey,
       profiles,
+      ...(puraAuthMode ? { puraAuthMode } : {}),
       enableThinking: toBoolean(rawSet?.enableThinking, fallback.enableThinking),
+      anonymizationEnabled: provider !== 'ollama' && rawSet?.anonymizationEnabled === true,
       updatedAt,
     };
   }
@@ -982,15 +1014,29 @@ export class ConfigStore {
           : defaultConfig.webServicesKey,
       enableDevLogs: toBoolean(raw.enableDevLogs, defaultConfig.enableDevLogs),
       theme: isAppTheme(raw.theme) ? raw.theme : defaultConfig.theme,
-      uiZoom: normalizeDisplayScale(migrateLegacyUiZoom(raw.uiZoom), defaultConfig.uiZoom),
+      uiZoom: normalizeDisplayScale(
+        raw.uiZoomVersion === 1 ? raw.uiZoom : migrateLegacyUiZoom(raw.uiZoom),
+        defaultConfig.uiZoom
+      ),
+      uiZoomVersion: 1,
       alwaysOn: toBoolean(raw.alwaysOn, defaultConfig.alwaysOn),
       launchAtStartup: toBoolean(raw.launchAtStartup, defaultConfig.launchAtStartup),
       sandboxEnabled: toBoolean(raw.sandboxEnabled, defaultConfig.sandboxEnabled),
       memoryEnabled: toBoolean(raw.memoryEnabled, defaultConfig.memoryEnabled),
       memoryRuntime: normalizeMemoryRuntimeConfig(raw.memoryRuntime),
       enableThinking: projected.enableThinking,
+      anonymizationEnabled: projected.anonymizationEnabled,
       isConfigured: toBoolean(raw.isConfigured, defaultConfig.isConfigured),
     };
+    // Migrate existing installations once. Do not put this optional marker in
+    // electron-store defaults: that would hide whether a legacy config had it.
+    result.onboardingCompleted =
+      typeof raw.onboardingCompleted === 'boolean'
+        ? raw.onboardingCompleted
+        : result.isConfigured ||
+          result.configSets.some((set) =>
+            this.hasUsableCredentialsForProjection(this.projectFromConfigSet(set))
+          );
     this.normalizeModelIds(result);
     return result;
   }
@@ -1026,6 +1072,7 @@ export class ConfigStore {
       activeProfileKey: projected.activeProfileKey,
       profiles: projected.profiles,
       enableThinking: projected.enableThinking,
+      anonymizationEnabled: projected.anonymizationEnabled,
       activeConfigSetId: activeConfigSet.id,
       configSets: nextConfigSets,
     };
@@ -1192,6 +1239,7 @@ export class ConfigStore {
       const cloned = this.cloneConfigSet(source);
       newSet = {
         ...cloned,
+        anonymizationEnabled: false,
         id,
         name,
         isSystem: false,
@@ -1316,7 +1364,9 @@ export class ConfigStore {
       updates.apiKey !== undefined ||
       updates.baseUrl !== undefined ||
       updates.model !== undefined ||
-      updates.enableThinking !== undefined;
+      updates.enableThinking !== undefined ||
+      updates.anonymizationEnabled !== undefined ||
+      updates.puraAuthMode !== undefined;
 
     if (mutatesActiveSet) {
       if (updates.profiles) {
@@ -1369,14 +1419,20 @@ export class ConfigStore {
         nextActiveProfile
       );
 
+      const nextPuraAuthMode =
+        updates.puraAuthMode !== undefined && isPuraAuthMode(updates.puraAuthMode)
+          ? updates.puraAuthMode
+          : targetSet.puraAuthMode;
       const updatedSet: ApiConfigSet = {
         ...targetSet,
         provider: nextProvider,
         customProtocol: nextCustomProtocol,
         activeProfileKey: nextActiveProfileKey,
         profiles: nextProfiles,
+        ...(nextPuraAuthMode ? { puraAuthMode: nextPuraAuthMode } : {}),
         enableThinking:
           updates.enableThinking !== undefined ? updates.enableThinking : targetSet.enableThinking,
+        anonymizationEnabled: nextProvider !== 'ollama' && (updates.anonymizationEnabled ?? targetSet.anonymizationEnabled) === true,
         updatedAt: nowISO(),
       };
 
@@ -1388,6 +1444,8 @@ export class ConfigStore {
     const projectedConfig = this.composeProjectedConfig(current, nextConfigSets, activeConfigSetId);
     this.saveConfig({
       ...projectedConfig,
+      onboardingCompleted:
+        current.onboardingCompleted === true || updates.onboardingCompleted === true,
       claudeCodePath:
         updates.claudeCodePath !== undefined ? updates.claudeCodePath : current.claudeCodePath,
       defaultWorkdir:
@@ -1399,6 +1457,8 @@ export class ConfigStore {
       enableDevLogs:
         updates.enableDevLogs !== undefined ? updates.enableDevLogs : current.enableDevLogs,
       theme: updates.theme !== undefined ? updates.theme : current.theme,
+      uiZoom: normalizeDisplayScale(updates.uiZoom ?? current.uiZoom, current.uiZoom),
+      uiZoomVersion: 1,
       sandboxEnabled:
         updates.sandboxEnabled !== undefined ? updates.sandboxEnabled : current.sandboxEnabled,
       memoryEnabled:
@@ -1429,7 +1489,17 @@ export class ConfigStore {
     apiKey?: string;
     baseUrl?: string;
     model?: string;
+    configSetId?: string;
+    puraAuthMode?: PuraAuthMode;
   }): boolean {
+    if (
+      isPuraDigitalActive(projection.provider, projection.customProtocol || 'openai', projection.baseUrl) &&
+      projection.puraAuthMode === 'subscription' &&
+      projection.configSetId &&
+      puraOAuthManager.getConnectionState(projection.configSetId).connected
+    ) {
+      return true;
+    }
     if (projection.provider === 'ollama' && !projection.model?.trim()) {
       return false;
     }
@@ -1494,12 +1564,15 @@ export class ConfigStore {
 
   hasUsableCredentialsForActiveSet(config: AppConfig = this.getAll()): boolean {
     const normalized = this.normalizeConfig(config);
+    const activeSet = normalized.configSets.find((set) => set.id === normalized.activeConfigSetId);
     return this.hasUsableCredentialsForProjection({
       provider: normalized.provider,
       customProtocol: normalized.customProtocol,
       apiKey: normalized.apiKey,
       baseUrl: normalized.baseUrl,
       model: normalized.model,
+      configSetId: normalized.activeConfigSetId,
+      puraAuthMode: activeSet?.puraAuthMode,
     });
   }
 
@@ -1513,6 +1586,8 @@ export class ConfigStore {
         apiKey: projected.apiKey,
         baseUrl: projected.baseUrl,
         model: projected.model,
+        configSetId: configSet.id,
+        puraAuthMode: configSet.puraAuthMode,
       });
     });
   }

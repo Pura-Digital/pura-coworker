@@ -10,6 +10,7 @@ import { SettingsCustomize } from './settings/SettingsCustomize';
 import { SettingsSchedule } from './settings/SettingsSchedule';
 import { SettingsGeneral } from './settings/SettingsGeneral';
 import { ApiSystemIcon, WalkieTalkieIcon } from './settings/SettingsNavIcons';
+import { SettingsFooterTargetContext } from './settings/settings-ui';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -40,6 +41,7 @@ function resolveTabId(tab: string | null | undefined, fallback: TabId): TabId {
 export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProps) {
   const { t } = useTranslation();
   const { width } = useWindowSize();
+  const [footerTarget, setFooterTarget] = useState<HTMLDivElement | null>(null);
   const compactSidebar = width < 900;
   const storeTab = useAppStore((s) => s.settingsTab);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
@@ -111,9 +113,9 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background">
+    <div className="flex h-full w-full overflow-hidden bg-transparent">
       <div
-        className={`${compactSidebar ? 'w-12' : 'w-44 lg:w-48'} bg-background-secondary/88 border-r border-border-muted flex flex-col flex-shrink-0`}
+        className={`${compactSidebar ? 'w-12' : 'w-44 lg:w-48'} bg-transparent border-r border-border-muted flex flex-col flex-shrink-0`}
       >
         {!compactSidebar && (
           <div className="px-3 pt-3 pb-2 border-b border-border-muted">
@@ -159,57 +161,69 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="flex items-center justify-between px-4 lg:px-8 py-4 border-b border-border-muted flex-shrink-0 bg-background/88 backdrop-blur-sm">
-          <div>
-            <h3 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-text-primary">
-              {activeTabMeta?.label}
-            </h3>
-            {activeTabMeta?.description && (
-              <p className="mt-1 text-sm text-text-muted max-w-[36rem]">
-                {activeTabMeta.description}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-surface-hover transition-colors"
-          >
-            <X className="w-5 h-5 text-text-secondary" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 lg:px-8 lg:py-8">
-          <div className="w-full min-w-0">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden min-w-0">
+        <div className="bg-transparent px-4 lg:px-8 pt-6 pb-2 flex-shrink-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges]">
+          <div className="w-full max-w-4xl mx-auto flex items-start justify-between gap-4">
             <div>
-              <div className={activeTab === 'api' ? '' : 'hidden'}>
-                {viewedTabs.has('api') && <SettingsAPI />}
-              </div>
-              <div className={activeTab === 'sandbox' ? '' : 'hidden'}>
-                {viewedTabs.has('sandbox') && <SettingsSandbox />}
-              </div>
-              <div className={activeTab === 'customize' ? '' : 'hidden'}>
-                {viewedTabs.has('customize') && (
-                  <SettingsCustomize isActive={activeTab === 'customize'} />
-                )}
-              </div>
-              <div className={activeTab === 'schedule' ? '' : 'hidden'}>
-                {viewedTabs.has('schedule') && (
-                  <SettingsSchedule isActive={activeTab === 'schedule'} />
-                )}
-              </div>
-              <div className={activeTab === 'remote' ? '' : 'hidden'}>
-                {viewedTabs.has('remote') && (
-                  <RemoteControlPanel isActive={activeTab === 'remote'} />
-                )}
-              </div>
-              <div className={activeTab === 'general' ? '' : 'hidden'}>
-                {viewedTabs.has('general') && (
-                  <SettingsGeneral isActive={activeTab === 'general'} />
-                )}
+              <h3 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-text-primary">
+                {activeTabMeta?.label}
+              </h3>
+              {activeTabMeta?.description && (
+                <p className="mt-1 text-sm text-text-muted max-w-[36rem]">
+                  {activeTabMeta.description}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-surface-hover transition-colors"
+            >
+              <X className="w-5 h-5 text-text-secondary" />
+            </button>
+          </div>
+        </div>
+        <SettingsFooterTargetContext.Provider value={activeTab === 'api' ? footerTarget : null}>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges] px-4 py-4 lg:px-8 lg:py-6">
+            <div className="w-full min-w-0">
+              <div>
+                <div className={activeTab === 'api' ? '' : 'hidden'}>
+                  {viewedTabs.has('api') && <SettingsAPI />}
+                </div>
+                <div className={activeTab === 'sandbox' ? '' : 'hidden'}>
+                  {viewedTabs.has('sandbox') && <SettingsSandbox />}
+                </div>
+                <div className={activeTab === 'customize' ? '' : 'hidden'}>
+                  {viewedTabs.has('customize') && (
+                    <SettingsCustomize isActive={activeTab === 'customize'} />
+                  )}
+                </div>
+                <div className={activeTab === 'schedule' ? '' : 'hidden'}>
+                  {viewedTabs.has('schedule') && (
+                    <SettingsSchedule isActive={activeTab === 'schedule'} />
+                  )}
+                </div>
+                <div className={activeTab === 'remote' ? '' : 'hidden'}>
+                  {viewedTabs.has('remote') && (
+                    <RemoteControlPanel isActive={activeTab === 'remote'} />
+                  )}
+                </div>
+                <div className={activeTab === 'general' ? '' : 'hidden'}>
+                  {viewedTabs.has('general') && (
+                    <SettingsGeneral isActive={activeTab === 'general'} />
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </SettingsFooterTargetContext.Provider>
+        <div
+          ref={setFooterTarget}
+          className={
+            activeTab === 'api'
+              ? 'flex-shrink-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable_both-edges] px-4 pb-4 pt-2 lg:px-8'
+              : 'hidden'
+          }
+        />
       </div>
     </div>
   );

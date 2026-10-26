@@ -38,6 +38,10 @@
     --color-success: #22c55e;
     --color-warning: #eab308;
     --color-error: #ef4444;
+    /* Solid shell in dark mode — frosted rgba washed out contrast vs pre-glass UI */
+    --color-app-shell: #060b17;
+    --color-app-shell-elevated: #070e1d;
+    --app-glass-blur: 0px;
   }
 
   /* Light theme override — Claude warm cream */
@@ -72,6 +76,9 @@
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
+    --color-app-shell: rgba(255, 255, 255, 0.62);
+    --color-app-shell-elevated: rgba(247, 250, 255, 0.78);
+    --app-glass-blur: 12px;
   }
 
   * {
@@ -88,6 +95,17 @@
     overscroll-behavior: none;
   }
 
+  html,
+  body {
+    position: relative;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+    isolation: isolate;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-text-primary);
@@ -95,6 +113,57 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Ambient depth — light frosted shell only (dark stays flat like pre-glass UI) */
+  html:not(.light) body::before {
+    content: none;
+  }
+
+  html.light body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 90% 70% at 12% 8%, rgba(92, 121, 223, 0.14), transparent 55%),
+      radial-gradient(ellipse 75% 60% at 88% 92%, rgba(30, 73, 138, 0.08), transparent 50%),
+      radial-gradient(ellipse 100% 85% at 50% 50%, #f0f6ff, var(--color-background));
+  }
+
+  /* macOS vibrancy / Windows Mica — WebContents must stay transparent (no opaque white). */
+  html.native-os-glass,
+  html.native-os-glass body,
+  html.native-os-glass #root {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  html.native-os-glass.light {
+    --color-background: rgba(255, 255, 255, 0.16);
+    --color-background-secondary: rgba(245, 249, 255, 0.14);
+    --color-surface: rgba(255, 255, 255, 0.22);
+    --color-surface-hover: rgba(239, 245, 255, 0.3);
+    --color-surface-muted: rgba(247, 250, 255, 0.2);
+    --color-app-shell: rgba(255, 255, 255, 0.14);
+    --color-app-shell-elevated: rgba(247, 250, 255, 0.22);
+  }
+
+  /* OS blur (Mica / vibrancy): no full-screen overlay — avoids extra compositor work */
+  html.native-os-glass body::before {
+    content: none;
+  }
+
+  html.native-os-glass:not(.light) .native-window-root.app-glass {
+    background-color: var(--color-background);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    contain: layout style paint;
+  }
+
+  html.native-os-glass.light .native-window-root.app-glass {
+    background-color: rgba(255, 255, 255, 0.07);
   }
 
   /* Custom scrollbar — only on non-macOS platforms.
@@ -120,6 +189,21 @@
 }
 
 @layer components {
+  .app-glass {
+    background-color: var(--color-app-shell);
+  }
+
+  .app-glass-elevated {
+    background-color: var(--color-app-shell-elevated);
+  }
+
+  /* Frosted shell — light theme only; dark stays solid for readable contrast */
+  html.light:not(.native-os-glass) .app-glass,
+  html.light:not(.native-os-glass) .app-glass-elevated {
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(1.08);
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(1.08);
+  }
+
   /* Heading serif font — for titles and headings */
   .heading-serif {
     font-family: 'Source Serif 4', Georgia, serif;
@@ -233,6 +317,49 @@
 }
 
 @layer utilities {
+  /*
+   * backdrop-filter on large surfaces is very expensive during scroll/animations.
+   * With native Mica/vibrancy, rely on the OS and keep UI tints only.
+   */
+  html.native-os-glass .app-glass,
+  html.native-os-glass .app-glass-elevated,
+  html.native-os-glass [class*='backdrop-blur'] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /*
+   * Portaled popovers + floating toasts: opaque fill + blur on the layer behind.
+   * Semi-transparent rgba + backdrop-filter reads as “too glassy” over native vibrancy.
+   */
+  .chat-config-popover,
+  .app-floating-toast {
+    background-color: #070e1d;
+    -webkit-backdrop-filter: blur(40px) saturate(1.2);
+    backdrop-filter: blur(40px) saturate(1.2);
+  }
+
+  html.light .chat-config-popover,
+  html.light .app-floating-toast {
+    background-color: #ffffff;
+  }
+
+  html.native-os-glass .chat-config-popover,
+  html.native-os-glass .app-floating-toast {
+    -webkit-backdrop-filter: blur(40px) saturate(1.2) !important;
+    backdrop-filter: blur(40px) saturate(1.2) !important;
+  }
+
+  html.native-os-glass:not(.light) .chat-config-popover,
+  html.native-os-glass:not(.light) .app-floating-toast {
+    background-color: #060b17;
+  }
+
+  html.native-os-glass.light .chat-config-popover,
+  html.native-os-glass.light .app-floating-toast {
+    background-color: #ffffff;
+  }
+
   /* Window drag region for custom titlebar */
   .titlebar-drag {
     -webkit-app-region: drag;
@@ -417,6 +544,85 @@
   }
 }
 
+/* Chat composer — circular send (FAB-style, no mic) */
+.chat-send-fab {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 9999px;
+  overflow: hidden;
+  color: #fff;
+  border: 1px solid rgba(127, 147, 238, 0.45);
+  background-color: #3f52a8;
+  background-image:
+    radial-gradient(circle at 50% 14%, rgba(182, 198, 255, 0.22) 0%, rgba(182, 198, 255, 0) 56%),
+    linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--color-accent) 78%, #1a2540) 0%,
+      color-mix(in srgb, var(--color-accent) 62%, #0f1830) 48%,
+      color-mix(in srgb, var(--color-accent) 48%, #060b17) 100%
+    );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  box-shadow:
+    0 2px 8px rgba(6, 11, 23, 0.45),
+    inset 0 1px 0 rgba(182, 198, 255, 0.2);
+  filter: saturate(1.05);
+  transition:
+    transform 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.16s ease,
+    filter 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.chat-send-fab:hover:not(:disabled) {
+  transform: scale(1.04);
+  filter: saturate(1.08) brightness(1.03);
+  box-shadow:
+    0 3px 10px rgba(6, 11, 23, 0.5),
+    inset 0 1px 0 rgba(182, 198, 255, 0.26);
+}
+
+html.light .chat-send-fab:not(.chat-send-fab--inactive) {
+  border-color: rgba(73, 104, 209, 0.55);
+  background-color: #3d56b8;
+  background-image:
+    radial-gradient(circle at 50% 14%, rgba(255, 255, 255, 0.2) 0%, transparent 56%),
+    linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--color-accent) 72%, #102a4d) 0%,
+      color-mix(in srgb, var(--color-accent) 58%, #0a1830) 50%,
+      color-mix(in srgb, var(--color-accent) 45%, #060b17) 100%
+    );
+}
+
+.chat-send-fab:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.chat-send-fab:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 3px var(--color-accent-muted),
+    0 1px 2px rgba(6, 11, 23, 0.2);
+}
+
+.chat-send-fab--inactive {
+  color: var(--color-text-muted);
+  border-color: var(--color-border-muted);
+  background-color: var(--color-surface-muted);
+  background-image: none;
+  box-shadow: none;
+  filter: none;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 /* Pura voice FAB — liquid-style ambient glow (blur + organic border-radius) */
 .pura-voice-fab__blob::before {
   content: '';
@@ -430,6 +636,12 @@
   filter: blur(26px);
   animation: pura-voice-liquid 11s ease-in-out infinite;
   opacity: 0.92;
+}
+
+html.native-os-glass .pura-voice-fab__blob::before {
+  filter: blur(14px);
+  animation-duration: 14s;
+  opacity: 0.78;
 }
 
 @keyframes pura-voice-liquid {
