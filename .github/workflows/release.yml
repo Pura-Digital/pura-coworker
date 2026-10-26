@@ -99,6 +99,7 @@ jobs:
       - name: Build native system storage authorization
         run: node scripts/prepare-keychain.js
       - name: Archive runtime preserving symbolic links and permissions
+        shell: bash
         env:
           RUNTIME_TARGET: ${{ matrix.target }}
         run: |
