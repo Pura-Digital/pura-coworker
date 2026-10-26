@@ -18,6 +18,7 @@ export interface PiiEntity {
 }
 export interface Analysis {
   entities: PiiEntity[];
+  /** Legacy worker flag for uncertain candidates; these are still maskable. */
   complex: boolean;
 }
 

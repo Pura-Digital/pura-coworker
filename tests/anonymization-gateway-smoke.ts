@@ -57,17 +57,13 @@ async function run() {
   let unexpectedDecisions = 0;
   gateway.on('event', (event) => {
     if (event.type === 'decision') {
-      // Standard SDK prompts include machine/date metadata that can be ambiguous.
-      // In this synthetic fixture, simulate the human choosing Exclude. Never
-      // authorize a clear-text bypass, and fail any service-failure decision.
-      if (!cancellationExpected && event.decision.kind === 'service') {
+      // Greetings and uncertain but maskable spans must never need consent.
+      // Only the explicit unsupported-image cancellation below is expected.
+      if (!cancellationExpected) {
         unexpectedDecisions++;
-        console.log('Unexpected service decision:', event.decision.reason);
+        console.log('Unexpected decision:', event.decision.kind, event.decision.reason);
       }
-      void gateway!.decide(
-        event.decision.id,
-        !cancellationExpected && event.decision.kind === 'complex' ? 'exclude' : 'cancel'
-      );
+      void gateway!.decide(event.decision.id, 'cancel');
     }
   });
   const authStorage = AuthStorage.inMemory();
@@ -121,7 +117,8 @@ async function run() {
     assert(!wire.includes('local-only-metadata'));
     assert(!wire.includes('Mario Rossi') && !wire.includes('mario.rossi@example.com'));
     assert(context.tools?.every((tool) => !('execute' in tool)));
-    const found = wire.match(/\[AIDEN_[a-f0-9]+_FULLNAME_\d+\]/)?.[0];
+    const latestUser = [...context.messages].reverse().find((message) => message.role === 'user');
+    const found = JSON.stringify(latestUser).match(/\[AIDEN_[a-f0-9]+_FULLNAME_\d+\]/)?.[0];
     token = found || token;
     const message: AssistantMessage = {
       role: 'assistant',

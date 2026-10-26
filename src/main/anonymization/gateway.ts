@@ -739,17 +739,10 @@ export class AnonymizationGateway extends EventEmitter {
         if (action === 'retry') continue;
         return action === 'exclude' ? '' : text;
       }
-      if (analysis.complex) {
-        const action = await this.complex(
-          chatId,
-          'Il rilevamento locale contiene entità a bassa confidenza.',
-          signal,
-          `text:${text}`
-        );
-        if (action === 'retry') continue;
-        if (action === 'exclude') return '';
-        return text;
-      }
+      // The worker's legacy `complex` flag means low detection confidence,
+      // not incomplete analysis. Mask every returned candidate conservatively,
+      // including uncertain spans, rather than asking to send this text clear.
+      // Unprocessable inputs still take the decision path in the catch above.
       const chars = Array.from(text); // Python reports Unicode code-point offsets.
       const entities = analysis.entities.slice();
       // Escape literal placeholder-like strings, preserving their exact original value.

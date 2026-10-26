@@ -94,6 +94,35 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it('masks uncertain candidates in instructions and messages without consent or clear-text bypass', async () => {
+    const gateway = makeGateway();
+    const analyze = vi.mocked(gateway.service.analyze).getMockImplementation()!;
+    vi.spyOn(gateway.service, 'analyze').mockImplementation(async (text, signal) => {
+      const result = await analyze(text, signal);
+      return {
+        ...result,
+        complex: result.entities.length > 0,
+        entities: result.entities.map((entity) => ({ ...entity, score: 0.1 })),
+      };
+    });
+    let decisions = 0;
+    gateway.on('event', (event) => {
+      if (event.type === 'decision') {
+        decisions++;
+        void gateway.decide(event.decision.id, 'cancel');
+      }
+    });
+    const context: Context = {
+      systemPrompt: 'Assist Mario Rossi',
+      messages: [{ role: 'user', content: 'Mario Rossi', timestamp: 1 }],
+    };
+    const result = await gateway.prepare('chat', context);
+    expect(result.bypass).toBe(false);
+    expect(JSON.stringify(result.context)).not.toContain('Mario Rossi');
+    expect([...result.mapping.values()]).toContain('Mario Rossi');
+    expect(context.systemPrompt).toBe('Assist Mario Rossi');
+    expect(decisions).toBe(0);
+  });
   it('reports the failing phase without logging context or exception contents', async () => {
     const gateway = makeGateway();
     const warning = vi.spyOn(logger, 'logCtxWarn').mockImplementation(() => {});
