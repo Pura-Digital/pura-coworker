@@ -98,11 +98,25 @@ jobs:
         run: python scripts/prepare-anonymization.py
       - name: Build native system storage authorization
         run: node scripts/prepare-keychain.js
+      - name: Archive runtime preserving symbolic links and permissions
+        env:
+          RUNTIME_TARGET: ${{ matrix.target }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tarfile
+          target = os.environ['RUNTIME_TARGET']
+          root = pathlib.Path('.bundle-resources/anonymization')
+          with tarfile.open(root / f'pii-runtime-{target}.tar.gz', 'w:gz', dereference=False) as archive:
+              archive.add(root / target, arcname=target)
+          PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: pii-runtime-${{ matrix.target }}
-          path: .bundle-resources/anonymization/${{ matrix.target }}
-          include-hidden-files: true
+          path: .bundle-resources/anonymization/pii-runtime-${{ matrix.target }}.tar.gz
+          compression-level: 0
+          if-no-files-found: error
 
   build-macos:
     name: Release macOS
@@ -131,13 +145,15 @@ jobs:
       - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
           name: pii-runtime-darwin-arm64
-          path: .bundle-resources/anonymization/darwin-arm64
+          path: .bundle-resources/anonymization
       - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
           name: pii-runtime-darwin-x64
-          path: .bundle-resources/anonymization/darwin-x64
-      - name: Restore worker executable permissions
-        run: chmod +x .bundle-resources/anonymization/darwin-*/rizzo-worker/rizzo-worker
+          path: .bundle-resources/anonymization
+      - name: Extract macOS runtimes preserving framework structure
+        run: |
+          tar -xzf .bundle-resources/anonymization/pii-runtime-darwin-arm64.tar.gz -C .bundle-resources/anonymization
+          tar -xzf .bundle-resources/anonymization/pii-runtime-darwin-x64.tar.gz -C .bundle-resources/anonymization
 
       - name: Install cliclick for GUI tools
         run: brew install cliclick
@@ -245,7 +261,9 @@ jobs:
       - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
           name: pii-runtime-win32-x64
-          path: .bundle-resources/anonymization/win32-x64
+          path: .bundle-resources/anonymization
+      - name: Extract Windows runtime
+        run: tar -xzf .bundle-resources/anonymization/pii-runtime-win32-x64.tar.gz -C .bundle-resources/anonymization
 
       - name: Download Node binaries
         run: node scripts/download-node.js
