@@ -19,6 +19,7 @@ on:
         options:
           - macos-26
           - macos-15
+          - pura-release-arm64
 
 permissions:
   contents: write
