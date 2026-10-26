@@ -88,8 +88,12 @@ jobs:
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: matrix.runner != 'pura-release-arm64'
         with:
           python-version: '3.11'
+      - name: Verify Python on dedicated ARM64 runner
+        if: matrix.runner == 'pura-release-arm64'
+        run: python -c "import platform, sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'; assert platform.machine() == 'arm64', 'ARM64 Python required'"
       - name: Build private offline CPU worker
         run: python scripts/prepare-anonymization.py
       - name: Build native system storage authorization
