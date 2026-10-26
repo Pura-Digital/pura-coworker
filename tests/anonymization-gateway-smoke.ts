@@ -111,15 +111,19 @@ async function run() {
   assert.equal(typeof session.agent.state.tools[0].execute, 'function');
   let calls = 0;
   let token = '';
-  const provider: StreamFn = (model, context) => {
+  let emailToken = '';
+  const provider: StreamFn = async (model, context, options) => {
     calls++;
-    const wire = JSON.stringify(context);
+    const payload = (await options?.onPayload?.(context, model)) ?? context;
+    const wire = JSON.stringify(payload);
     assert(!wire.includes('local-only-metadata'));
     assert(!wire.includes('Mario Rossi') && !wire.includes('mario.rossi@example.com'));
     assert(context.tools?.every((tool) => !('execute' in tool)));
     const latestUser = [...context.messages].reverse().find((message) => message.role === 'user');
     const found = JSON.stringify(latestUser).match(/\[AIDEN_[a-f0-9]+_FULLNAME_\d+\]/)?.[0];
     token = found || token;
+    emailToken =
+      JSON.stringify(latestUser).match(/\[AIDEN_[a-f0-9]+_EMAIL_\d+\]/)?.[0] || emailToken;
     const message: AssistantMessage = {
       role: 'assistant',
       api: model.api,
@@ -138,7 +142,12 @@ async function run() {
       content:
         calls === 2
           ? [{ type: 'toolCall', id: 'lookup-1', name: 'Lookup', arguments: { name: token } }]
-          : [{ type: 'text', text: calls === 1 ? 'Ciao!' : `Contatto ${token} confermato.` }],
+          : [
+              {
+                type: 'text',
+                text: calls === 1 ? 'Ciao!' : `Contatto ${token}, email ${emailToken}, confermato.`,
+              },
+            ],
     };
     if (calls === 2) assert(token);
     const stream = createAssistantMessageEventStream();
@@ -165,6 +174,7 @@ async function run() {
   assert.equal(calls, 3);
   assert.deepEqual(executions, ['Mario Rossi']);
   assert(JSON.stringify(messages.at(-1)).includes('Mario Rossi'));
+  assert(JSON.stringify(messages.at(-1)).includes('mario.rossi@example.com'));
   assert.equal(unexpectedDecisions, 0);
   await gateway.service.restart();
   await prompt('Ciao');

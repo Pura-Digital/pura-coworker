@@ -94,6 +94,56 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it('audits masked email egress and restored replies without logging either email or token', async () => {
+    const gateway = makeGateway();
+    const email = 'private.person@example.com';
+    const audit = vi.spyOn(logger, 'logCtxAudit').mockImplementation(() => {});
+    vi.spyOn(gateway.service, 'analyze').mockImplementation(async (text) => ({
+      complex: false,
+      entities: text.includes(email)
+        ? [
+            {
+              label: 'EMAIL',
+              start: text.indexOf(email),
+              end: text.indexOf(email) + email.length,
+              score: 1,
+            },
+          ]
+        : [],
+    }));
+    const provider: StreamFn = async (currentModel, context, options) => {
+      await options?.onPayload?.({ messages: context.messages }, currentModel);
+      await options?.onResponse?.(
+        { status: 200, headers: { 'x-private': 'private-header-value' } },
+        currentModel
+      );
+      const stream = createAssistantMessageEventStream();
+      stream.push({
+        type: 'done',
+        reason: 'stop',
+        message: message(context.messages[0].content as string),
+      });
+      return stream;
+    };
+    const stream = await gateway.stream('chat', provider)(model, {
+      messages: [{ role: 'user', content: email, timestamp: 1 }],
+    });
+    expect((await stream.result()).content).toEqual([{ type: 'text', text: email }]);
+    expect(audit).toHaveBeenCalledWith(
+      '[Anonymization] Provider payload ready',
+      expect.objectContaining({ mode: 'protected', emailReferences: 1, knownEmailValuesInClear: 0 })
+    );
+    expect(audit).toHaveBeenCalledWith(
+      '[Anonymization] Response restored',
+      expect.objectContaining({ emailReferences: 1 })
+    );
+    expect(JSON.stringify(audit.mock.calls)).not.toContain(email);
+    expect(JSON.stringify(audit.mock.calls)).not.toContain('[AIDEN_');
+    expect(JSON.stringify(audit.mock.calls)).not.toContain('private-header-value');
+    expect(audit).toHaveBeenCalledWith('[Anonymization] Provider response received', {
+      status: 200,
+    });
+  });
   it('masks uncertain candidates in instructions and messages without consent or clear-text bypass', async () => {
     const gateway = makeGateway();
     const analyze = vi.mocked(gateway.service.analyze).getMockImplementation()!;

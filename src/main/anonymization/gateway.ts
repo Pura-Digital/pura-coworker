@@ -4,7 +4,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeStorage } from 'electron';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { logCtxWarn } from '../utils/logger';
+import { logCtxAudit, logCtxWarn } from '../utils/logger';
+import { summarizeProtection } from './audit';
 import type {
   Context,
   AssistantMessage,
@@ -827,10 +828,25 @@ export class AnonymizationGateway extends EventEmitter {
             let payloadCancelled = false;
             const upstream = await original(model, nextContext, {
               ...options,
+              onResponse: async (response, modelArg) => {
+                logCtxAudit('[Anonymization] Provider response received', {
+                  status: response.status,
+                });
+                await options?.onResponse?.(response, modelArg);
+              },
               onPayload: async (payload, modelArg) => {
                 const baseline = structuredClone(payload);
                 const changed = (await options?.onPayload?.(payload, modelArg)) ?? payload;
-                if (bypass || !options?.onPayload) return changed;
+                const auditPayload = (value: unknown, clearException = bypass) => {
+                  logCtxAudit('[Anonymization] Provider payload ready', {
+                    mode: clearException ? 'explicit-clear-exception' : 'protected',
+                    ...summarizeProtection(value, mapping),
+                  });
+                };
+                if (bypass || !options?.onPayload) {
+                  auditPayload(changed);
+                  return changed;
+                }
                 for (;;) {
                   try {
                     const guarded = await this.guardPayload(
@@ -842,7 +858,9 @@ export class AnonymizationGateway extends EventEmitter {
                     );
                     for (const [token, value] of this.mappingStore().entries(chatId))
                       mapping.set(token, value);
-                    return guarded ?? baseline;
+                    const protectedPayload = guarded ?? baseline;
+                    auditPayload(protectedPayload);
+                    return protectedPayload;
                   } catch (error) {
                     if (error instanceof AnonymizationCancelled || options?.signal?.aborted) {
                       payloadCancelled = true;
@@ -858,7 +876,10 @@ export class AnonymizationGateway extends EventEmitter {
                       payloadCancelled = true;
                       throw new AnonymizationCancelled();
                     }
-                    if (action === 'proceed') return changed;
+                    if (action === 'proceed') {
+                      auditPayload(changed, true);
+                      return changed;
+                    }
                     await this.service.start(options?.signal);
                   }
                 }
@@ -875,12 +896,17 @@ export class AnonymizationGateway extends EventEmitter {
                       ? event.error
                       : event.partial;
                 if (event.type === 'done' || event.type === 'error') {
-                  if (event.type === 'done')
+                  if (event.type === 'done') {
+                    const restored = this.restoreMessage(event.message, mapping, true, chatId);
+                    logCtxAudit(
+                      '[Anonymization] Response restored',
+                      summarizeProtection(event.message, mapping)
+                    );
                     output.push({
                       ...event,
-                      message: this.restoreMessage(event.message, mapping, true, chatId),
+                      message: restored,
                     });
-                  else
+                  } else
                     output.push({
                       ...event,
                       reason: payloadCancelled ? 'aborted' : event.reason,
