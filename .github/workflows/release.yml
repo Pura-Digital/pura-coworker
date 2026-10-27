@@ -265,7 +265,16 @@ jobs:
           PREPARED=1
 
       - name: Electron Builder (signed + notarized)
-        run: npx electron-builder --mac dmg zip dir --arm64 --x64 --publish never
+        shell: bash
+        run: |
+          ulimit -Sn 10240 || true
+          node - <<'JS'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const preload = path.join(process.env.RUNNER_TEMP, 'pura-build-fs.cjs');
+          fs.writeFileSync(preload, `require(${JSON.stringify(require.resolve('graceful-fs'))}).gracefulify(require('node:fs'));\n`);
+          JS
+          node --require "$RUNNER_TEMP/pura-build-fs.cjs" node_modules/electron-builder/cli.js --mac dmg zip dir --arm64 --x64 --publish never
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
