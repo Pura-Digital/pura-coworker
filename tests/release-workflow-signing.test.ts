@@ -28,6 +28,7 @@ function prepareWithMockSecurity(failImport = false) {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.PURA_SECURITY_LOG, JSON.stringify(args) + '\\n');
+if (args[0] === 'list-keychains' && !args.includes('-s')) console.log(JSON.stringify('/Users/runner/Library/Keychains/login.keychain-db'));
 if (args[0] === 'create-keychain') fs.writeFileSync(args.at(-1), 'test-keychain');
 if (args[0] === 'delete-keychain') fs.rmSync(args.at(-1), { force: true });
 if (args[0] === 'import') {
@@ -38,6 +39,7 @@ if (args[0] === 'find-identity') console.log('1) AABBCCDDEEFF "Developer ID Appl
 `,
     { mode: 0o755 }
   );
+  fs.writeFileSync(path.join(bin, 'codesign'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   const result = spawnSync('bash', ['-c', prepare], {
     encoding: 'utf8',
     env: {
@@ -82,6 +84,8 @@ describe('release signing keychain', () => {
     const keychain = path.join(root, 'pura-signing-test-1.keychain-db');
     expect(fs.readFileSync(githubEnv, 'utf8')).toBe(`CSC_KEYCHAIN=${keychain}\n`);
     expect(fs.existsSync(keychain)).toBe(true);
+    const search = calls.find((args) => args[0] === 'list-keychains' && args.includes('-s'))!;
+    expect(search.slice(4)).toEqual([keychain, '/Users/runner/Library/Keychains/login.keychain-db']);
   });
 
   it('removes the certificate and partial keychain if importing fails', () => {

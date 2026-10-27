@@ -260,7 +260,19 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -q 'Developer ID Application'
+          node - "$KEYCHAIN_PATH" <<'JS'
+          const { execFileSync } = require('node:child_process');
+          const existing = execFileSync('security', ['list-keychains', '-d', 'user'], { encoding: 'utf8' })
+            .split('\n').map(line => line.trim()).filter(Boolean).map(line => JSON.parse(line));
+          execFileSync('security', ['list-keychains', '-d', 'user', '-s', process.argv[2], ...existing]);
+          JS
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk '/Developer ID Application/ {print $2; exit}')"
+          : "${IDENTITY:?No Developer ID Application identity found}"
+          PROBE_PATH="$RUNNER_TEMP/pura-signing-probe"
+          cp /usr/bin/true "$PROBE_PATH"
+          codesign --force --sign "$IDENTITY" --keychain "$KEYCHAIN_PATH" --timestamp "$PROBE_PATH"
+          codesign --verify --strict "$PROBE_PATH"
+          rm -f "$PROBE_PATH"
           printf 'CSC_KEYCHAIN=%s\n' "$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           PREPARED=1
 
