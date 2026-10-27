@@ -1,4 +1,7 @@
-import { PURA_CONNECT_REDIRECT_URI } from '../../shared/pura-connect';
+import {
+  DEFAULT_PURA_CONNECT_CLIENT_ID,
+  PURA_CONNECT_REDIRECT_URI,
+} from '../../shared/pura-connect';
 
 const DEFAULT_API_BASE = 'https://ai.puradigital.it/v1';
 
@@ -17,7 +20,7 @@ export function getPuraClientConfig() {
     pickEnv('VITE_PURA_CONNECT_CLIENT_ID', 'VITE_PURA_CLIENT_ID') ||
     import.meta.env.VITE_PURA_CONNECT_CLIENT_ID?.trim() ||
     import.meta.env.VITE_PURA_CLIENT_ID?.trim() ||
-    '';
+    DEFAULT_PURA_CONNECT_CLIENT_ID;
   const apiBase =
     pickEnv('VITE_PURA_OAUTH_API_BASE', 'VITE_PURA_API_BASE') ||
     import.meta.env.VITE_PURA_OAUTH_API_BASE?.trim() ||

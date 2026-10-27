@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composer model selector shows **PuraLLM Subscription** when the active set uses a connected Pura subscription
 - Global, sandbox sync, update, and settings feedback toasts use opaque frosted panels (same treatment as the in-chat model picker)
 
+## [3.5.2] - 2026-10-27
+
+### Fixed
+
+- Pura Connect is enabled in release builds without a local `.env` or CI client ID setting, using Aiden's registered public OAuth client consistently in the renderer and main process
+- Build regression tests cover Pura Connect with missing and empty environment settings
+
 ## [3.5.1] - 2026-10-26
 
 ### Fixed
