@@ -20,9 +20,14 @@ on:
           - macos-26
           - macos-15
           - pura-release-arm64
+      runtime_run_id:
+        description: Optional original tag run whose successful runtime artifacts should be reused
+        required: false
+        type: string
 
 permissions:
   contents: write
+  actions: read
 
 env:
   RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
@@ -44,6 +49,42 @@ jobs:
           if (process.env.RELEASE_TAG !== expected) {
             throw new Error(`Release tag ${process.env.RELEASE_TAG} does not match ${expected}`);
           }
+          JS
+
+      - name: Verify reusable runtime artifacts match the release commit
+        if: inputs.runtime_run_id != ''
+        env:
+          RUNTIME_RUN_ID: ${{ inputs.runtime_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node - <<'JS'
+          const { execFileSync } = require('node:child_process');
+          (async () => {
+            const id = process.env.RUNTIME_RUN_ID;
+            if (!/^\d+$/.test(id)) throw new Error('Runtime run ID must be numeric');
+            const base = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}`;
+            async function get(path) {
+              const response = await fetch(`${base}/${path}`, {
+                headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json' },
+              });
+              if (!response.ok) throw new Error(`Cannot verify runtime source: HTTP ${response.status}`);
+              return response.json();
+            }
+            const source = await get(`actions/runs/${id}`);
+            const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            if (source.head_sha !== commit) throw new Error('Runtime artifacts must come from the same release commit');
+            const { jobs } = await get(`actions/runs/${id}/jobs?per_page=100`);
+            const { artifacts } = await get(`actions/runs/${id}/artifacts?per_page=100`);
+            for (const target of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
+              if (!jobs.some(job => job.name === `PII runtime (${target})` && job.conclusion === 'success')) {
+                throw new Error(`Runtime build did not succeed: ${target}`);
+              }
+              if (!artifacts.some(artifact => artifact.name === `pii-runtime-${target}` && !artifact.expired)) {
+                throw new Error(`Runtime artifact is unavailable: ${target}`);
+              }
+            }
+            console.log(`Verified runtime artifacts from run ${id} at ${commit}`);
+          })().catch(error => { console.error(error.message); process.exitCode = 1; });
           JS
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -71,6 +112,7 @@ jobs:
 
   anonymization-runtimes:
     name: PII runtime (${{ matrix.target }})
+    if: inputs.runtime_run_id == ''
     needs: [lint-and-test]
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -122,6 +164,7 @@ jobs:
   build-macos:
     name: Release macOS
     needs: [lint-and-test, anonymization-runtimes]
+    if: ${{ !cancelled() && needs.lint-and-test.result == 'success' && (needs.anonymization-runtimes.result == 'success' || (needs.anonymization-runtimes.result == 'skipped' && inputs.runtime_run_id != '')) }}
     runs-on: ${{ inputs.arm64_runner || vars.MACOS_ARM64_RUNNER || 'macos-26' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -149,10 +192,14 @@ jobs:
         with:
           name: pii-runtime-darwin-arm64
           path: .bundle-resources/anonymization
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
       - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
           name: pii-runtime-darwin-x64
           path: .bundle-resources/anonymization
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
       - name: Extract macOS runtimes preserving framework structure
         run: |
           tar -xzf .bundle-resources/anonymization/pii-runtime-darwin-arm64.tar.gz -C .bundle-resources/anonymization
@@ -185,11 +232,37 @@ jobs:
       - name: Pre-build check (arm64 + x64 resources)
         run: node scripts/pre-build-check.js --all-darwin
 
-      - name: Verify macOS signing credentials
-        run: bash scripts/verify-macos-signing-env.sh
+      - name: Prepare macOS signing keychain
+        shell: bash
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${CSC_LINK:?Missing signing certificate}"
+          : "${CSC_KEY_PASSWORD:?Missing certificate password}"
+          umask 077
+          P12_PATH="$(mktemp "$RUNNER_TEMP/pura-signing.XXXXXX.p12")"
+          KEYCHAIN_PATH="$RUNNER_TEMP/pura-signing-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.keychain-db"
+          PREPARED=0
+          cleanup() {
+            rm -f "$P12_PATH"
+            if [ "$PREPARED" != 1 ]; then
+              security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+          node -e 'require("node:fs").writeFileSync(process.argv[1], Buffer.from(process.env.CSC_LINK, "base64"))' "$P12_PATH"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -q 'Developer ID Application'
+          printf 'CSC_KEYCHAIN=%s\n' "$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          PREPARED=1
 
       - name: Electron Builder (signed + notarized)
         run: npx electron-builder --mac dmg zip dir --arm64 --x64 --publish never
@@ -197,8 +270,6 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: Generate latest-mac.yml
         run: node scripts/generate-latest-mac-yml.js
@@ -237,9 +308,18 @@ jobs:
             release/latest-mac.yml
             release/*.zip.blockmap
 
+      - name: Remove macOS signing keychain
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${CSC_KEYCHAIN:-}" ]; then
+            security delete-keychain "$CSC_KEYCHAIN"
+          fi
+
   build-windows:
     name: Release Windows
     needs: [lint-and-test, anonymization-runtimes]
+    if: ${{ !cancelled() && needs.lint-and-test.result == 'success' && (needs.anonymization-runtimes.result == 'success' || (needs.anonymization-runtimes.result == 'skipped' && inputs.runtime_run_id != '')) }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -265,6 +345,8 @@ jobs:
         with:
           name: pii-runtime-win32-x64
           path: .bundle-resources/anonymization
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
       - name: Extract Windows runtime
         run: tar -xzf .bundle-resources/anonymization/pii-runtime-win32-x64.tar.gz -C .bundle-resources/anonymization
 

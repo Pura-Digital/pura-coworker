@@ -62,7 +62,7 @@ if ! security import "$TMP_P12" -k "$TMP_KC" -P "$CSC_KEY_PASSWORD" -T /usr/bin/
   exit 1
 fi
 
-security set-key-partition-list -S apple-tool:,apple: -s -k "$CSC_KEY_PASSWORD" "$TMP_KC" >/dev/null 2>&1 || true
+security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PASS" "$TMP_KC" >/dev/null
 
 IDENTITY="$(security find-identity -v -p codesigning "$TMP_KC" | grep "Developer ID Application" || true)"
 if [ -z "$IDENTITY" ]; then

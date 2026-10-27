@@ -9,6 +9,7 @@ Use **Actions → Release → Run workflow**, select `main`, and enter the exist
 release tag. Every job checks out that tag, and uploads target that same release.
 The workflow definition comes from `main`, so runner fixes can be applied without
 moving an existing tag or changing the application version.
+Application source changes still require a new version tag.
 
 The manual `arm64_runner` input overrides the repository default. For example:
 
@@ -17,6 +18,13 @@ gh workflow run release.yml --ref main \
   -f release_tag=v3.5.1 \
   -f arm64_runner=pura-release-arm64
 ```
+
+If the original tag run already built all three runtimes successfully, the
+optional `runtime_run_id` input reuses those artifacts and skips worker builds.
+The workflow verifies that the source run's commit matches the checked-out release
+commit, all worker jobs succeeded, and all three artifacts remain available.
+The packaging job may have failed in that source run; successful worker outputs
+can still be reused. Runs that built another commit are rejected.
 
 ## Configure a permanent runner
 
@@ -39,6 +47,10 @@ For a dedicated Apple Silicon Mac:
 
 That runner processes the ARM64 anonymization worker and the final macOS build.
 Signing and notarization still use the repository's existing Actions secrets.
+The certificate is imported into a separate temporary signing keychain. The
+certificate export password is used only for import; a generated keychain password
+is used for unlocking and key access permissions. The keychain is removed after
+the macOS job, including when packaging fails.
 The workflow uses installed Python on this runner because `setup-python` assumes
 the GitHub-hosted `/Users/runner/hostedtoolcache` location on macOS.
 
