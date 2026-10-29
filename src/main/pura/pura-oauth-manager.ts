@@ -1,6 +1,7 @@
 import { net, shell } from 'electron';
 import type { PendingAuthorization, StoredTokens } from '@pura-ai/sdk';
 import { PURA_CONNECT_REDIRECT_URI } from '../../shared/pura-connect';
+import { resolvePuraUserEmail } from '../../shared/pura-user-identity';
 import { log, logError } from '../utils/logger';
 import { getPuraClientConfig, isPuraConnectConfigured } from './pura-oauth-config';
 import * as puraTokenStore from './pura-token-store';
@@ -32,10 +33,12 @@ async function loadSdk() {
 }
 
 export function getConnectionState(configSetId: string) {
+  const tokens = puraTokenStore.getForSet(configSetId);
   return {
     configured: isPuraConnectConfigured(),
     connected: puraTokenStore.isConnected(configSetId),
-    puraUserId: puraTokenStore.getForSet(configSetId)?.pura_user_id ?? null,
+    puraUserId: tokens?.pura_user_id ?? null,
+    puraUserEmail: resolvePuraUserEmail(tokens),
   };
 }
 

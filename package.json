@@ -1,7 +1,7 @@
 {
   "name": "aiden",
-  "version": "3.5.2",
-  "description": "Open-source AI agent desktop app for Windows & macOS — one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
+  "version": "3.5.3",
+  "description": "Proprietary AI agent desktop app for Windows & macOS — one-click install Claude Code, MCP tools, and Skills with sandbox isolation and multi-model support",
   "keywords": [
     "ai-agent",
     "claude",
@@ -10,7 +10,6 @@
     "desktop-app",
     "mcp",
     "sandbox",
-    "open-source",
     "ai-coding",
     "ai-tools",
     "computer-use",
@@ -145,7 +144,7 @@
     "tar": "^7.5.11"
   },
   "author": "Aiden Team",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",

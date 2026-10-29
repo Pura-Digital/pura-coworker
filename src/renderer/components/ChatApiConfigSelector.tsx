@@ -67,15 +67,12 @@ export function ChatApiConfigSelector({
   }, [configSets]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
     void refreshPuraConnections();
     const unsubscribe = window.electronAPI?.puraConnect?.onConnectionChanged?.(() => {
       void refreshPuraConnections();
     });
     return () => unsubscribe?.();
-  }, [open, refreshPuraConnections]);
+  }, [refreshPuraConnections]);
 
   const close = () => {
     setOpen(false);

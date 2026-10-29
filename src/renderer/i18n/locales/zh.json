@@ -267,7 +267,7 @@
       "disconnect": "断开",
       "connectedBadge": "已连接",
       "disconnectedBadge": "未连接",
-      "connectedDescription": "已连接 Pura 用户 #{{id}}。",
+      "connectedDescription": "已连接 {{identity}}。",
       "disconnectedHint": "登录 Pura 即可通过订阅使用云端模型，聊天模型由您的 Pura 套餐管理。",
       "notConfigured": "请配置 VITE_PURA_CONNECT_CLIENT_ID 以启用 Pura Connect。",
       "protocolUnavailable": "未注册自定义 URL scheme。请安装正式版应用以完成 OAuth。",

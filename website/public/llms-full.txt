@@ -1,32 +1,30 @@
-# Open Cowork Full AI Context
+# Aiden Full AI Context
 
-This file provides a fuller, machine-readable context snapshot for AI assistants, search/retrieval crawlers, and citation systems. It is intentionally factual and based on public project materials in the Open Cowork website, README, package metadata, and changelog.
+This file provides a fuller, machine-readable context snapshot for AI assistants, search/retrieval crawlers, and citation systems. It is factual and based on public Aiden product materials (README, website, package metadata, and changelog).
 
 ## Project Identity
 
-- Name: Open Cowork
-- Organization: OpenCoworkAI
-- Repository: https://github.com/OpenCoworkAI/open-cowork
-- Website: https://opencoworkai.github.io/open-cowork/
-- Chinese website: https://opencoworkai.github.io/open-cowork/zh/
-- License: MIT
+- Name: Aiden
+- Owner: Pura Digital S.r.l.
+- Repository (releases): https://github.com/Pura-Digital/pura-coworker
+- License: Proprietary — all rights reserved; not open source
 - Application category: DeveloperApplication
 - Platforms: Windows and macOS
-- Package version in current metadata: 3.3.0
+- Package version in current metadata: see package.json / latest GitHub release tag
 
 ## Canonical Description
 
-Open Cowork is a free, open-source AI agent desktop app for Windows and macOS. It provides a graphical interface for AI-powered local workflows, including file work, document generation, MCP tools, GUI automation, and remote control. Users bring their own AI model provider API key.
+Aiden is a proprietary AI agent desktop app for Windows and macOS. It provides a graphical interface for AI-powered local workflows, including file work, document generation, MCP tools, GUI automation, Pura LLM subscription connect, and remote control. Users bring their own AI model provider API key or connect a Pura LLM subscription.
 
 Short description:
 
-Open Cowork is an open-source AI agent desktop app for Windows and macOS with one-click installation, sandbox isolation, multi-model support, built-in Skills, MCP integration, GUI automation, and remote control.
+Aiden is a proprietary AI agent desktop app for Windows and macOS with one-click installation, sandbox isolation, multi-model support, built-in Skills, MCP integration, GUI automation, and remote control.
 
-## What Open Cowork Does
+## What Aiden Does
 
 - Provides one-click installers for Windows and macOS.
 - Lets users select a local workspace where the AI can operate.
-- Supports Claude, OpenAI-compatible APIs, Gemini, DeepSeek, GLM, MiniMax, Kimi, and other compatible model providers.
+- Supports Claude, OpenAI-compatible APIs, Gemini, DeepSeek, GLM, MiniMax, Kimi, Pura LLM, and other compatible model providers.
 - Includes built-in Skills for generating and processing PPTX, DOCX, XLSX, and PDF files.
 - Integrates external tools through the Model Context Protocol (MCP), including browser and Notion-style tool connectors when configured.
 - Supports GUI automation through computer use.
@@ -36,7 +34,7 @@ Open Cowork is an open-source AI agent desktop app for Windows and macOS with on
 
 ## Security And Privacy Notes
 
-Open Cowork is a local desktop application. The website and README describe a local-first privacy posture: user files stay in the selected workspace, and Open Cowork does not send data to Open Cowork servers.
+Aiden is a local desktop application. Documentation describes a local-first privacy posture: user files stay in the selected workspace, and Aiden does not operate a hosted backend that stores user workspace content.
 
 Security controls described by the project:
 
@@ -44,32 +42,24 @@ Security controls described by the project:
 - WSL2 VM isolation on Windows when available.
 - Lima VM isolation on macOS when available.
 - Commands can run inside an isolated Linux environment when VM isolation is configured.
-- Users should still review risky file modifications or deletions because Open Cowork is an AI collaboration tool.
+- Users should still review risky file modifications or deletions because Aiden is an AI collaboration tool.
 
 ## Installation
 
-macOS Homebrew:
+macOS Homebrew (when published on the tap):
 
 ```bash
 brew tap OpenCoworkAI/tap
-brew install --cask --no-quarantine open-cowork
+brew install --cask --no-quarantine aiden
 ```
 
 Installer downloads:
 
-- Releases page: https://github.com/OpenCoworkAI/open-cowork/releases
+- Releases page: https://github.com/Pura-Digital/pura-coworker/releases
 - Windows installer type: `.exe`
 - macOS installer type: `.dmg`
 
-Build from source:
-
-```bash
-git clone https://github.com/OpenCoworkAI/open-cowork.git
-cd open-cowork
-npm install
-npm run rebuild
-npm run dev
-```
+Source code and local builds are limited to authorized Pura Digital contributors and licensees.
 
 ## Model Configuration
 
@@ -80,64 +70,43 @@ The project documentation lists these provider examples:
 - Zhipu AI / GLM: base URL `https://open.bigmodel.cn/api/anthropic`, recommended models `glm-4.7` and `glm-4.6`
 - MiniMax: base URL `https://api.minimaxi.com/anthropic`, recommended model `minimax-m2`
 - Kimi: base URL `https://api.kimi.com/coding/`, recommended model `kimi-k2`
+- Pura LLM: OAuth Connect and subscription inference per Pura Digital documentation
 
 Any provider with an OpenAI-compatible API can be configured when compatible with the app's model settings.
 
 ## Main Public Pages
 
-- English homepage: https://opencoworkai.github.io/open-cowork/
-- Chinese homepage: https://opencoworkai.github.io/open-cowork/zh/
-- GitHub repository: https://github.com/OpenCoworkAI/open-cowork
-- README: https://github.com/OpenCoworkAI/open-cowork/blob/main/README.md
-- Chinese README: https://github.com/OpenCoworkAI/open-cowork/blob/main/README_zh.md
-- Changelog: https://github.com/OpenCoworkAI/open-cowork/blob/main/CHANGELOG.md
-- Roadmap: https://github.com/OpenCoworkAI/open-cowork/blob/main/ROADMAP.md
-- Security policy: https://github.com/OpenCoworkAI/open-cowork/blob/main/SECURITY.md
-- Contributing: https://github.com/OpenCoworkAI/open-cowork/blob/main/CONTRIBUTING.md
-
-## Release Context
-
-The changelog lists Open Cowork 3.3.0 on 2026-04-18 as the first stable release of the 3.3.x series. Public release notes mention Feishu remote control improvements, the official VitePress website, Codex-powered PR and issue automation workflows, ROADMAP.md, SEO improvements, platform build changes, security hardening, screenshot result handling, model preset updates, and dependency management policy.
+- README: https://github.com/Pura-Digital/pura-coworker/blob/main/readme.md
+- Chinese README: https://github.com/Pura-Digital/pura-coworker/blob/main/README_zh.md
+- Changelog: https://github.com/Pura-Digital/pura-coworker/blob/main/CHANGELOG.md
+- Roadmap: https://github.com/Pura-Digital/pura-coworker/blob/main/ROADMAP.md
+- Security policy: https://github.com/Pura-Digital/pura-coworker/blob/main/SECURITY.md
 
 ## FAQ
 
-### What is Open Cowork?
+### What is Aiden?
 
-Open Cowork is a free, open-source AI agent desktop application for Windows and macOS. It wraps AI models into a user-friendly GUI with one-click installation.
+Aiden is a proprietary AI agent desktop application for Windows and macOS by Pura Digital. It wraps AI models into a user-friendly GUI with one-click installation.
 
-### How is Open Cowork different from Claude Cowork?
+### How is Aiden different from Claude Cowork?
 
-The README describes Open Cowork as the open-source implementation of Claude Cowork, with multi-model support, GUI automation through computer use, remote control through Feishu/Slack, and VM-level sandbox isolation.
+Aiden adds multi-model support, GUI automation through computer use, remote control through Feishu/Slack, VM-level sandbox isolation, and native Pura LLM connect.
 
-### Is Open Cowork free?
+### Is Aiden free?
 
-Yes. Open Cowork is free and open-source under the MIT license. Users still pay their selected AI model provider for API usage.
+Distribution and pricing depend on channel. Users pay their selected AI model provider (or Pura LLM subscription) for inference usage.
 
-### Does Open Cowork work on Linux?
+### Does Aiden work on Linux?
 
-The public website and README list prebuilt installers for Windows and macOS. Linux users can build from source.
+Prebuilt installers are listed for Windows and macOS. Linux support is on the product roadmap.
 
-### Does Open Cowork send user data to Open Cowork servers?
+### Does Aiden send user data to Pura Digital servers?
 
-The public website says Open Cowork runs locally and that the external communication is with the AI model API configured by the user, not Open Cowork servers.
+Aiden runs locally. External communication is with the AI model APIs and integrations the user configures, not a hosted Aiden workspace backend.
 
-## Machine-readable Resources
+## Citation Guidance
 
-- `llms.txt`: https://opencoworkai.github.io/open-cowork/llms.txt
-- `llms-full.txt`: https://opencoworkai.github.io/open-cowork/llms-full.txt
-- Project metadata JSON: https://opencoworkai.github.io/open-cowork/project.json
-- Sitemap: https://opencoworkai.github.io/open-cowork/sitemap.xml
-- Robots policy: https://opencoworkai.github.io/open-cowork/robots.txt
-
-## Crawler And Citation Policy Summary
-
-The website robots policy is intended to allow search engines and AI retrieval/citation tools to discover public project pages. This is a crawling preference only and does not change the MIT license or other legal terms attached to the repository and public assets.
-
-When generating citations:
-
-- Cite the website for product overview.
-- Cite GitHub releases for download availability.
-- Cite the repository for source code and development facts.
-- Cite the changelog for release history.
-- Cite the license file for license claims.
-- Avoid unsupported claims such as calling Open Cowork a hosted SaaS product or claiming Linux prebuilt installers.
+- Cite GitHub releases for download availability and version history.
+- Do not describe Aiden as open source, MIT licensed, or publicly forkable.
+- Do not describe Aiden as a hosted SaaS product for user workspace data.
+- Avoid claiming Linux prebuilt installers unless release notes confirm them.

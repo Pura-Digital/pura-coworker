@@ -1,17 +1,21 @@
 # Changelog
 
-All notable changes to the Open Cowork AI agent desktop app will be documented in this file.
+All notable changes to the Aiden AI agent desktop app will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.5.3] - 2026-10-29
+
 ### Changed
 
 - Pura subscription usage in settings: horizontal progress bars (aligned with other Pura apps), with reset and billing period dates
-- Composer model selector shows **PuraLLM Subscription** when the active set uses a connected Pura subscription
+- Composer model selector shows **PuraLLM Subscription** when the active set uses a connected Pura subscription (including on the welcome composer before opening the menu)
+- Pura Connect connection status prefers the account email when OAuth tokens expose it
 - Global, sandbox sync, update, and settings feedback toasts use opaque frosted panels (same treatment as the in-chat model picker)
+- Project metadata and docs reflect Aiden / Pura Digital proprietary branding
 
 ## [3.5.2] - 2026-10-27
 
@@ -243,7 +247,7 @@ First stable release of the 3.3.x series. Graduated from 9 beta releases with 30
 
 ### Changed
 
-- Updated Open Cowork app icons for Windows and macOS packaging (branding refresh)
+- Updated Aiden app icons for Windows and macOS packaging (branding refresh)
 - Widened chat content area layout for better readability
 
 ### Fixed
@@ -286,12 +290,12 @@ First stable release of the 3.3.x series. Graduated from 9 beta releases with 30
 
 ### Added
 
-- Initial release of Open Cowork — open-source AI agent desktop app with one-click install for Windows and macOS
+- Initial release of Aiden — AI agent desktop app with one-click install for Windows and macOS
 
-[Unreleased]: https://github.com/OpenCoworkAI/open-cowork/compare/v3.3.0-beta.8...HEAD
-[3.3.0-beta.8]: https://github.com/OpenCoworkAI/open-cowork/compare/v3.2.0...v3.3.0-beta.8
-[3.2.0]: https://github.com/OpenCoworkAI/open-cowork/compare/v3.1.0...v3.2.0
-[3.1.0]: https://github.com/OpenCoworkAI/open-cowork/compare/v3.0.0...v3.1.0
-[3.0.0]: https://github.com/OpenCoworkAI/open-cowork/compare/v2.0.0...v3.0.0
-[2.0.0]: https://github.com/OpenCoworkAI/open-cowork/compare/v1.0...v2.0.0
-[1.0.0]: https://github.com/OpenCoworkAI/open-cowork/releases/tag/v1.0
+[Unreleased]: https://github.com/Pura-Digital/pura-coworker/compare/v3.3.0-beta.8...HEAD
+[3.3.0-beta.8]: https://github.com/Pura-Digital/pura-coworker/compare/v3.2.0...v3.3.0-beta.8
+[3.2.0]: https://github.com/Pura-Digital/pura-coworker/compare/v3.1.0...v3.2.0
+[3.1.0]: https://github.com/Pura-Digital/pura-coworker/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/Pura-Digital/pura-coworker/compare/v2.0.0...v3.0.0
+[2.0.0]: https://github.com/Pura-Digital/pura-coworker/compare/v1.0...v2.0.0
+[1.0.0]: https://github.com/Pura-Digital/pura-coworker/releases/tag/v1.0

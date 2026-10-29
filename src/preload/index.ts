@@ -594,6 +594,7 @@ declare global {
           configured: boolean;
           connected: boolean;
           puraUserId: number | null;
+          puraUserEmail: string | null;
         }>;
         startConnection: (payload?: {
           locale?: string;

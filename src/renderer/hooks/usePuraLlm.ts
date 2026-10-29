@@ -5,6 +5,7 @@ export interface PuraConnectionState {
   configured: boolean;
   connected: boolean;
   puraUserId: number | null;
+  puraUserEmail: string | null;
 }
 
 export function usePuraLlm(configSetId: string) {
@@ -13,6 +14,7 @@ export function usePuraLlm(configSetId: string) {
     configured: false,
     connected: false,
     puraUserId: null,
+    puraUserEmail: null,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export function usePuraLlm(configSetId: string) {
   const refreshConnection = useCallback(async () => {
     const api = window.electronAPI?.puraConnect;
     if (!api?.getConnectionState) {
-      setConnection({ configured: false, connected: false, puraUserId: null });
+      setConnection({ configured: false, connected: false, puraUserId: null, puraUserEmail: null });
       return;
     }
     const state = await api.getConnectionState(configSetId);

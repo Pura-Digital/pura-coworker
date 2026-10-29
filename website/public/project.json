@@ -1,31 +1,22 @@
 {
   "schemaVersion": "1.0",
   "name": "Aiden",
-  "organization": "OpenCoworkAI",
-  "canonicalUrl": "https://opencoworkai.github.io/aiden/",
-  "localizedUrls": {
-    "en": "https://opencoworkai.github.io/aiden/",
-    "zh-CN": "https://opencoworkai.github.io/aiden/zh/"
-  },
-  "repository": "https://github.com/OpenCoworkAI/aiden",
-  "releases": "https://github.com/OpenCoworkAI/aiden/releases",
-  "issues": "https://github.com/OpenCoworkAI/aiden/issues",
+  "organization": "Pura Digital S.r.l.",
+  "canonicalUrl": "https://github.com/Pura-Digital/pura-coworker",
+  "repository": "https://github.com/Pura-Digital/pura-coworker",
+  "releases": "https://github.com/Pura-Digital/pura-coworker/releases",
   "license": {
-    "name": "MIT",
-    "url": "https://github.com/OpenCoworkAI/aiden/blob/main/LICENSE"
+    "name": "Proprietary",
+    "summary": "All rights reserved. Not open source."
   },
-  "version": "3.3.0",
-  "lastReviewed": "2026-05-01",
-  "description": "Open-source AI agent desktop app for Windows and macOS with one-click installation, sandbox isolation, multi-model support, built-in Skills, MCP integration, GUI automation, and remote control.",
+  "version": "3.5.3",
+  "lastReviewed": "2026-10-29",
+  "description": "Proprietary AI agent desktop app for Windows and macOS with one-click installation, sandbox isolation, multi-model support, built-in Skills, MCP integration, GUI automation, Pura LLM connect, and remote control.",
   "applicationCategory": "DeveloperApplication",
   "platforms": ["Windows", "macOS"],
   "prebuiltInstallerTypes": {
     "Windows": ".exe",
     "macOS": ".dmg"
-  },
-  "sourceBuild": {
-    "node": ">=22",
-    "commands": ["npm install", "npm run rebuild", "npm run dev"]
   },
   "install": [
     {
@@ -36,12 +27,13 @@
     {
       "platform": "Windows and macOS",
       "method": "GitHub Releases",
-      "url": "https://github.com/OpenCoworkAI/aiden/releases"
+      "url": "https://github.com/Pura-Digital/pura-coworker/releases"
     }
   ],
   "capabilities": [
     "Local AI agent desktop workspace",
     "Multi-model provider configuration",
+    "Pura LLM subscription connect",
     "Built-in Skills for PPTX, DOCX, XLSX, and PDF workflows",
     "Model Context Protocol tool integration",
     "GUI automation through computer use",
@@ -80,21 +72,13 @@
     "localFirst": true,
     "workspaceBoundary": "File operations are restricted to the selected workspace folder.",
     "vmIsolation": ["WSL2 on Windows", "Lima on macOS"],
-    "dataPolicy": "Aiden runs locally; the external network path is the AI model API configured by the user. The project website states that Aiden does not send data to Aiden servers."
-  },
-  "machineReadableResources": {
-    "llmsTxt": "https://opencoworkai.github.io/aiden/llms.txt",
-    "llmsFullTxt": "https://opencoworkai.github.io/aiden/llms-full.txt",
-    "projectJson": "https://opencoworkai.github.io/aiden/project.json",
-    "sitemap": "https://opencoworkai.github.io/aiden/sitemap.xml",
-    "robots": "https://opencoworkai.github.io/aiden/robots.txt"
+    "dataPolicy": "Aiden runs locally; external network traffic goes to the AI model APIs and integrations the user configures."
   },
   "sourcePages": [
-    "https://github.com/OpenCoworkAI/aiden/blob/main/README.md",
-    "https://github.com/OpenCoworkAI/aiden/blob/main/README_zh.md",
-    "https://github.com/OpenCoworkAI/aiden/blob/main/CHANGELOG.md",
-    "https://github.com/OpenCoworkAI/aiden/blob/main/ROADMAP.md",
-    "https://github.com/OpenCoworkAI/aiden/blob/main/SECURITY.md",
-    "https://github.com/OpenCoworkAI/aiden/blob/main/CONTRIBUTING.md"
+    "https://github.com/Pura-Digital/pura-coworker/blob/main/readme.md",
+    "https://github.com/Pura-Digital/pura-coworker/blob/main/README_zh.md",
+    "https://github.com/Pura-Digital/pura-coworker/blob/main/CHANGELOG.md",
+    "https://github.com/Pura-Digital/pura-coworker/blob/main/ROADMAP.md",
+    "https://github.com/Pura-Digital/pura-coworker/blob/main/SECURITY.md"
   ]
 }

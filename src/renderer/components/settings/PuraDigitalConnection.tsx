@@ -9,6 +9,7 @@ import {
   isPuraConnectConfigured,
 } from '../../config/puraConnect';
 import { usePuraLlm } from '../../hooks/usePuraLlm';
+import { formatPuraConnectedIdentity } from '../../../shared/pura-user-identity';
 import { PuraUsagePanel } from './PuraUsagePanel';
 import {
   SettingsCard,
@@ -174,9 +175,14 @@ export function PuraDigitalConnection({
                   )}
                 </button>
               </div>
-              {connection.connected && connection.puraUserId ? (
+              {connection.connected && (connection.puraUserEmail || connection.puraUserId) ? (
                 <p className="text-xs text-text-muted">
-                  {t('api.puraConnect.connectedDescription', { id: connection.puraUserId })}
+                  {t('api.puraConnect.connectedDescription', {
+                    identity: formatPuraConnectedIdentity(
+                      connection.puraUserEmail,
+                      connection.puraUserId
+                    ),
+                  })}
                 </p>
               ) : (
                 <p className="text-xs text-text-muted">{t('api.puraConnect.disconnectedHint')}</p>

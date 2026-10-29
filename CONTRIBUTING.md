@@ -1,6 +1,6 @@
-# Contributing to Open Cowork
+# Developing Aiden (Pura Digital)
 
-Thank you for your interest in contributing! Open Cowork is an open-source desktop AI agent app built with Electron, React, and TypeScript. This guide covers everything you need to get started.
+Aiden is **proprietary software** owned by **Pura Digital S.r.l.** This guide is for **authorized contributors** with access to the private repository. It does not grant a license to copy, redistribute, or publish the source.
 
 ---
 
@@ -15,8 +15,8 @@ Thank you for your interest in contributing! Open Cowork is an open-source deskt
 **Install**
 
 ```bash
-git clone https://github.com/OpenCoworkAI/open-cowork.git
-cd open-cowork
+git clone git@github.com:Pura-Digital/pura-coworker.git
+cd pura-coworker
 npm install        # also runs postinstall: downloads Node binaries + rebuilds native modules
 ```
 
@@ -83,20 +83,11 @@ fix/<name>      — bug fixes
 
 **Conventional Commits** are enforced by commitlint + husky on every commit.
 
-```
-<type>(<scope>): <short summary>
-```
-
-Allowed types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `chore`, `ci`, `style`, `revert`, `release`, `merge`
-
-Header max length: **100 characters**
-
 Examples:
 
 ```
-feat(mcp): add Streamable HTTP transport support
-fix(sandbox): handle WSL2 path with spaces
-docs: update README setup instructions
+feat(mcp): add registry search filter
+fix(sandbox): sync workspace on Lima resume
 test(session): add unit tests for session-manager
 ```
 
@@ -117,7 +108,7 @@ Scope is optional but encouraged.
 
 ## Dependency Management
 
-Open Cowork uses **Dependabot** (`.github/dependabot.yml`) to keep dependencies current. To avoid PR pile-up and reduce risk, we follow a tiered strategy:
+Aiden uses **Dependabot** (`.github/dependabot.yml`) to keep dependencies current. To avoid PR pile-up and reduce risk, we follow a tiered strategy:
 
 ### Tiers
 
@@ -149,7 +140,7 @@ These packages are deeply integrated — any update (including patch) should be 
 
 Before adding a dependency:
 
-1. **Check license** — must be MIT, Apache-2.0, BSD, or ISC. No GPL/AGPL/SSPL.
+1. **Check license** — third-party deps must be MIT, Apache-2.0, BSD, or ISC. No GPL/AGPL/SSPL in the shipped app.
 2. **Check size** — run `npx pkg-size <package>` or check bundlephobia. Avoid bloating the installer.
 3. **Check maintenance** — prefer packages with recent commits, multiple maintainers, and >1K weekly downloads.
 4. **Prefer built-in** — use Node.js built-ins or existing dependencies before adding new ones.
@@ -159,7 +150,7 @@ Before adding a dependency:
 
 ## Testing
 
-Open Cowork uses **Vitest**.
+Aiden uses **Vitest**.
 
 **File placement**
 
@@ -204,18 +195,12 @@ Translation files live in `src/renderer/i18n/`. Add keys to both `en` and `zh` l
 
 ## Reporting Issues
 
-**Bug reports** — use the GitHub issue template and include:
+**Bug reports** — use the internal issue tracker and include:
 
-- Open Cowork version
+- Aiden version
 - Operating system (macOS / Windows + version)
 - Steps to reproduce
 - Expected vs. actual behavior
 - Relevant logs (from DevTools console or the in-app log viewer)
 
-**Feature requests** — open a GitHub Discussion or issue with:
-
-- The problem you are trying to solve
-- Your proposed solution or behavior
-- Any alternatives you considered
-
-For questions or informal discussion, open a GitHub Discussion rather than an issue.
+**Security** — follow [SECURITY.md](SECURITY.md); do not file public issues for vulnerabilities.

@@ -267,7 +267,7 @@
       "disconnect": "Disconnect",
       "connectedBadge": "Connected",
       "disconnectedBadge": "Not connected",
-      "connectedDescription": "Connected as Pura user #{{id}}.",
+      "connectedDescription": "Connected as {{identity}}.",
       "disconnectedHint": "Sign in with Pura to use cloud models with your subscription—the chat model is managed by your Pura plan.",
       "notConfigured": "Add VITE_PURA_CONNECT_CLIENT_ID to enable Pura Connect.",
       "protocolUnavailable": "Custom URL scheme is not registered. Reinstall or launch the packaged app to complete OAuth.",

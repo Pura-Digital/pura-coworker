@@ -267,7 +267,7 @@
       "disconnect": "Disconnetti",
       "connectedBadge": "Connesso",
       "disconnectedBadge": "Non connesso",
-      "connectedDescription": "Connesso come utente Pura #{{id}}.",
+      "connectedDescription": "Connesso come {{identity}}.",
       "disconnectedHint": "Accedi con Pura per usare i modelli cloud del tuo abbonamento: il modello chat è gestito dal tuo piano.",
       "notConfigured": "Aggiungi VITE_PURA_CONNECT_CLIENT_ID per abilitare Pura Connect.",
       "protocolUnavailable": "Lo schema URL personalizzato non è registrato. Reinstalla o avvia l'app pacchettizzata per completare l'OAuth.",

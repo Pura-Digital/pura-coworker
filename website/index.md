@@ -19,7 +19,7 @@ head:
 
 hero:
   name: Aiden
-  text: Open-Source AI Agent Desktop App
+  text: AI Agent Desktop App by Pura Digital
   tagline: One-click install for Windows & macOS. Multi-model support, VM sandbox isolation, built-in Skills, and MCP integration — no coding required.
   image:
     src: /logo.png
@@ -27,10 +27,10 @@ hero:
   actions:
     - theme: brand
       text: Download
-      link: https://github.com/OpenCoworkAI/aiden/releases
+      link: https://github.com/Pura-Digital/pura-coworker/releases
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/OpenCoworkAI/aiden
+      text: Release notes
+      link: https://github.com/Pura-Digital/pura-coworker/releases
 
 features:
   - icon: 🚀
@@ -55,8 +55,8 @@ features:
     title: Remote Control
     details: Send commands and receive results via Feishu (Lark) and Slack integration. Automate workflows across collaboration platforms.
   - icon: 🛡️
-    title: Free & Open Source
-    details: MIT licensed. Fully transparent codebase. Your data stays local — no telemetry, no data sent to Aiden servers.
+    title: Local-first & private
+    details: Proprietary app by Pura Digital. Your workspace stays on your machine — no telemetry; only the AI providers you configure receive requests.
 ---
 
 <style>
@@ -139,7 +139,7 @@ brew tap OpenCoworkAI/tap
 brew install --cask --no-quarantine aiden
 ```
 
-**Windows / macOS** — [Download from Releases →](https://github.com/OpenCoworkAI/aiden/releases)
+**Windows / macOS** — [Download from Releases →](https://github.com/Pura-Digital/pura-coworker/releases)
 
 </div>
 
@@ -151,7 +151,7 @@ brew install --cask --no-quarantine aiden
 
 ### What is Aiden?
 
-Aiden is a free, open-source AI agent desktop application for Windows and macOS. It wraps AI models (Claude, GPT, Gemini, DeepSeek, etc.) into a user-friendly GUI with one-click installation — no terminal or coding knowledge required.
+Aiden is a proprietary AI agent desktop application for Windows and macOS by Pura Digital. It wraps AI models (Claude, GPT, Gemini, DeepSeek, etc.) into a user-friendly GUI with one-click installation — no terminal or coding knowledge required.
 
 </div>
 
@@ -167,7 +167,7 @@ Claude (via Anthropic or OpenRouter), OpenAI-compatible APIs, and Chinese models
 
 ### Is it free?
 
-Yes. Aiden is completely free and open-source under the MIT license. You only pay for AI model API usage from your chosen provider.
+Pricing depends on your distribution channel. Model usage is billed by your chosen provider (including Pura LLM when connected). See the End User License Agreement shipped with your installer.
 
 </div>
 
@@ -191,7 +191,7 @@ Aiden runs entirely on your local machine. The only external communication is wi
 
 ### Does it work on Linux?
 
-Pre-built installers are available for Windows and macOS. Linux users can build from source — see the [GitHub repository](https://github.com/OpenCoworkAI/aiden) for instructions.
+Pre-built installers are available for Windows and macOS. Linux builds are planned — contact Pura Digital for partner access.
 
 </div>
 

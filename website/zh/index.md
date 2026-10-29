@@ -19,7 +19,7 @@ head:
 
 hero:
   name: Aiden
-  text: 开源 AI 智能助手桌面应用
+  text: Pura Digital AI 智能助手桌面应用
   tagline: Windows & macOS 一键安装。多模型支持、虚拟机沙盒隔离、内置 Skills 技能系统、MCP 集成 — 无需编程。
   image:
     src: /logo.png
@@ -27,10 +27,10 @@ hero:
   actions:
     - theme: brand
       text: 立即下载
-      link: https://github.com/OpenCoworkAI/aiden/releases
+      link: https://github.com/Pura-Digital/pura-coworker/releases
     - theme: alt
-      text: GitHub 仓库
-      link: https://github.com/OpenCoworkAI/aiden
+      text: 版本说明
+      link: https://github.com/Pura-Digital/pura-coworker/releases
 
 features:
   - icon: 🚀
@@ -55,8 +55,8 @@ features:
     title: 远程控制
     details: 支持通过飞书和 Slack 发送指令、接收执行结果，实现跨平台工作流自动化。
   - icon: 🛡️
-    title: 免费开源
-    details: MIT 协议开源，代码完全透明。数据全部本地运行，无遥测，不向任何外部服务器发送数据。
+    title: 本地优先与隐私
+    details: Pura Digital 专有应用。工作区保留在本机，无遥测；仅你配置的 AI 服务商接收请求。
 ---
 
 <style>
@@ -176,7 +176,7 @@ brew tap OpenCoworkAI/tap
 brew install --cask --no-quarantine aiden
 ```
 
-**Windows / macOS** — [前往下载页面 →](https://github.com/OpenCoworkAI/aiden/releases)
+**Windows / macOS** — [前往下载页面 →](https://github.com/Pura-Digital/pura-coworker/releases)
 
 </div>
 
@@ -188,7 +188,7 @@ brew install --cask --no-quarantine aiden
 
 ### Aiden 是什么？
 
-Aiden 是一款免费开源的 AI 智能助手桌面应用，将 AI 模型（Claude、GPT、Gemini、DeepSeek 等）封装为图形界面，提供 Windows 和 macOS 一键安装包，无需命令行或编程知识。
+Aiden 是 Pura Digital 的专有 AI 智能助手桌面应用，将 AI 模型（Claude、GPT、Gemini、DeepSeek 等）封装为图形界面，提供 Windows 和 macOS 一键安装包，无需命令行或编程知识。
 
 </div>
 
@@ -204,7 +204,7 @@ Aiden 是一款免费开源的 AI 智能助手桌面应用，将 AI 模型（Cla
 
 ### 免费吗？
 
-Aiden 本身完全免费，采用 MIT 开源协议。你只需为所选 AI 模型服务商的 API 调用付费。
+定价取决于分发渠道。模型费用由所选服务商收取（含已连接的 Pura LLM）。请参阅安装包中的最终用户许可协议。
 
 </div>
 
@@ -228,7 +228,7 @@ Aiden 完全在本地运行，你的文件保留在你的工作区内。唯一�
 
 ### 支持 Linux 吗？
 
-目前提供 Windows 和 macOS 的预构建安装包。Linux 用户可以通过源码编译方式使用，详见 [GitHub 仓库](https://github.com/OpenCoworkAI/aiden)。
+目前提供 Windows 和 macOS 的预构建安装包。Linux 版本规划中，合作伙伴可联系 Pura Digital。
 
 </div>
 

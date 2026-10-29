@@ -5,7 +5,7 @@
 <h1 align="center">🚀 Aiden: Your Personal AI Agent Desktop App</h1>
 
 <p align="center">
-  • Open Source Claude Cowork • One-Click Install 
+  • Personal AI Agent Desktop App • One-Click Install
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-blue" alt="Platform" />
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
+  <img src="https://img.shields.io/badge/License-Proprietary-red" alt="License" />
   <img src="https://img.shields.io/badge/Node.js-18+-brightgreen" alt="Node.js" />
   <a href="https://discord.gg/pynjtQDf"><img src="https://img.shields.io/discord/1493588403260883078?logo=discord&label=Discord&color=5865F2" alt="Discord" /></a>
   <a href="#community"><img src="https://img.shields.io/badge/WeChat-微信群-07C160?logo=wechat&logoColor=white" alt="WeChat" /></a>
@@ -27,13 +27,13 @@
 
 ---
 
-Aiden is a free, open-source AI agent desktop application for Windows and macOS. It wraps Claude Code, OpenAI, Gemini, DeepSeek, and other AI models into a user-friendly GUI with one-click installation — no coding required. Key capabilities include VM-level sandbox isolation (WSL2 on Windows, Lima on macOS), a built-in Skills system for generating PPTX, DOCX, XLSX, and PDF documents, MCP (Model Context Protocol) integration for connecting to browsers, Notion, and other desktop apps, GUI automation via computer use, and remote control through Feishu (Lark) and Slack. Aiden is the open-source implementation of Claude Cowork, designed to make AI-powered desktop automation accessible to everyone.
+Aiden is a proprietary AI agent desktop application for Windows and macOS, developed by **Pura Digital S.r.l.** It wraps Claude Code, OpenAI, Gemini, DeepSeek, and other AI models into a user-friendly GUI with one-click installation — no coding required. Key capabilities include VM-level sandbox isolation (WSL2 on Windows, Lima on macOS), a built-in Skills system for generating PPTX, DOCX, XLSX, and PDF documents, MCP (Model Context Protocol) integration for connecting to browsers, Notion, and other desktop apps, GUI automation via computer use, and remote control through Feishu (Lark) and Slack.
 
 ---
 
 ## 📖 Introduction
 
-**Aiden** is an open-source implementation of **Claude Cowork**, with one-click installers for **Windows** and **macOS**—no coding required.
+**Aiden** is a desktop AI coworking environment with one-click installers for **Windows** and **macOS**—no coding required.
 
 It provides a sandboxed workspace where AI can manage files, generate professional outputs (PPTX, DOCX, XLSX, etc.) through our built-in **Skills** system, and **connect to desktop apps via MCP** (browser, Notion, etc.) for better collaboration.
 
@@ -50,7 +50,7 @@ It provides a sandboxed workspace where AI can manage files, generate profession
 | ------------- | ------------ | -------------- | ------------- |
 | Claude Cowork | ✓            | ✗              | ✗             |
 | OpenClaw      | ✓            | ✓              | ✗             |
-| OpenCowork    | ✓            | ✓              | ✓             |
+| **Aiden**     | ✓            | ✓              | ✓             |
 
 - **One-Click Install, Ready to Use**: Pre-built installers for Windows and macOS, no environment setup needed—just download and start using.
 - **Flexible Model Support**: Supports **Claude**, **OpenAI-compatible APIs**, and Chinese models like **GLM**, **MiniMax**, **Kimi**. Use your OpenRouter, Anthropic, or other API keys with flexible configuration. More models coming soon!
@@ -108,27 +108,13 @@ brew install --cask --no-quarantine aiden
 
 ### Option 2: Download Installer
 
-Get the latest version from our [Releases Page](https://github.com/OpenCoworkAI/aiden/releases).
+Get the latest version from our [Releases page](https://github.com/Pura-Digital/pura-coworker/releases).
 
 | Platform                  | File Type |
 | ------------------------- | --------- |
 | **Windows**               | `.exe`    |
 | **macOS** (Apple Silicon) | `-mac-arm64.dmg` |
 | **macOS** (Intel)         | `-mac-x64.dmg`   |
-
-### Option 3: Build from Source
-
-For developers who want to contribute or modify the codebase:
-
-```bash
-git clone https://github.com/OpenCoworkAI/aiden.git
-cd aiden
-npm install
-npm run rebuild
-npm run dev
-```
-
-To build the installer locally: `npm run build`
 
 ### Security Configuration: 🔒 Sandbox Support
 
@@ -290,19 +276,19 @@ See our full **[ROADMAP.md](ROADMAP.md)** for detailed plans.
 ## ❓ FAQ
 
 **What is Aiden?**
-Aiden is a free, open-source desktop application that provides a local AI agent workspace. It wraps AI models (Claude, GPT, Gemini, DeepSeek, etc.) into a GUI with one-click installers for Windows and macOS — no terminal or coding knowledge required.
+Aiden is a proprietary desktop application that provides a local AI agent workspace. It wraps AI models (Claude, GPT, Gemini, DeepSeek, etc.) into a GUI with one-click installers for Windows and macOS — no terminal or coding knowledge required.
 
 **How is Aiden different from Claude Cowork?**
-Aiden is the open-source implementation of Claude Cowork. It adds multi-model support (not just Claude), GUI automation via computer use, remote control through Feishu/Slack, and VM-level sandbox isolation. See the [feature comparison table](#features) for details.
+Aiden adds multi-model support (not just Claude), GUI automation via computer use, remote control through Feishu/Slack, VM-level sandbox isolation, and native **Pura LLM** subscription connect. See the [feature comparison table](#features) for details.
 
 **What AI models does Aiden support?**
 Claude (via Anthropic or OpenRouter), OpenAI-compatible APIs, and Chinese models including GLM (Zhipu AI), MiniMax, and Kimi. Any provider offering an OpenAI-compatible API endpoint can be configured.
 
 **Is Aiden free?**
-Yes. Aiden itself is completely free and open-source under the MIT license. You only need to pay for the AI model API usage from your chosen provider.
+Distribution and pricing depend on your channel (installer, enterprise, or Pura LLM bundle). Model usage is always billed by your chosen provider (including **Pura LLM** when connected). See the End User License Agreement included with your build.
 
 **Does Aiden work on Linux?**
-Currently, Aiden provides pre-built installers for Windows and macOS only. Linux users can build from source — see the [Build from Source](#installation) section.
+Pre-built installers are available for Windows and macOS. Linux support is on the [roadmap](ROADMAP.md); contact Pura Digital for early access builds.
 
 **How does sandbox isolation work?**
 Aiden offers multi-level protection: basic path-based restrictions on all platforms, and enhanced VM-level isolation using WSL2 (Windows) or Lima (macOS). When a VM is available, all commands execute inside an isolated Linux environment, protecting your host system.
@@ -321,13 +307,9 @@ Aiden runs locally on your machine. Your files stay in your workspace. The only 
 
 ---
 
-## 🛠️ Contributing
+## 🛠️ Development & licensing
 
-We welcome contributions! Whether it's a new Skill, a UI fix, or a security improvement:
-
-1. Fork the repo.
-2. Create a branch (`git checkout -b feature/NewSkill`).
-3. Submit a PR.
+Aiden is **proprietary software**. Source access, local builds, and redistribution are limited to authorized **Pura Digital** contributors and licensees. Internal workflow: see [CONTRIBUTING.md](CONTRIBUTING.md). For licensing or partnership: **Pura Digital S.r.l.**
 
 ---
 
@@ -346,7 +328,7 @@ Join our community for support and discussion:
 
 ## 📄 License
 
-MIT © Aiden Team
+Copyright © Pura Digital S.r.l. All rights reserved. Unauthorized copying, modification, or distribution of Aiden or its components is prohibited except under a written license from Pura Digital.
 
 ---
 

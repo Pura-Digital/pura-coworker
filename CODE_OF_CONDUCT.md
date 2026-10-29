@@ -1,3 +1,7 @@
+# Aiden Community Code of Conduct
+
+This code applies to Aiden community spaces (for example Discord and WeChat groups). Aiden application software is proprietary; participation in community channels does not grant source-code rights.
+
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge

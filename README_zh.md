@@ -5,7 +5,7 @@
 <h1 align="center">🚀 Aiden: 你的私人 AI 智能助手桌面应用</h1>
 
 <p align="center">
-  • Claude Cowork 的开源实现 • 一键安装
+  • 私人 AI 智能助手桌面应用 • 一键安装
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/平台-Windows%20%7C%20macOS-blue" alt="Platform" />
-  <img src="https://img.shields.io/badge/协议-MIT-green" alt="License" />
+  <img src="https://img.shields.io/badge/协议-专有-red" alt="License" />
   <img src="https://img.shields.io/badge/Node.js-18+-brightgreen" alt="Node.js" />
   <a href="https://discord.gg/pynjtQDf"><img src="https://img.shields.io/discord/1493588403260883078?logo=discord&label=Discord&color=5865F2" alt="Discord" /></a>
   <a href="#加入社群"><img src="https://img.shields.io/badge/WeChat-微信群-07C160?logo=wechat&logoColor=white" alt="WeChat" /></a>
@@ -27,13 +27,13 @@
 
 ---
 
-Aiden 是一款免费开源的 AI 智能助手桌面应用，支持 Windows 和 macOS 一键安装，无需任何编程知识。它将 Claude Code、OpenAI、Gemini、DeepSeek 等多种 AI 模型封装为友好的图形界面，提供虚拟机级别的沙盒隔离（Windows 使用 WSL2，macOS 使用 Lima）、内置 Skills 技能系统（可生成 PPTX、DOCX、XLSX、PDF 文档）、MCP 协议集成（连接浏览器、Notion 等桌面应用）、GUI 自动化操作，以及通过飞书和 Slack 进行远程控制。Aiden 是 Claude Cowork 的开源实现，让每个人都能轻松使用 AI 驱动的桌面自动化。
+Aiden 是由 **Pura Digital S.r.l.** 开发的专有 AI 智能助手桌面应用，支持 Windows 和 macOS 一键安装，无需任何编程知识。它将 Claude Code、OpenAI、Gemini、DeepSeek 等多种 AI 模型封装为友好的图形界面，提供虚拟机级别的沙盒隔离（Windows 使用 WSL2，macOS 使用 Lima）、内置 Skills 技能系统（可生成 PPTX、DOCX、XLSX、PDF 文档）、MCP 协议集成（连接浏览器、Notion 等桌面应用）、GUI 自动化操作，以及通过飞书和 Slack 进行远程控制。
 
 ---
 
 ## 📖 简介
 
-**Aiden** 是 **Claude Cowork** 的开源实现，提供 **Windows** 和 **macOS** 一键安装包，无需任何编程知识。
+**Aiden** 是面向桌面协作的 AI 工作环境，提供 **Windows** 和 **macOS** 一键安装包，无需任何编程知识。
 
 它为 AI 提供了一个沙盒化的工作环境，可以管理文件、通过内置的 **Skills** 系统生成专业文件（PPTX、DOCX、XLSX等）和 **通过MCP链接桌面APP**（浏览器、Notion等）进行人机协作等等。
 
@@ -50,7 +50,7 @@ Aiden 是一款免费开源的 AI 智能助手桌面应用，支持 Windows 和 
 | ------------- | ------------ | -------- | ------------ |
 | Claude Cowork | ✓            | ✗        | ✗            |
 | OpenClaw      | ✓            | ✓        | ✗            |
-| OpenCowork    | ✓            | ✓        | ✓            |
+| **Aiden**     | ✓            | ✓        | ✓            |
 
 - **一键安装，开箱即用**：提供 Windows 和 macOS 预构建安装包，无需配置环境，下载即可开始使用。。
 - **灵活模型支持**：支持 **Claude**、**OpenAI 兼容接口**，以及国产大模型 **GLM**、**MiniMax**、**Kimi** 等。使用你的 OpenRouter、Anthropic等API Key，灵活配置。更多模型持续接入中！
@@ -100,26 +100,12 @@ brew install --cask --no-quarantine aiden
 
 ### 方式二：下载安装包
 
-请访问我们的 [Release 页面](https://github.com/OpenCoworkAI/aiden/releases) 下载最新版本。
+请访问 [Release 页面](https://github.com/Pura-Digital/pura-coworker/releases) 下载最新版本。
 
 | 平台                      | 文件类型 |
 | ------------------------- | -------- |
 | **Windows**               | `.exe`   |
 | **macOS** (Apple Silicon) | `.dmg`   |
-
-### 方式三：源码编译
-
-适合想要贡献代码或进行二次开发的开发者：
-
-```bash
-git clone https://github.com/OpenCoworkAI/aiden.git
-cd aiden
-npm install
-npm run rebuild
-npm run dev
-```
-
-构建安装包：`npm run build`
 
 ### 安全配置：🔒 沙盒支持
 
@@ -278,19 +264,19 @@ aiden/
 ## ❓ 常见问题
 
 **Aiden 是什么？**
-Aiden 是一款免费开源的桌面应用，为用户提供本地 AI 智能助手工作空间。它将 AI 模型（Claude、GPT、Gemini、DeepSeek 等）封装为图形界面，提供 Windows 和 macOS 一键安装包，无需命令行或编程知识。
+Aiden 是一款专有桌面应用，为用户提供本地 AI 智能助手工作空间。它将 AI 模型（Claude、GPT、Gemini、DeepSeek 等）封装为图形界面，提供 Windows 和 macOS 一键安装包，无需命令行或编程知识。
 
 **Aiden 和 Claude Cowork 有什么区别？**
-Aiden 是 Claude Cowork 的开源实现，在此基础上增加了多模型支持（不只是 Claude）、GUI 自动化操作、飞书/Slack 远程控制，以及虚拟机级别的沙盒隔离。详见[功能对比表](#核心特性)。
+Aiden 在此基础上增加了多模型支持（不只是 Claude）、GUI 自动化操作、飞书/Slack 远程控制、虚拟机级别的沙盒隔离，以及原生 **Pura LLM** 订阅连接。详见[功能对比表](#核心特性)。
 
 **支持哪些 AI 模型？**
 支持 Claude（通过 Anthropic 或 OpenRouter）、OpenAI 兼容接口，以及国产大模型包括智谱 GLM、MiniMax、Kimi 等。任何提供 OpenAI 兼容 API 的服务商都可以配置使用。
 
 **Aiden 免费吗？**
-是的。Aiden 本身完全免费，采用 MIT 开源协议。你只需为所选 AI 模型服务商的 API 调用付费。
+分发与定价取决于渠道（安装包、企业授权或 Pura LLM 捆绑）。模型调用费用由所选服务商收取（含已连接的 **Pura LLM**）。请参阅随安装包提供的最终用户许可协议。
 
 **支持 Linux 吗？**
-目前提供 Windows 和 macOS 的预构建安装包。Linux 用户可以通过源码编译方式使用，详见[源码编译](#下载与安装)章节。
+目前提供 Windows 和 macOS 的预构建安装包。Linux 支持见 [路线图](ROADMAP.md)；如需早期构建请联系 Pura Digital。
 
 **沙盒隔离是怎么工作的？**
 Aiden 提供多级安全保护：所有平台均有基础的路径限制，Windows 和 macOS 还支持虚拟机级别隔离（分别使用 WSL2 和 Lima）。启用虚拟机后，所有命令在隔离的 Linux 环境中执行，保护你的宿主机系统安全。
@@ -309,13 +295,9 @@ Aiden 完全在本地运行，你的文件保留在你的工作区内。唯一�
 
 ---
 
-## 🛠️ 贡献指南
+## 🛠️ 开发与许可
 
-欢迎任何形式的贡献！无论是新技能、UI 修复还是安全改进：
-
-1. Fork 本仓库。
-2. 创建分支 (`git checkout -b feature/NewSkill`)。
-3. 提交 PR。
+Aiden 为**专有软件**。源代码访问、本地构建与再分发仅限经授权的 **Pura Digital** 贡献者与被许可方。内部流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。商业许可请联系 **Pura Digital S.r.l.**
 
 ---
 
@@ -334,7 +316,7 @@ Aiden 完全在本地运行，你的文件保留在你的工作区内。唯一�
 
 ## 📄 许可证
 
-MIT © Aiden Team
+Copyright © Pura Digital S.r.l. 保留所有权利。未经 Pura Digital 书面许可，不得复制、修改或分发 Aiden 及其组件。
 
 ---
 
