@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Settings skills UI loads the marketplace on demand and installs skills into the global skills storage path
 
+### Fixed
+
+- Typecheck for Pura Connect token email resolution (`StoredTokens` assignable to identity helper)
+- Update failure toast uses opaque floating error styling (icon, border, and retry action)
+
 ## [3.5.3] - 2026-10-29
 
 ### Changed

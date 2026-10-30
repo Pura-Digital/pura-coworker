@@ -1,6 +1,10 @@
-type TokenLike = Record<string, unknown> & {
+type TokenLike = {
   access_token?: unknown;
   pura_user_id?: unknown;
+  email?: unknown;
+  user_email?: unknown;
+  pura_user_email?: unknown;
+  preferred_username?: unknown;
 };
 
 const EMAIL_KEYS = ['email', 'user_email', 'pura_user_email', 'preferred_username'] as const;

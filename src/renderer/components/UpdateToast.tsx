@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CheckCircle2, Download, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, RefreshCw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { UpdaterSnapshot } from '../../shared/updater-types';
 
@@ -44,22 +44,37 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
   }
 
   const versionLabel = version ? `v${version}` : '';
+  const isError = phase === 'error';
+  const toastBorderClass = isError
+    ? 'border-error/50'
+    : phase === 'up-to-date'
+      ? 'border-success/50'
+      : 'border-border-subtle';
+  const titleClass = isError
+    ? 'text-error'
+    : phase === 'up-to-date'
+      ? 'text-success'
+      : 'text-text-primary';
 
   return (
     <div className="fixed bottom-4 left-4 z-50 max-w-sm">
-      <div className="app-floating-toast rounded-[1.4rem] border border-border-subtle shadow-elevated overflow-hidden">
+      <div
+        className={`app-floating-toast rounded-[1.4rem] border shadow-elevated overflow-hidden ${toastBorderClass}`}
+      >
         <div className="flex items-start gap-3 px-4 py-3">
           <div
             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
               phase === 'up-to-date'
                 ? 'bg-success/10 text-success'
-                : phase === 'error'
-                  ? 'bg-error/10 text-error'
+                : isError
+                  ? 'bg-error/15 text-error'
                   : 'bg-accent/10 text-accent'
             }`}
           >
             {phase === 'up-to-date' ? (
               <CheckCircle2 className="h-4 w-4" />
+            ) : isError ? (
+              <AlertCircle className="h-4 w-4" />
             ) : phase === 'downloaded' || phase === 'checking' ? (
               <RefreshCw className={`h-4 w-4${phase === 'checking' ? ' animate-spin' : ''}`} />
             ) : (
@@ -68,7 +83,7 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-text-primary">
+            <p className={`text-sm font-medium ${titleClass}`}>
               {phase === 'checking' &&
                 t('updater.checkingTitle', { defaultValue: 'Checking for updates…' })}
               {phase === 'available' &&
@@ -91,7 +106,9 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
               {phase === 'error' && t('updater.errorTitle', { defaultValue: 'Update failed' })}
             </p>
 
-            <p className="mt-0.5 text-xs text-text-muted">
+            <p
+              className={`mt-0.5 text-xs ${isError ? 'text-error/85' : 'text-text-muted'}`}
+            >
               {phase === 'checking' &&
                 t('updater.checkingBody', { defaultValue: 'Looking for the latest version of Aiden.' })}
               {phase === 'available' &&
@@ -141,8 +158,10 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
           )}
         </div>
 
-        {(phase === 'available' || phase === 'downloaded' || phase === 'error') && (
-          <div className="border-t border-border-muted px-4 py-3">
+        {(phase === 'available' || phase === 'downloaded' || isError) && (
+          <div
+            className={`border-t px-4 py-3 ${isError ? 'border-error/25' : 'border-border-muted'}`}
+          >
             {phase === 'available' && (
               <button
                 type="button"
@@ -161,11 +180,11 @@ export function UpdateToast({ status, onDownload, onInstall, onRetry, onDismiss 
                 {t('updater.restartAction', { defaultValue: 'Restart to update' })}
               </button>
             )}
-            {phase === 'error' && (
+            {isError && (
               <button
                 type="button"
                 onClick={onRetry}
-                className="w-full rounded-xl border border-accent/40 bg-accent/10 px-3 py-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
+                className="w-full rounded-xl border border-error/35 bg-error/10 px-3 py-2.5 text-sm font-medium text-error transition-colors hover:bg-error/15"
               >
                 {t('updater.retryAction', { defaultValue: 'Try again' })}
               </button>
