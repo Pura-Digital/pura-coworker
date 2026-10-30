@@ -167,8 +167,19 @@ export function resolveMessageEndPayload(
 
   // Post-process: split any <think>...</think> tags in text blocks into
   // separate thinking + text content blocks for proper UI rendering.
-  const effectiveContent: MessageEndContentBlock[] = [];
+  // Provider text blocks can split the tags themselves. Join adjacent text
+  // before parsing, while retaining tool calls and native thinking boundaries.
+  const joinedContent: MessageEndContentBlock[] = [];
   for (const block of rawContent) {
+    const previous = joinedContent.at(-1);
+    if (block.type === 'text' && previous?.type === 'text') {
+      previous.text += block.text;
+    } else {
+      joinedContent.push(block.type === 'text' ? { ...block } : block);
+    }
+  }
+  const effectiveContent: MessageEndContentBlock[] = [];
+  for (const block of joinedContent) {
     if (block.type === 'text') {
       const splitBlocks = splitThinkTagBlocks(block.text);
       for (const splitBlock of splitBlocks) {

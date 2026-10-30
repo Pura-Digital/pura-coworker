@@ -1,5 +1,4 @@
 import { createVisionConsentScope } from '../anonymization/vision-consent';
-import { streamSimple } from '@mariozechner/pi-ai';
 import { getAnonymizationGateway, anonymizationContext } from '../anonymization/gateway';
 import { anonymizationCompactionExtension } from '../anonymization/compaction-extension';
 /**
@@ -89,7 +88,7 @@ import {
   resolvePiRouteProtocol,
   resolveSyntheticPiModelFallback,
 } from './pi-model-resolution';
-import { buildPiSessionRuntimeSignature } from './pi-session-runtime';
+import { buildPiSessionRuntimeSignature, configurePiAgentStream } from './pi-session-runtime';
 import { ThinkTagStreamParser } from './think-tag-parser';
 import {
   normalizeMcpToolResultForModel,
@@ -2241,9 +2240,13 @@ Tool routing:
         logTiming('pi-coding-agent session created', runStartTime);
       }
 
-      piSession.agent.streamFn = (anonymizationContext.getStore()?.enabled ?? runtimeConfig.anonymizationEnabled) && runtimeConfig.provider !== 'ollama'
-        ? getAnonymizationGateway().stream(session.id, streamSimple)
-        : streamSimple;
+      const protectStream =
+        (anonymizationContext.getStore()?.enabled ?? runtimeConfig.anonymizationEnabled) &&
+        runtimeConfig.provider !== 'ollama';
+      configurePiAgentStream(
+        piSession.agent,
+        protectStream ? (original) => getAnonymizationGateway().stream(session.id, original) : undefined
+      );
 
       // Set up event handler to bridge pi-coding-agent events → our ServerEvent protocol
 

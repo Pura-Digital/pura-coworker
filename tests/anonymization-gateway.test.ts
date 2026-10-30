@@ -3,13 +3,28 @@ import { safeStorage } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAssistantMessageEventStream,
+  streamSimple,
   type AssistantMessage,
   type Context,
   type Model,
 } from '@mariozechner/pi-ai';
 import type { StreamFn } from '@mariozechner/pi-agent-core';
+import {
+  AuthStorage,
+  createAgentSession,
+  DefaultResourceLoader,
+  ModelRegistry,
+  SessionManager,
+  SettingsManager,
+} from '@mariozechner/pi-coding-agent';
+import { Type } from 'typebox';
+import { configurePiAgentStream } from '../src/main/claude/pi-session-runtime';
 import type { AnonymizationEvent } from '../src/shared/anonymization-types';
 import * as logger from '../src/main/utils/logger';
+import {
+  buildSyntheticPiModel,
+  applyPiModelRuntimeOverrides,
+} from '../src/main/claude/pi-model-resolution';
 
 const root = vi.hoisted(() => `/tmp/aiden-gateway-tests-${process.pid}`);
 vi.mock('electron', () => ({
@@ -94,6 +109,232 @@ function message(text: string): AssistantMessage {
 }
 
 describe('anonymization provider boundary', () => {
+  it('keeps Pura API key agent requests valid across Velo toggles and tool continuations', async () => {
+    const gateway = makeGateway();
+    const decisions = vi.fn();
+    gateway.on('event', (event: AnonymizationEvent) => {
+      if (event.type === 'decision') {
+        decisions(event);
+        queueMicrotask(() => void gateway.decide(event.decision.id, 'cancel'));
+      }
+    });
+    mkdirSync(root, { recursive: true });
+    const model = applyPiModelRuntimeOverrides(
+      buildSyntheticPiModel('pura-low', 'openai', 'openai', 'https://llm.puradigital.it/v1'),
+      { rawProvider: 'custom', customProtocol: 'openai' }
+    );
+    const authStorage = AuthStorage.inMemory();
+    authStorage.setRuntimeApiKey('openai', 'test-unused');
+    const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false } });
+    const resourceLoader = new DefaultResourceLoader({
+      cwd: root,
+      agentDir: root,
+      settingsManager,
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+    });
+    await resourceLoader.reload();
+    const execute = vi.fn(async () => ({
+      content: [{ type: 'text' as const, text: 'Mario Rossi' }],
+      details: undefined,
+    }));
+    const { session } = await createAgentSession({
+      cwd: root,
+      agentDir: root,
+      model,
+      thinkingLevel: 'off',
+      authStorage,
+      modelRegistry: ModelRegistry.inMemory(authStorage),
+      settingsManager,
+      resourceLoader,
+      sessionManager: SessionManager.inMemory(root),
+      tools: ['probe'],
+      customTools: [
+        {
+          name: 'probe',
+          label: 'Probe',
+          description: 'Test tool',
+          parameters: Type.Object({}),
+          execute,
+        },
+      ],
+    });
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer test-unused');
+      requests.push(JSON.parse(String(init?.body)));
+      const toolTurn = requests.length % 2 === 1;
+      return new Response(
+        'data: ' +
+          JSON.stringify({
+            id: 'test',
+            choices: [
+              {
+                index: 0,
+                delta: toolTurn
+                  ? {
+                      tool_calls: [
+                        {
+                          index: 0,
+                          id: `call-${requests.length}`,
+                          type: 'function',
+                          function: { name: 'probe', arguments: '{}' },
+                        },
+                      ],
+                    }
+                  : { reasoning_content: 'Reasoning', content: 'Answer' },
+                finish_reason: toolTurn ? 'tool_calls' : 'stop',
+              },
+            ],
+          }) +
+          '\n\ndata: [DONE]\n\n',
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+    });
+    try {
+      for (const enabled of [true, true, false, true, false]) {
+        await withAnonymization('pura-sdk-chat', enabled, async () => {
+          configurePiAgentStream(
+            session.agent,
+            enabled ? (original) => gateway.stream('pura-sdk-chat', original) : undefined
+          );
+          await session.prompt('Ciao Mario Rossi');
+        });
+        const final = session.messages.at(-1) as AssistantMessage;
+        expect(final.stopReason, final.errorMessage).toBe('stop');
+        expect(final.content).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ type: 'thinking', thinking: 'Reasoning' }),
+            expect.objectContaining({ type: 'text', text: 'Answer' }),
+          ])
+        );
+        for (const request of requests.slice(-2)) {
+          expect(request.model).toBe('pura-low');
+          const messages = request.messages as { role: string; content?: unknown }[];
+          expect(
+            messages.some(
+              (m) =>
+                m.role === 'user' &&
+                (typeof m.content === 'string'
+                  ? m.content.trim()
+                  : Array.isArray(m.content) &&
+                    m.content.some((p) => p.type === 'text' && p.text.trim()))
+            )
+          ).toBe(true);
+          expect(JSON.stringify(messages).includes('Mario Rossi')).toBe(!enabled);
+        }
+        expect((requests.at(-1)!.messages as { role: string }[]).at(-1)!.role).toBe('tool');
+      }
+      expect(requests).toHaveLength(10);
+      expect(execute).toHaveBeenCalledTimes(5);
+      expect(decisions).not.toHaveBeenCalled();
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it.each(['reasoning_content', 'reasoning', 'reasoning_text'])(
+    'masks Chat Completions reasoning while retaining the %s replay marker',
+    async (thinkingSignature) => {
+      const gateway = makeGateway();
+      const prior = message('');
+      prior.content = [{ type: 'thinking', thinking: 'Mario Rossi', thinkingSignature }];
+      const prepared = await gateway.prepare('reasoning-chat', {
+        messages: [prior, { role: 'user', content: 'Continua', timestamp: 2 }],
+      });
+      const reasoning = prepared.context.messages[0].content;
+      expect(reasoning).toEqual([
+        { type: 'thinking', thinking: expect.stringContaining('[AIDEN_'), thinkingSignature },
+      ]);
+      expect(JSON.stringify(reasoning)).not.toContain('Mario Rossi');
+      expect(prior.content).toEqual([
+        { type: 'thinking', thinking: 'Mario Rossi', thinkingSignature },
+      ]);
+      expect(gateway.decisions()).toHaveLength(0);
+    }
+  );
+
+  it('keeps nonempty serialized requests and separate reasoning across Velo toggles', async () => {
+    const gateway = makeGateway();
+    const decisions = vi.fn();
+    gateway.on('event', (event: AnonymizationEvent) => {
+      if (event.type === 'decision') {
+        decisions(event);
+        queueMicrotask(() => void gateway.decide(event.decision.id, 'cancel'));
+      }
+    });
+    const wireModel = applyPiModelRuntimeOverrides(
+      buildSyntheticPiModel('pura-low', 'openai', 'openai', 'https://relay.example/v1'),
+      { rawProvider: 'custom', customProtocol: 'openai' }
+    );
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return new Response(
+        'data: ' +
+          JSON.stringify({
+            id: 'test',
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  reasoning_content: 'Reasoning',
+                  content: 'Answer',
+                },
+                finish_reason: 'stop',
+              },
+            ],
+          }) +
+          '\n\ndata: [DONE]\n\n',
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+    });
+    const context: Context = {
+      messages: [{ role: 'user', content: 'Ciao Mario Rossi', timestamp: 1 }],
+    };
+    for (const enabled of [true, false, true, false]) {
+      const result = await withAnonymization('toggle-chat', enabled, async () => {
+        const stream = enabled ? gateway.stream('toggle-chat', streamSimple) : streamSimple;
+        return (
+          await stream(wireModel, context, {
+            apiKey: 'test-unused',
+            // Subscription requests remove the server-managed model field.
+            onPayload: (payload) => {
+              const next = { ...(payload as Record<string, unknown>) };
+              delete next.model;
+              return next;
+            },
+          })
+        ).result();
+      });
+      expect(result.stopReason).toBe('stop');
+      expect(result.content).toHaveLength(2);
+      expect(result.content).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'thinking', thinking: 'Reasoning' }),
+          expect.objectContaining({ type: 'text', text: 'Answer' }),
+        ])
+      );
+      const request = requests.at(-1)!;
+      expect(request).not.toHaveProperty('model');
+      const messages = request.messages as { role: string; content: string }[];
+      const user = messages.find((item) => item.role === 'user')!;
+      expect(user.content.trim()).not.toBe('');
+      expect(user.content.includes('Mario Rossi')).toBe(!enabled);
+      // Replay the restored assistant history on the next turn of the same chat.
+      context.messages.push(result, {
+        role: 'user',
+        content: 'Continua',
+        timestamp: context.messages.length + 1,
+      });
+    }
+    expect(requests).toHaveLength(4);
+    expect(decisions).not.toHaveBeenCalled();
+    expect(context.messages[0].content).toBe('Ciao Mario Rossi');
+  });
+
   it('audits masked email egress and restored replies without logging either email or token', async () => {
     const gateway = makeGateway();
     const email = 'private.person@example.com';

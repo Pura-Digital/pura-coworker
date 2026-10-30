@@ -10,6 +10,27 @@ import {
 } from '../src/main/claude/pi-model-resolution';
 
 describe('pi model resolution helpers', () => {
+  it.each([
+    [
+      'https://generativelanguage.googleapis.com',
+      'https://generativelanguage.googleapis.com/v1beta',
+    ],
+    [
+      'https://generativelanguage.googleapis.com/v1beta/',
+      'https://generativelanguage.googleapis.com/v1beta',
+    ],
+    ['https://relay.example/google/v1', 'https://relay.example/google/v1'],
+  ])('uses a versioned Gemini inference URL for %s', (baseUrl, expected) => {
+    const model = buildSyntheticPiModel('gemini-new-flash', 'gemini', 'gemini', baseUrl);
+    expect(
+      applyPiModelRuntimeOverrides(model, {
+        rawProvider: 'custom',
+        customProtocol: 'gemini',
+        customBaseUrl: baseUrl,
+      }).baseUrl
+    ).toBe(expected);
+  });
+
   it('skips invalid custom raw provider lookups and deduplicates candidates', () => {
     const candidates = buildPiModelLookupCandidates('openai/gpt-5.4', {
       configProvider: 'openai',
@@ -500,7 +521,8 @@ describe('pi model resolution helpers', () => {
   it('applies DeepSeek compatibility after selecting the final custom protocol', () => {
     const source = buildSyntheticPiModel('deepseek-v4-pro', 'custom', 'anthropic');
     const model = applyPiModelRuntimeOverrides(source, {
-      rawProvider: 'custom', customProtocol: 'openai',
+      rawProvider: 'custom',
+      customProtocol: 'openai',
     });
     expect(model.api).toBe('openai-completions');
     expect(model.compat?.thinkingFormat).toBe('deepseek');

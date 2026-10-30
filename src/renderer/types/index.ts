@@ -307,6 +307,16 @@ export interface PluginInstallResult {
   errors: string[];
 }
 
+export type SkillImportFolderKind = 'skill' | 'plugin';
+
+export interface SkillImportFolderClassification {
+  kind: SkillImportFolderKind;
+  valid: boolean;
+  errors: string[];
+  suggestedPackageName?: string;
+  skillCount?: number;
+}
+
 export interface SkillsStorageChangeEvent {
   path: string;
   reason: 'updated' | 'path_changed' | 'fallback' | 'watcher_error';

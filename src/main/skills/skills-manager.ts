@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import chokidar, { type FSWatcher } from 'chokidar';
-import type { Skill, PluginInstallResult } from '../../renderer/types';
+import type { Skill, PluginInstallResult, SkillImportFolderClassification } from '../../renderer/types';
 import type { DatabaseInstance } from '../db/database';
 import { log, logError, logWarn } from '../utils/logger';
 import { isPathWithinRoot } from '../tools/path-containment';
@@ -1063,6 +1063,68 @@ export class SkillsManager {
     }
 
     return Array.from(byName.values());
+  }
+
+  private countInstallablePluginSkills(pluginRootPath: string): number {
+    const skillsRootPath = path.join(pluginRootPath, 'skills');
+    if (!fs.existsSync(skillsRootPath) || !fs.statSync(skillsRootPath).isDirectory()) {
+      return 0;
+    }
+
+    return fs.readdirSync(skillsRootPath, { withFileTypes: true }).filter((entry) => {
+      if (!entry.isDirectory()) return false;
+      return fs.existsSync(path.join(skillsRootPath, entry.name, 'SKILL.md'));
+    }).length;
+  }
+
+  private resolveSuggestedPluginName(pluginRootPath: string): string {
+    const pluginJsonPath = path.join(pluginRootPath, '.claude-plugin', 'plugin.json');
+    let suggestedName = path.basename(pluginRootPath);
+    try {
+      const manifest = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf8')) as PluginManifest;
+      suggestedName = manifest.name?.trim() || suggestedName;
+    } catch {
+      // ignore, fallback to directory name
+    }
+    return suggestedName;
+  }
+
+  async classifyImportFolder(folderPath: string): Promise<SkillImportFolderClassification> {
+    if (!fs.existsSync(folderPath)) {
+      return { kind: 'skill', valid: false, errors: ['Path does not exist'] };
+    }
+
+    const stat = fs.statSync(folderPath);
+    if (!stat.isDirectory()) {
+      return { kind: 'skill', valid: false, errors: ['Path is not a directory'] };
+    }
+
+    const skillMdAtRoot = path.join(folderPath, 'SKILL.md');
+    if (fs.existsSync(skillMdAtRoot)) {
+      const validation = await this.validateSkillFolder(folderPath);
+      return {
+        kind: 'skill',
+        valid: validation.valid,
+        errors: validation.errors,
+      };
+    }
+
+    const pluginValidation = await this.validatePluginFolder(folderPath);
+    if (pluginValidation.valid) {
+      return {
+        kind: 'plugin',
+        valid: true,
+        errors: [],
+        suggestedPackageName: this.resolveSuggestedPluginName(folderPath),
+        skillCount: this.countInstallablePluginSkills(folderPath),
+      };
+    }
+
+    return {
+      kind: 'plugin',
+      valid: false,
+      errors: pluginValidation.errors,
+    };
   }
 
   async validatePluginFolder(

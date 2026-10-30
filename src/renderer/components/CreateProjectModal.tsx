@@ -83,7 +83,7 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-md rounded-2xl border border-border-subtle bg-surface shadow-2xl">
+      <div className="app-floating-surface relative w-full max-w-md rounded-2xl border border-border-subtle shadow-2xl">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border-muted">
           <h2 className="text-[15px] font-semibold text-text-primary">
             {t('project.createTitle')}

@@ -8,6 +8,45 @@ import {
 } from '../src/main/claude/agent-runner-message-end';
 
 describe('resolveMessageEndPayload', () => {
+  it('preserves native thinking boundaries and leaves provider content unchanged', () => {
+    const content = [
+      { type: 'text' as const, text: 'first' },
+      { type: 'text' as const, text: ' answer' },
+      { type: 'thinking' as const, thinking: 'native reasoning', thinkingSignature: 'signed' },
+      { type: 'text' as const, text: 'second answer' },
+    ];
+    const original = structuredClone(content);
+    const result = resolveMessageEndPayload({
+      message: { role: 'assistant', stopReason: 'stop', content },
+      streamedText: '',
+    });
+    expect(result.effectiveContent).toEqual([
+      { type: 'text', text: 'first answer' },
+      original[2],
+      { type: 'text', text: 'second answer' },
+    ]);
+    expect(content).toEqual(original);
+  });
+
+  it('separates reasoning when think tags span adjacent provider text blocks', () => {
+    const result = resolveMessageEndPayload({
+      message: {
+        role: 'assistant',
+        stopReason: 'stop',
+        content: [
+          { type: 'text', text: '<thi' },
+          { type: 'text', text: 'nk>reasoning</th' },
+          { type: 'text', text: 'ink>answer' },
+        ],
+      },
+      streamedText: 'answer',
+    });
+    expect(result.effectiveContent).toEqual([
+      { type: 'thinking', thinking: 'reasoning' },
+      { type: 'text', text: 'answer' },
+    ]);
+  });
+
   it('does not report a cancelled privacy decision as an empty provider success', () => {
     const result = resolveMessageEndPayload({
       message: {

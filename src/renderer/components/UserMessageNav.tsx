@@ -121,8 +121,8 @@ export function UserMessageNav({ items, layout = 'floating', activeMessageId = n
 
   const popoverClassName =
     layout === 'floating'
-      ? 'absolute z-50 w-[min(18rem,calc(100vw-3rem))] max-h-[min(24rem,70vh)] overflow-y-auto rounded-2xl border border-border-muted bg-surface py-2 shadow-lg right-full mr-2 top-1/2 -translate-y-1/2'
-      : 'absolute bottom-full right-0 z-50 w-[min(18rem,calc(100vw-2rem))] max-h-56 overflow-y-auto rounded-2xl border border-border-muted bg-surface py-2 shadow-lg pb-3 -mb-1';
+      ? 'app-floating-surface absolute z-50 w-[min(18rem,calc(100vw-3rem))] max-h-[min(24rem,70vh)] overflow-y-auto rounded-2xl border border-border-muted py-2 shadow-lg right-full mr-2 top-1/2 -translate-y-1/2'
+      : 'app-floating-surface absolute bottom-full right-0 z-50 w-[min(18rem,calc(100vw-2rem))] max-h-56 overflow-y-auto rounded-2xl border border-border-muted py-2 shadow-lg pb-3 -mb-1';
 
   return (
     <div

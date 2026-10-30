@@ -35,7 +35,7 @@ function ModeChoiceModal({ resourceType, onChoice, onCancel }: ModeChoiceModalPr
   const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-border-subtle bg-surface shadow-2xl p-6">
+      <div className="app-floating-surface w-full max-w-sm rounded-2xl border border-border-subtle shadow-2xl p-6">
         <h3 className="text-[14px] font-semibold text-text-primary mb-2">
           {t('project.modeChoiceTitle', { resource: t(`project.${resourceType}`) })}
         </h3>
@@ -210,7 +210,7 @@ export function SettingsProject({ project, onClose }: SettingsProjectProps) {
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <div className="relative w-full max-w-lg rounded-2xl border border-border-subtle bg-surface shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="app-floating-surface relative w-full max-w-lg rounded-2xl border border-border-subtle shadow-2xl flex flex-col max-h-[85vh]">
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border-muted flex-shrink-0">
             <div className="min-w-0 flex-1">

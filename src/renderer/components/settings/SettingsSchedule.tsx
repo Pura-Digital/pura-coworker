@@ -895,7 +895,7 @@ function ScheduleSelectMenu(props: {
         />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-64 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-elevated">
+        <div className="app-floating-surface absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-64 overflow-y-auto rounded-lg border border-border p-1 shadow-elevated">
           {options.map((option) => {
             const selected = isMulti ? values.includes(option.value) : option.value === value;
             return (
@@ -1013,7 +1013,7 @@ function TimeMultiSelectMenu(props: {
       </button>
       {open && (
         <div
-          className={`absolute right-0 z-20 w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border/80 bg-surface p-3 shadow-[0_24px_60px_rgba(0,0,0,0.14)] ${
+          className={`app-floating-surface absolute right-0 z-20 w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border/80 p-3 shadow-[0_24px_60px_rgba(0,0,0,0.14)] ${
             openUpward ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'
           }`}
         >

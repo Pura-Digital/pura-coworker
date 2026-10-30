@@ -92,8 +92,8 @@ describe('ClaudeAgentRunner pi-coding-agent integration', () => {
   });
 
   it('recreates cached pi sessions when the runtime signature changes', () => {
-    expect(agentRunnerContent).toContain(
-      "import { buildPiSessionRuntimeSignature } from './pi-session-runtime'"
+    expect(agentRunnerContent).toMatch(
+      /import \{[^}]*\bbuildPiSessionRuntimeSignature\b[^}]*\} from '\.\/pi-session-runtime'/
     );
     expect(agentRunnerContent).toContain(
       'const sessionRuntimeSignature = buildPiSessionRuntimeSignature({'

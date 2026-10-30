@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
   const tcpConnect = vi.fn();
   const tlsConnect = vi.fn();
   const openaiModelsList = vi.fn();
+  const anthropicModelsList = vi.fn();
   const fetch = vi.fn();
   const probeWithClaudeSdk = vi.fn();
 
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => {
     tcpConnect,
     tlsConnect,
     openaiModelsList,
+    anthropicModelsList,
     fetch,
     probeWithClaudeSdk,
   };
@@ -45,7 +47,9 @@ vi.mock('openai', () => ({
 }));
 
 vi.mock('@anthropic-ai/sdk', () => ({
-  Anthropic: vi.fn(),
+  Anthropic: class MockAnthropic {
+    models = { list: mocks.anthropicModelsList };
+  },
 }));
 
 vi.mock('@google/genai', () => ({
@@ -92,17 +96,20 @@ vi.mock('../src/main/utils/logger', () => ({
 import { discoverLocalOllama, runDiagnostics } from '../src/main/config/api-diagnostics';
 import { resetGeminiModelCache } from '../src/main/config/gemini-models';
 import { resetOllamaModelIndexCache } from '../src/main/config/ollama-api';
+import { resetAnthropicModelCache } from '../src/main/config/anthropic-models';
 
 describe('runDiagnostics TLS step', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
     resetGeminiModelCache();
+    resetAnthropicModelCache();
     resetOllamaModelIndexCache();
     mocks.dnsLookup.mockReset();
     mocks.tcpConnect.mockReset();
     mocks.tlsConnect.mockReset();
     mocks.openaiModelsList.mockReset();
+    mocks.anthropicModelsList.mockReset().mockResolvedValue({ data: [] });
     mocks.fetch.mockReset();
     mocks.probeWithClaudeSdk.mockReset();
     global.fetch = mocks.fetch;
@@ -292,6 +299,45 @@ describe('runDiagnostics TLS step', () => {
     expect(modelStep?.fix).toBe('ollama_model_not_listed:gemini-3.8-flash');
   });
 
+  it('uses /v1/models for fast Anthropic verification without generating a message', async () => {
+    mocks.fetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' }],
+        }),
+        { headers: { 'content-type': 'application/json' } }
+      )
+    );
+    const result = await runDiagnostics({
+      provider: 'anthropic',
+      apiKey: 'sk-ant-test',
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-sonnet-5-5',
+      verificationLevel: 'fast',
+    });
+    expect(result.overallOk).toBe(true);
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      'https://api.anthropic.com/v1/models',
+      expect.objectContaining({ method: 'GET' })
+    );
+    expect(mocks.probeWithClaudeSdk).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a live probe when an Anthropic-compatible proxy has no models endpoint', async () => {
+    mocks.fetch.mockResolvedValueOnce(new Response('not found', { status: 404 }));
+    mocks.probeWithClaudeSdk.mockResolvedValueOnce({ ok: true, latencyMs: 1 });
+    const result = await runDiagnostics({
+      provider: 'custom',
+      customProtocol: 'anthropic',
+      apiKey: 'test-key',
+      baseUrl: 'https://relay.example',
+      model: 'claude-sonnet-5-5',
+      verificationLevel: 'fast',
+    });
+    expect(result.overallOk).toBe(true);
+    expect(mocks.probeWithClaudeSdk).toHaveBeenCalledOnce();
+  });
+
   it('model step reports failure from probeWithClaudeSdk', async () => {
     mocks.probeWithClaudeSdk.mockResolvedValue({
       ok: false,
@@ -314,6 +360,8 @@ describe('runDiagnostics TLS step', () => {
   });
 
   it.each([
+    ['unknown', 'body.getReader is not a function', 'model_client_error:gpt-4.1'],
+    ['unknown', '404 not_found_error: model not found', 'model_unavailable:gpt-4.1'],
     ['network_error', 'connection reset by peer', 'model_network_error:gpt-4.1'],
     ['rate_limited', '429 Too Many Requests', 'model_rate_limited:gpt-4.1'],
     ['server_error', '502 Bad Gateway', 'model_request_failed:gpt-4.1'],

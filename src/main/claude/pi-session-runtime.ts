@@ -1,4 +1,21 @@
 import { createHash } from 'node:crypto';
+import type { StreamFn } from '@mariozechner/pi-agent-core';
+import { withPiStreamCompatibility } from './pi-stream-compat';
+
+const providerStreams = new WeakMap<{ streamFn: StreamFn }, StreamFn>();
+
+/** Toggle wrappers without replacing the SDK's authentication and request options. */
+export function configurePiAgentStream(
+  agent: { streamFn: StreamFn },
+  wrap?: (original: StreamFn) => StreamFn
+): void {
+  let original = providerStreams.get(agent);
+  if (!original) {
+    original = withPiStreamCompatibility(agent.streamFn);
+    providerStreams.set(agent, original);
+  }
+  agent.streamFn = wrap ? wrap(original) : original;
+}
 
 export interface PiSessionRuntimeSignatureInput {
   configProvider?: string;
@@ -23,9 +40,7 @@ function fingerprintSecret(value: string | undefined): string {
   return createHash('sha256').update(normalized).digest('hex');
 }
 
-export function buildPiSessionRuntimeSignature(
-  input: PiSessionRuntimeSignatureInput,
-): string {
+export function buildPiSessionRuntimeSignature(input: PiSessionRuntimeSignatureInput): string {
   return JSON.stringify({
     configProvider: normalizeText(input.configProvider),
     anonymizationEnabled: input.anonymizationEnabled === true,

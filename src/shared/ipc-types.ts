@@ -10,6 +10,13 @@
 
 import type { McpConnectionStatus, McpOAuthConfig } from './mcp-oauth';
 import type { McpMarketplaceItem } from './mcp-registry';
+import type {
+  SkillsMarketplaceBrowseRequest,
+  SkillsMarketplaceBrowseResponse,
+  SkillsMarketplaceItem,
+} from './skills-marketplace';
+
+export type { SkillsMarketplaceBrowseRequest, SkillsMarketplaceBrowseResponse, SkillsMarketplaceItem };
 
 // ---------------------------------------------------------------------------
 // MCP

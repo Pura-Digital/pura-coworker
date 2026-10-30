@@ -8,6 +8,7 @@ import type {
   CreateSetPayload,
   ProviderPresets,
   Skill,
+  SkillImportFolderClassification,
   ApiTestInput,
   ApiTestResult,
   PluginCatalogItemV2,
@@ -36,6 +37,8 @@ import type {
   McpPresetsMap,
   McpRegistryBrowseRequest,
   McpRegistryBrowseResponse,
+  SkillsMarketplaceBrowseRequest,
+  SkillsMarketplaceBrowseResponse,
   RemoteConfig,
   GatewayConfig,
   TelegramChannelConfig,
@@ -279,6 +282,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('skills.setEnabled', skillId, enabled),
     validate: (skillPath: string): Promise<{ valid: boolean; errors: string[] }> =>
       ipcRenderer.invoke('skills.validate', skillPath),
+    classifyImportFolder: (folderPath: string): Promise<SkillImportFolderClassification> =>
+      ipcRenderer.invoke('skills.classifyImportFolder', folderPath),
     getStoragePath: (): Promise<string> => ipcRenderer.invoke('skills.getStoragePath'),
     setStoragePath: (
       targetPath: string,
@@ -292,6 +297,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }> => ipcRenderer.invoke('skills.setStoragePath', targetPath, migrate),
     openStoragePath: (): Promise<{ success: boolean; path: string; error?: string }> =>
       ipcRenderer.invoke('skills.openStoragePath'),
+    browseMarketplace: (
+      request?: SkillsMarketplaceBrowseRequest
+    ): Promise<SkillsMarketplaceBrowseResponse> =>
+      ipcRenderer.invoke('skills.browseMarketplace', request),
+    installFromMarketplace: (
+      installRef: string
+    ): Promise<{ success: boolean; skill: Skill }> =>
+      ipcRenderer.invoke('skills.installFromMarketplace', installRef),
   },
 
   plugins: {
@@ -300,6 +313,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listInstalled: (): Promise<InstalledPlugin[]> => ipcRenderer.invoke('plugins.listInstalled'),
     install: (pluginName: string): Promise<PluginInstallResultV2> =>
       ipcRenderer.invoke('plugins.install', pluginName),
+    installFromDirectory: (
+      folderPath: string,
+      options?: { displayName?: string }
+    ): Promise<PluginInstallResultV2> =>
+      ipcRenderer.invoke('plugins.installFromDirectory', folderPath, options),
     setEnabled: (pluginId: string, enabled: boolean): Promise<PluginToggleResult> =>
       ipcRenderer.invoke('plugins.setEnabled', pluginId, enabled),
     setComponentEnabled: (
@@ -640,6 +658,7 @@ declare global {
         delete: (skillId: string) => Promise<{ success: boolean }>;
         setEnabled: (skillId: string, enabled: boolean) => Promise<{ success: boolean }>;
         validate: (skillPath: string) => Promise<{ valid: boolean; errors: string[] }>;
+        classifyImportFolder: (folderPath: string) => Promise<SkillImportFolderClassification>;
         getStoragePath: () => Promise<string>;
         setStoragePath: (
           targetPath: string,
@@ -652,11 +671,19 @@ declare global {
           error?: string;
         }>;
         openStoragePath: () => Promise<{ success: boolean; path: string; error?: string }>;
+        browseMarketplace: (
+          request?: SkillsMarketplaceBrowseRequest
+        ) => Promise<SkillsMarketplaceBrowseResponse>;
+        installFromMarketplace: (installRef: string) => Promise<{ success: boolean; skill: Skill }>;
       };
       plugins: {
         listCatalog: (options?: { installableOnly?: boolean }) => Promise<PluginCatalogItemV2[]>;
         listInstalled: () => Promise<InstalledPlugin[]>;
         install: (pluginName: string) => Promise<PluginInstallResultV2>;
+        installFromDirectory: (
+          folderPath: string,
+          options?: { displayName?: string }
+        ) => Promise<PluginInstallResultV2>;
         setEnabled: (pluginId: string, enabled: boolean) => Promise<PluginToggleResult>;
         setComponentEnabled: (
           pluginId: string,

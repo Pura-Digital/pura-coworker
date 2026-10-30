@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Package,
@@ -12,8 +12,9 @@ import {
   ChevronRight,
   Power,
   PowerOff,
+  X,
 } from 'lucide-react';
-import type { Skill, PluginCatalogItemV2, InstalledPlugin, PluginComponentKind } from '../../types';
+import type { Skill, InstalledPlugin, PluginComponentKind } from '../../types';
 import { useAppStore } from '../../store';
 import {
   SettingsFeedbackToast,
@@ -21,18 +22,16 @@ import {
   SettingsDisclosure,
 } from './shared';
 import type { LocalizedBanner } from './shared';
-import { PluginMarketplaceModal } from './PluginMarketplaceModal';
+import type { SkillsMarketplaceItem } from '../../../shared/skills-marketplace';
+
+const PluginMarketplaceModal = lazy(() =>
+  import('./PluginMarketplaceModal').then((module) => ({
+    default: module.PluginMarketplaceModal,
+  }))
+);
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
 const componentOrder: PluginComponentKind[] = ['skills', 'commands', 'agents', 'hooks', 'mcp'];
-
-function normalizePluginLookupKey(value: string | undefined): string {
-  if (!value) return '';
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const { t } = useTranslation();
@@ -44,13 +43,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const skillsStorageChangeEvent = useAppStore((state) => state.skillsStorageChangeEvent);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [storagePath, setStoragePath] = useState('');
-  const [plugins, setPlugins] = useState<PluginCatalogItemV2[]>([]);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
-  const [installedPluginsByKey, setInstalledPluginsByKey] = useState<
-    Record<string, InstalledPlugin>
-  >({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isPluginLoading, setIsPluginLoading] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
@@ -59,6 +53,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const [error, setError] = useState<LocalizedBanner | null>(null);
   const [success, setSuccess] = useState<LocalizedBanner | null>(null);
   const pluginToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [packageImportPrompt, setPackageImportPrompt] = useState<{
+    folderPath: string;
+    packageName: string;
+    skillCount?: number;
+  } | null>(null);
+  const [packageImportError, setPackageImportError] = useState<string | null>(null);
+  const [isPackageImportSubmitting, setIsPackageImportSubmitting] = useState(false);
 
   useEffect(() => {
     if (!skillsStorageChangeEvent) return;
@@ -144,49 +145,24 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
   }, []);
 
+  const installedSkillNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const skill of skills) {
+      if (skill.type === 'builtin') continue;
+      names.add(skill.name);
+    }
+    return names;
+  }, [skills]);
+
   const loadInstalledPlugins = useCallback(async () => {
     try {
       const installed = await window.electronAPI.plugins.listInstalled();
       const nextInstalled = installed || [];
       setInstalledPlugins(nextInstalled);
-
-      const nextInstalledByKey: Record<string, InstalledPlugin> = {};
-      const addLookupKey = (key: string, plugin: InstalledPlugin) => {
-        if (!key || nextInstalledByKey[key]) return;
-        nextInstalledByKey[key] = plugin;
-      };
-      for (const plugin of nextInstalled) {
-        const candidates = [
-          plugin.name,
-          plugin.name?.toLowerCase(),
-          normalizePluginLookupKey(plugin.name),
-          plugin.pluginId,
-          plugin.pluginId?.toLowerCase(),
-          normalizePluginLookupKey(plugin.pluginId),
-        ].filter((value): value is string => Boolean(value));
-        for (const key of candidates) {
-          addLookupKey(key, plugin);
-        }
-      }
-      setInstalledPluginsByKey(nextInstalledByKey);
     } catch (err) {
       console.error('Failed to load installed plugins:', err);
     }
   }, []);
-
-  const loadPlugins = useCallback(async () => {
-    try {
-      setIsPluginLoading(true);
-      const catalog = await window.electronAPI.plugins.listCatalog({ installableOnly: false });
-      setPlugins(catalog || []);
-      await loadInstalledPlugins();
-      setError(null);
-    } catch (err) {
-      setError({ text: err instanceof Error ? err.message : tRef.current('skills.pluginInstallFailed') });
-    } finally {
-      setIsPluginLoading(false);
-    }
-  }, [loadInstalledPlugins]);
 
   useEffect(() => {
     if (!isElectron || !isActive) {
@@ -216,10 +192,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   async function handleOpenMarketplace() {
     setShowMarketplace(true);
     setAddMenuOpen(false);
-    await loadPlugins();
   }
 
-  async function handleInstall() {
+  async function handleInstallSkillFromFolder() {
     setAddMenuOpen(false);
     try {
       const folderPath = await window.electronAPI.invoke<string | null>({
@@ -229,23 +204,94 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       if (!folderPath) return;
 
       setIsLoading(true);
+      setError(null);
       const validation = await window.electronAPI.skills.validate(folderPath);
 
       if (!validation.valid) {
-        setError({ text: `Invalid skill folder: ${validation.errors.join(', ')}` });
+        setError({
+          text: t('skills.invalidSkillFolder', {
+            details: validation.errors.join(', '),
+          }),
+        });
         return;
       }
 
       const result = await window.electronAPI.skills.install(folderPath);
       if (result.success) {
         await loadSkills();
-        setError(null);
         setSuccess(null);
       }
     } catch (err) {
       setError({ text: err instanceof Error ? err.message : t('skills.failedToInstall') });
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleInstallPackageFromFolder() {
+    setAddMenuOpen(false);
+    try {
+      const folderPath = await window.electronAPI.invoke<string | null>({
+        type: 'folder.select',
+        payload: {},
+      });
+      if (!folderPath) return;
+
+      setIsLoading(true);
+      setError(null);
+      const classification = await window.electronAPI.skills.classifyImportFolder(folderPath);
+
+      if (!classification.valid || classification.kind !== 'plugin') {
+        setError({
+          text: t('skills.invalidSkillPackageFolder', {
+            details: classification.errors.join(', ') || t('skills.pluginNoSkills'),
+          }),
+        });
+        return;
+      }
+
+      setPackageImportError(null);
+      setPackageImportPrompt({
+        folderPath,
+        packageName: classification.suggestedPackageName?.trim() ?? '',
+        skillCount: classification.skillCount,
+      });
+    } catch (err) {
+      setError({ text: err instanceof Error ? err.message : t('skills.pluginInstallFailed') });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleConfirmPackageImport() {
+    if (!packageImportPrompt) return;
+    const packageName = packageImportPrompt.packageName.trim();
+    if (!packageName) {
+      setPackageImportError(t('skills.skillPackageNameRequired'));
+      return;
+    }
+
+    setIsPackageImportSubmitting(true);
+    setPackageImportError(null);
+    setError(null);
+    try {
+      const result = await window.electronAPI.plugins.installFromDirectory(
+        packageImportPrompt.folderPath,
+        { displayName: packageName }
+      );
+      setPackageImportPrompt(null);
+      await loadSkills();
+      await loadInstalledPlugins();
+      const message = t('skills.pluginInstallSuccess', { name: result.plugin.name });
+      setSuccess({ text: message });
+      showPluginInstallToast(message);
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (err) {
+      setPackageImportError(
+        err instanceof Error ? err.message : t('skills.pluginInstallFailed')
+      );
+    } finally {
+      setIsPackageImportSubmitting(false);
     }
   }
 
@@ -333,16 +379,14 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
   }
 
-  async function handleInstallPlugin(plugin: PluginCatalogItemV2) {
-    const installTarget = plugin.pluginId ?? plugin.name;
-    setPluginActionKey(`install:${installTarget}`);
+  async function handleInstallMarketplaceSkill(item: SkillsMarketplaceItem) {
+    setPluginActionKey(`install:${item.installRef}`);
     setError(null);
     setSuccess(null);
     try {
-      const result = await window.electronAPI.plugins.install(installTarget);
+      const result = await window.electronAPI.skills.installFromMarketplace(item.installRef);
       await loadSkills();
-      await loadPlugins();
-      const message = t('skills.pluginInstallSuccess', { name: result.plugin.name });
+      const message = t('skills.skillInstallSuccess', { name: result.skill.name });
       setSuccess({ text: message });
       showPluginInstallToast(message);
       setTimeout(() => setSuccess(null), 4000);
@@ -392,7 +436,6 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     setError(null);
     try {
       await window.electronAPI.plugins.uninstall(plugin.pluginId);
-      await loadPlugins();
       await loadSkills();
       showPluginInstallToast(t('skills.pluginUninstalled', { name: plugin.name }));
     } catch (err) {
@@ -437,13 +480,20 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             />
           </button>
           {addMenuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-[10rem] rounded-lg border border-border-subtle bg-surface shadow-lg py-1">
+            <div className="app-floating-surface absolute right-0 top-full z-20 mt-1 min-w-[14rem] rounded-lg border border-border-subtle shadow-lg py-1">
               <button
                 type="button"
-                onClick={() => void handleInstall()}
+                onClick={() => void handleInstallSkillFromFolder()}
                 className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover transition-colors"
               >
-                {t('skills.installFromFolder')}
+                {t('skills.installSkillFromFolder')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleInstallPackageFromFolder()}
+                className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover transition-colors"
+              >
+                {t('skills.installSkillPackageFromFolder')}
               </button>
             </div>
           )}
@@ -535,16 +585,130 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       </div>
 
       {showMarketplace && (
-        <PluginMarketplaceModal
-          plugins={plugins}
-          installedPluginsByKey={installedPluginsByKey}
-          isLoading={isPluginLoading}
-          pluginActionKey={pluginActionKey}
-          onClose={() => setShowMarketplace(false)}
-          onInstall={handleInstallPlugin}
+        <Suspense fallback={null}>
+          <PluginMarketplaceModal
+            installedSkillNames={installedSkillNames}
+            installActionKey={pluginActionKey}
+            onClose={() => setShowMarketplace(false)}
+            onInstall={handleInstallMarketplaceSkill}
+          />
+        </Suspense>
+      )}
+
+      {packageImportPrompt && (
+        <SkillPackageImportModal
+          folderPath={packageImportPrompt.folderPath}
+          packageName={packageImportPrompt.packageName}
+          skillCount={packageImportPrompt.skillCount}
+          error={packageImportError}
+          isSubmitting={isPackageImportSubmitting}
+          onPackageNameChange={(value) =>
+            setPackageImportPrompt((current) =>
+              current ? { ...current, packageName: value } : current
+            )
+          }
+          onClose={() => {
+            if (isPackageImportSubmitting) return;
+            setPackageImportPrompt(null);
+            setPackageImportError(null);
+          }}
+          onConfirm={() => void handleConfirmPackageImport()}
         />
       )}
 
+    </div>
+  );
+}
+
+function SkillPackageImportModal({
+  folderPath,
+  packageName,
+  skillCount,
+  error,
+  isSubmitting,
+  onPackageNameChange,
+  onClose,
+  onConfirm,
+}: {
+  folderPath: string;
+  packageName: string;
+  skillCount?: number;
+  error: string | null;
+  isSubmitting: boolean;
+  onPackageNameChange: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  const folderLabel = folderPath.split(/[/\\]/).filter(Boolean).pop() ?? folderPath;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div
+        className="app-floating-surface w-full max-w-md rounded-xl border border-border-subtle shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="skill-package-import-title"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border-subtle px-4 py-3">
+          <div>
+            <h2 id="skill-package-import-title" className="text-sm font-semibold text-text-primary">
+              {t('skills.skillPackageImportTitle')}
+            </h2>
+            <p className="text-xs text-text-muted mt-1">{t('skills.skillPackageImportDesc')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+            aria-label={t('common.close')}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form
+          className="px-4 py-4 space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onConfirm();
+          }}
+        >
+          <p className="text-xs text-text-muted break-all">
+            {t('skills.skillPackageFolderLabel', { name: folderLabel })}
+          </p>
+          {typeof skillCount === 'number' && skillCount > 0 && (
+            <p className="text-xs text-text-muted">{t('skills.skillPackageSkillCount', { count: skillCount })}</p>
+          )}
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-text-primary">
+              {t('skills.skillPackageNameLabel')}
+            </span>
+            <input
+              type="text"
+              value={packageName}
+              onChange={(event) => onPackageNameChange(event.target.value)}
+              disabled={isSubmitting}
+              className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-text-primary"
+              autoFocus
+            />
+          </label>
+          {error && <p className="text-xs text-danger">{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="btn btn-secondary text-sm py-2"
+            >
+              {t('common.cancel')}
+            </button>
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary text-sm py-2">
+              {t('skills.pluginInstall')}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -329,9 +329,10 @@
   }
 
   /*
-   * Portaled popovers + floating toasts: opaque fill + blur on the layer behind.
+   * Portaled popovers, modals, menus + floating toasts: opaque fill + blur on the layer behind.
    * Semi-transparent rgba + backdrop-filter reads as “too glassy” over native vibrancy.
    */
+  .app-floating-surface,
   .chat-config-popover,
   .app-floating-toast {
     background-color: #070e1d;
@@ -339,22 +340,26 @@
     backdrop-filter: blur(40px) saturate(1.2);
   }
 
+  html.light .app-floating-surface,
   html.light .chat-config-popover,
   html.light .app-floating-toast {
     background-color: #ffffff;
   }
 
+  html.native-os-glass .app-floating-surface,
   html.native-os-glass .chat-config-popover,
   html.native-os-glass .app-floating-toast {
     -webkit-backdrop-filter: blur(40px) saturate(1.2) !important;
     backdrop-filter: blur(40px) saturate(1.2) !important;
   }
 
+  html.native-os-glass:not(.light) .app-floating-surface,
   html.native-os-glass:not(.light) .chat-config-popover,
   html.native-os-glass:not(.light) .app-floating-toast {
     background-color: #060b17;
   }
 
+  html.native-os-glass.light .app-floating-surface,
   html.native-os-glass.light .chat-config-popover,
   html.native-os-glass.light .app-floating-toast {
     background-color: #ffffff;

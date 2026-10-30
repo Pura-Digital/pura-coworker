@@ -250,7 +250,7 @@ export function ProjectAccordion({
       {/* Project context menu */}
       {projectMenu && (
         <div
-          className="fixed z-50 min-w-[160px] rounded-xl border border-border-subtle bg-surface shadow-lg py-1"
+          className="app-floating-surface fixed z-50 min-w-[160px] rounded-xl border border-border-subtle shadow-lg py-1"
           style={{ left: projectMenu.x, top: projectMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >

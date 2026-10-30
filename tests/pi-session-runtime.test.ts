@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { buildPiSessionRuntimeSignature } from '../src/main/claude/pi-session-runtime';
 
 describe('pi session runtime signature', () => {
+  it('invalidates cached sessions on every Velo toggle', () => {
+    const enabled = buildPiSessionRuntimeSignature({ anonymizationEnabled: true });
+    const disabled = buildPiSessionRuntimeSignature({ anonymizationEnabled: false });
+    expect(enabled).not.toBe(disabled);
+    expect(buildPiSessionRuntimeSignature({ anonymizationEnabled: true })).toBe(enabled);
+  });
   const baseInput = {
     configProvider: 'custom',
     customProtocol: 'openai',

@@ -23,6 +23,8 @@ import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager } from './session/session-manager';
 import { SkillsManager } from './skills/skills-manager';
 import { PluginCatalogService } from './skills/plugin-catalog-service';
+import { browseSkillsMarketplace } from './skills/skills-marketplace-client';
+import { installSkillFromMarketplace } from './skills/skills-marketplace-install';
 import { PluginRuntimeService } from './skills/plugin-runtime-service';
 import { MemoryService } from './memory/memory-service';
 import { MemoryExtension } from './memory/memory-extension';
@@ -2154,6 +2156,34 @@ ipcMain.handle('skills.install', async (_event, skillPath: string) => {
   }
 });
 
+ipcMain.handle('skills.browseMarketplace', async (_event, request) => {
+  try {
+    return await browseSkillsMarketplace(request);
+  } catch (error) {
+    logError('[Skills] Error browsing marketplace:', error);
+    return {
+      success: false,
+      items: [],
+      query: '',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+ipcMain.handle('skills.installFromMarketplace', async (_event, installRef: string) => {
+  try {
+    if (!skillsManager) {
+      throw new Error('SkillsManager not initialized');
+    }
+    const skill = await installSkillFromMarketplace(skillsManager, installRef);
+    sessionManager?.invalidateSkillsSetup();
+    return { success: true, skill };
+  } catch (error) {
+    logError('[Skills] Error installing from marketplace:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle('skills.delete', async (_event, skillId: string) => {
   try {
     if (!skillsManager) {
@@ -2192,6 +2222,18 @@ ipcMain.handle('skills.validate', async (_event, skillPath: string) => {
   } catch (error) {
     logError('[Skills] Error validating skill:', error);
     return { valid: false, errors: ['Validation failed'] };
+  }
+});
+
+ipcMain.handle('skills.classifyImportFolder', async (_event, folderPath: string) => {
+  try {
+    if (!skillsManager) {
+      return { kind: 'skill' as const, valid: false, errors: ['SkillsManager not initialized'] };
+    }
+    return await skillsManager.classifyImportFolder(folderPath);
+  } catch (error) {
+    logError('[Skills] Error classifying import folder:', error);
+    return { kind: 'skill' as const, valid: false, errors: ['Classification failed'] };
   }
 });
 
@@ -2271,6 +2313,32 @@ ipcMain.handle('plugins.install', async (_event, pluginName: string) => {
     throw error;
   }
 });
+
+ipcMain.handle(
+  'plugins.installFromDirectory',
+  async (_event, folderPath: string, options?: { displayName?: string }) => {
+    try {
+      if (!pluginRuntimeService) {
+        throw new Error('PluginRuntimeService not initialized');
+      }
+      if (!skillsManager) {
+        throw new Error('SkillsManager not initialized');
+      }
+      const classification = await skillsManager.classifyImportFolder(folderPath);
+      if (!classification.valid || classification.kind !== 'plugin') {
+        throw new Error(
+          classification.errors[0] ?? 'Selected folder is not a valid skill package'
+        );
+      }
+      const result = await pluginRuntimeService.installFromDirectory(folderPath, options);
+      sessionManager?.invalidateSkillsSetup();
+      return result;
+    } catch (error) {
+      logError('[Plugins] Error installing plugin from directory:', error);
+      throw error;
+    }
+  }
+);
 
 ipcMain.handle('plugins.setEnabled', async (_event, pluginId: string, enabled: boolean) => {
   try {

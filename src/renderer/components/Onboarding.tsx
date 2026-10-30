@@ -6,13 +6,15 @@ import {
   FolderOpen,
   Loader2,
   RefreshCw,
+  Plug,
   Monitor,
   Sun,
   Moon,
 } from 'lucide-react';
 import { AidenLogoLoader } from './AidenLogoLoader';
 import { AidenDemo } from './onboarding/AidenDemo';
-import { ProviderLogoBadge, providerTabToLogoId } from './ProviderLogoBadge';
+import { ProviderLogoBadge, protocolTabToLogoId, providerTabToLogoId } from './ProviderLogoBadge';
+import { GuidanceInlineHint } from './ProviderGuidance';
 import { SettingsSegmentedControl, SettingsToggle } from './settings/settings-ui';
 import '../styles/onboarding.css';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +23,7 @@ import { useIPC } from '../hooks/useIPC';
 import { useAppStore } from '../store';
 import { completeOnboarding } from '../utils/onboarding-setup';
 import { PuraDigitalConnection } from './settings/PuraDigitalConnection';
-import type { AppConfig, AppTheme, ProviderType, ApiTestInput, ApiTestResult } from '../types';
+import type { AppConfig, AppTheme, ApiTestInput, ApiTestResult } from '../types';
 
 export function Onboarding({
   initialConfig,
@@ -40,6 +42,16 @@ export function Onboarding({
   const [setupStep, setSetupStep] = useState(0);
   const [folder, setFolder] = useState(initialConfig.defaultWorkdir || '');
   const [theme, setTheme] = useState<AppTheme>(initialConfig.theme || 'system');
+  const originalTheme = useRef(useAppStore.getState().settings.theme);
+  const themeCommitted = useRef(false);
+  useEffect(() => {
+    useAppStore.getState().setSettings({ theme });
+  }, [theme]);
+  useEffect(() => () => {
+    if (!themeCommitted.current) {
+      useAppStore.getState().setSettings({ theme: originalTheme.current });
+    }
+  }, []);
   const [memoryEnabled, setMemoryEnabled] = useState(initialConfig.memoryEnabled ?? true);
   const [folderError, setFolderError] = useState('');
   const workingDir = useAppStore((s) => s.workingDir);
@@ -75,7 +87,16 @@ export function Onboarding({
           }
           return window.electronAPI.config.test(input);
         },
-        onSave,
+        async (nextConfig) => {
+          // Saving can unmount the onboarding before its promise resolves.
+          themeCommitted.current = true;
+          try {
+            await onSave(nextConfig);
+          } catch (error) {
+            themeCommitted.current = false;
+            throw error;
+          }
+        },
         t('onboarding.connectionError')
       );
       useAppStore.getState().setWorkingDir(selectedFolder);
@@ -116,7 +137,17 @@ export function Onboarding({
     (!api.requiresApiKey || api.apiKey.trim())
   );
   const fieldClass = 'input py-2.5 text-sm';
-  const providerValue = api.isPuraMode ? 'pura' : api.provider;
+  const activeProviderTab = api.isPuraMode
+    ? 'pura'
+    : api.provider === 'ollama'
+      ? 'ollama'
+      : 'custom';
+  const providerDisplayName =
+    activeProviderTab === 'pura'
+      ? t('api.puraDigital')
+      : activeProviderTab === 'custom'
+        ? t('api.moreModels')
+        : api.presets?.ollama?.name || 'Ollama';
 
   async function chooseFolder() {
     setFolderError('');
@@ -131,7 +162,7 @@ export function Onboarding({
   const canConnect = Boolean(
     (hasModel || api.puraSubscriptionConnected) &&
     (!api.requiresApiKey || api.apiKey.trim()) &&
-    ((api.provider !== 'custom' && !api.isOllamaMode && !api.isPuraMode) || api.baseUrl.trim())
+    (api.isPuraMode || api.baseUrl.trim())
   );
   const substeps = ['connection', 'workspace', 'review'];
   const title =
@@ -254,43 +285,34 @@ export function Onboarding({
               </div>
               {setupStep === 0 && (
                 <div className="space-y-5">
-                  {' '}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="space-y-2 text-xs font-medium text-text-secondary">
-                      <span>{t('api.provider')}</span>
-                      <select
-                        className={fieldClass}
-                        value={providerValue}
-                        disabled={busy}
-                        onChange={(e) =>
-                          e.target.value === 'pura'
-                            ? api.applyPuraDigitalSetup()
-                            : api.changeProvider(e.target.value as ProviderType)
-                        }
-                      >
-                        <option value="pura">Pura Digital</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="anthropic">Anthropic</option>
-                        <option value="gemini">Gemini</option>
-                        <option value="openrouter">OpenRouter</option>
-                        <option value="ollama">Ollama</option>
-                        <option value="custom">{t('api.moreModels')}</option>
-                      </select>
-                    </label>
-                    {api.requiresApiKey && !api.isPuraMode && (
-                      <label className="space-y-2 text-xs font-medium text-text-secondary">
-                        <span>{t('api.apiKey')}</span>
-                        <input
-                          type="password"
-                          autoComplete="off"
-                          className={fieldClass}
-                          value={api.apiKey}
-                          disabled={busy}
-                          onChange={(e) => api.setApiKey(e.target.value)}
-                          placeholder={t('api.enterApiKey')}
-                        />
-                      </label>
-                    )}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-text-secondary">{t('api.provider')}</p>
+                    <SettingsSegmentedControl
+                      value={activeProviderTab}
+                      disabled={busy}
+                      onChange={(p) => {
+                        if (p === 'pura') api.applyPuraDigitalSetup();
+                        else if (p === 'custom') api.applyCustomModelsSetup();
+                        else api.changeProvider('ollama');
+                      }}
+                      options={(['pura', 'ollama', 'custom'] as const).map((p) => {
+                        const isPuraTab = p === 'pura';
+                        const label = isPuraTab
+                          ? t('api.puraDigital')
+                          : p === 'custom'
+                            ? t('api.moreModels')
+                            : api.presets?.ollama?.name || 'Ollama';
+                        return {
+                          value: p,
+                          label: (
+                            <span className="inline-flex items-center justify-center gap-1.5">
+                              <ProviderLogoBadge id={providerTabToLogoId(p)} />
+                              <span className="truncate">{label}</span>
+                            </span>
+                          ),
+                        };
+                      })}
+                    />
                   </div>
                   {api.isPuraMode && (
                     <PuraDigitalConnection
@@ -318,106 +340,172 @@ export function Onboarding({
                       modelInputHint={api.modelInputHint}
                     />
                   )}
-                  {((api.provider === 'custom' && !api.isPuraMode) || api.isOllamaMode) && (
-                    <div className="grid gap-4 sm:grid-cols-2">
+                  {!api.isPuraMode && (
+                    <>
                       {api.provider === 'custom' && (
-                        <label className="space-y-2 text-xs text-text-secondary">
-                          <span>{t('api.protocol')}</span>
-                          <select
-                            className={fieldClass}
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-text-secondary">
+                            {t('api.protocol')}
+                          </p>
+                          <SettingsSegmentedControl
                             value={api.customProtocol}
                             disabled={busy}
-                            onChange={(e) =>
-                              api.changeProtocol(
-                                e.target.value as 'openai' | 'anthropic' | 'gemini'
-                              )
-                            }
-                          >
-                            <option value="openai">OpenAI</option>
-                            <option value="anthropic">Anthropic</option>
-                            <option value="gemini">Gemini</option>
-                          </select>
-                        </label>
+                            onChange={api.changeProtocol}
+                            options={(
+                              [
+                                { id: 'anthropic', label: 'Anthropic' },
+                                { id: 'openai', label: 'OpenAI' },
+                                { id: 'gemini', label: 'Gemini' },
+                              ] as const
+                            ).map((mode) => ({
+                              value: mode.id,
+                              label: (
+                                <span className="inline-flex items-center justify-center gap-1.5">
+                                  <ProviderLogoBadge id={protocolTabToLogoId(mode.id)} />
+                                  {mode.label}
+                                </span>
+                              ),
+                            }))}
+                          />
+                          <p className="text-xs text-text-muted">{t('api.selectProtocol')}</p>
+                          <GuidanceInlineHint
+                            text={api.protocolGuidanceText}
+                            tone={api.protocolGuidanceTone}
+                          />
+                        </div>
                       )}
-                      <label className="space-y-2 text-xs text-text-secondary">
-                        <span>{t('api.baseUrl')}</span>
-                        <input
-                          className={fieldClass}
-                          value={api.baseUrl}
-                          disabled={busy}
-                          onChange={(e) => api.setBaseUrl(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                  )}
-                  {!api.isPuraMode && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label
-                        htmlFor="onboarding-model"
-                        className="text-xs font-medium text-text-secondary"
-                      >
-                        {t('api.model')}
-                      </label>
-                      {(api.supportsModelDiscovery || api.isPuraMode) && (
-                        <button
-                          disabled={
-                            busy || (!api.isPuraMode && api.requiresApiKey && !api.apiKey.trim())
-                          }
-                          onClick={() =>
-                            void (api.isPuraMode
-                              ? api.discoverPuraDigitalModels()
-                              : api.refreshModelOptions())
-                          }
-                          className="flex items-center gap-1 text-xs text-accent disabled:opacity-50"
-                        >
-                          <RefreshCw
-                            size={12}
-                            className={
-                              api.isRefreshingModels || api.isDiscoveringPuraModels
-                                ? 'animate-spin'
-                                : ''
+                      {(api.provider === 'custom' || api.isOllamaMode) && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-medium text-text-secondary">
+                              {t('api.baseUrl')}
+                            </p>
+                            {api.isOllamaMode && (
+                              <button
+                                type="button"
+                                disabled={busy || api.isDiscoveringLocalOllama}
+                                onClick={() => void api.discoverLocalOllama()}
+                                className="flex items-center gap-1 text-xs text-accent disabled:opacity-50"
+                              >
+                                <Plug size={12} />
+                                {api.isDiscoveringLocalOllama
+                                  ? t('api.discoveringLocalOllama')
+                                  : t('api.discoverLocalOllama')}
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            className={fieldClass}
+                            value={api.baseUrl}
+                            disabled={busy}
+                            onChange={(e) => api.setBaseUrl(e.target.value)}
+                            placeholder={
+                              api.isOllamaMode
+                                ? 'http://localhost:11434/v1'
+                                : api.customProtocol === 'openai'
+                                  ? 'https://api.openai.com/v1'
+                                  : api.customProtocol === 'gemini'
+                                    ? 'https://generativelanguage.googleapis.com'
+                                    : api.currentPreset?.baseUrl || 'https://api.anthropic.com'
                             }
                           />
-                          {t('api.refreshModels')}
-                        </button>
+                          {api.provider === 'custom' && (
+                            <GuidanceInlineHint text={api.baseUrlGuidanceText} />
+                          )}
+                        </div>
                       )}
-                    </div>
-                    {api.useCustomModel ? (
-                      <input
-                        id="onboarding-model"
-                        className={fieldClass}
-                        value={api.customModel}
-                        placeholder={api.modelInputPlaceholder}
-                        disabled={busy}
-                        onChange={(e) => api.setCustomModel(e.target.value)}
-                      />
-                    ) : (
-                      <select
-                        id="onboarding-model"
-                        className={fieldClass}
-                        value={api.modelOptions.length ? api.model : ''}
-                        disabled={busy}
-                        onChange={(e) => api.setModel(e.target.value)}
-                      >
-                        {!api.modelOptions.length && (
-                          <option value="">{t('api.noModelsAvailable')}</option>
+                      {api.requiresApiKey && (
+                        <label className="block space-y-2 text-xs font-medium text-text-secondary">
+                          <span>{t('api.apiKey')}</span>
+                          <input
+                            type="password"
+                            autoComplete="off"
+                            className={fieldClass}
+                            value={api.apiKey}
+                            disabled={busy}
+                            onChange={(e) => api.setApiKey(e.target.value)}
+                            placeholder={
+                              api.currentPreset?.keyPlaceholder || t('api.enterApiKey')
+                            }
+                          />
+                          {api.currentPreset?.keyHint && (
+                            <p className="font-normal text-text-muted">{api.currentPreset.keyHint}</p>
+                          )}
+                        </label>
+                      )}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="onboarding-model"
+                            className="text-xs font-medium text-text-secondary"
+                          >
+                            {t('api.model')}
+                          </label>
+                          {api.supportsModelDiscovery && (
+                            <button
+                              type="button"
+                              disabled={busy || (api.requiresApiKey && !api.apiKey.trim())}
+                              onClick={() => void api.refreshModelOptions()}
+                              className="flex items-center gap-1 text-xs text-accent disabled:opacity-50"
+                            >
+                              <RefreshCw
+                                size={12}
+                                className={api.isRefreshingModels ? 'animate-spin' : ''}
+                              />
+                              {t('api.refreshModels')}
+                            </button>
+                          )}
+                        </div>
+                        {api.useCustomModel ? (
+                          <input
+                            id="onboarding-model"
+                            className={fieldClass}
+                            value={api.customModel}
+                            placeholder={api.modelInputPlaceholder}
+                            disabled={busy}
+                            onChange={(e) => api.setCustomModel(e.target.value)}
+                          />
+                        ) : (
+                          <select
+                            id="onboarding-model"
+                            className={fieldClass}
+                            value={api.modelOptions.length ? api.model : ''}
+                            disabled={busy}
+                            onChange={(e) => api.setModel(e.target.value)}
+                          >
+                            {!api.modelOptions.length && (
+                              <option value="">{t('api.noModelsAvailable')}</option>
+                            )}
+                            {api.modelOptions.map((model) => (
+                              <option key={model.id} value={model.id}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </select>
                         )}
-                        {api.modelOptions.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <button
-                      onClick={api.toggleCustomModel}
-                      disabled={busy}
-                      className="text-xs text-text-muted underline"
-                    >
-                      {t(api.useCustomModel ? 'api.usePreset' : 'api.manualModel')}
-                    </button>
-                  </div>
+                        {api.shouldShowOllamaManualModelToggle && (
+                          <button
+                            type="button"
+                            onClick={api.toggleCustomModel}
+                            disabled={busy}
+                            className="text-xs text-text-muted underline"
+                          >
+                            {t(
+                              api.isOllamaMode
+                                ? api.useCustomModel
+                                  ? 'api.useDetectedModels'
+                                  : 'api.manualModel'
+                                : api.useCustomModel
+                                  ? 'api.usePreset'
+                                  : 'api.custom'
+                            )}
+                          </button>
+                        )}
+                        {api.useCustomModel && (
+                          <p className="text-xs text-text-muted">{api.modelInputHint}</p>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -498,11 +586,16 @@ export function Onboarding({
               {setupStep === 2 && (
                 <div className="space-y-5">
                   <div className="flex items-center gap-3">
-                    <ProviderLogoBadge id={providerTabToLogoId(providerValue)} />
+                    <ProviderLogoBadge id={providerTabToLogoId(activeProviderTab)} />
                     <div>
                       <p className="text-sm font-semibold text-text-primary">
-                        {providerValue === 'pura' ? 'Pura Digital' : api.currentPreset.name}
+                        {providerDisplayName}
                       </p>
+                      {activeProviderTab === 'custom' && (
+                        <p className="mt-0.5 text-xs text-text-muted">
+                          {t('api.protocol')}: {api.customProtocol}
+                        </p>
+                      )}
                       <p className="mt-1 break-all text-xs text-text-muted">
                         {api.useCustomModel ? api.customModel : api.model}
                       </p>

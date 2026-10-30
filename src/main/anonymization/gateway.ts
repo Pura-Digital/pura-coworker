@@ -428,9 +428,18 @@ export class AnonymizationGateway extends EventEmitter {
                   `${chatId}:${message.timestamp}:${createHash('sha256').update(block.thinking).digest('hex')}`
                 );
                 if (saved) Object.assign(block, saved);
+                // For Chat Completions pi-ai stores the reasoning field name
+                // here for replay. These markers are not cryptographic signatures.
+                const reasoningField =
+                  message.role === 'assistant' &&
+                  message.api === 'openai-completions' &&
+                  ['reasoning_content', 'reasoning', 'reasoning_text'].includes(
+                    block.thinkingSignature || ''
+                  );
                 if (
                   block.redacted ||
                   (block.thinkingSignature &&
+                    !reasoningField &&
                     (!saved || !(await this.isSafeSignedThinking(chatId, block, signal))))
                 ) {
                   let action: AnonymizationAction;
@@ -447,7 +456,8 @@ export class AnonymizationGateway extends EventEmitter {
                     delete block.redacted;
                     block.thinking = 'Opaque reasoning omitted.';
                   }
-                } else if (!block.thinkingSignature) block.thinking = await mask(block.thinking);
+                } else if (!block.thinkingSignature || reasoningField)
+                  block.thinking = await mask(block.thinking);
               }
               if (block.type === 'toolCall')
                 block.arguments = await this.maskValues(chatId, block.arguments, signal);

@@ -15,6 +15,7 @@ import {
 import { log, logWarn } from '../utils/logger';
 import { normalizeGeneratedTitle } from '../session/session-title-utils';
 import { getSharedAuthStorage } from './shared-auth';
+import { normalizePiProviderPayload } from './pi-stream-compat';
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
@@ -298,15 +299,22 @@ export async function runPiAiOneShot(
   // reopen a foreground service-failure dialog or request Keychain access.
   if (protectedCall && getAnonymizationGateway().service.status().service !== 'ready')
     throw new Error('Servizio di anonimizzazione non disponibile: chiamata ausiliaria sospesa.');
+  const streamOptions = {
+    ...options,
+    apiKey: apiKey || undefined,
+    ...(resolvedModel.api === 'google-generative-ai'
+      ? { onPayload: normalizePiProviderPayload }
+      : {}),
+  };
   const response = protectedCall
-    ? await (await getAnonymizationGateway().stream(chatId!)(resolvedModel, { systemPrompt, messages: [userMsg] }, { ...options, apiKey: apiKey || undefined })).result()
+    ? await (await getAnonymizationGateway().stream(chatId!)(resolvedModel, { systemPrompt, messages: [userMsg] }, streamOptions)).result()
     : await completeSimple(
     resolvedModel,
     {
       systemPrompt,
       messages: [userMsg],
     },
-    { ...options, apiKey: apiKey || undefined }
+    streamOptions
   );
 
   // pi-ai resolves (not rejects) on provider errors — the error details

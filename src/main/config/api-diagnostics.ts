@@ -34,6 +34,7 @@ import { log, logWarn } from '../utils/logger';
 import { probeWithClaudeSdk } from '../claude/claude-sdk-one-shot';
 import { fetchOllamaModelIndex } from './ollama-api';
 import { listGeminiModels } from './gemini-models';
+import { listAnthropicModels } from './anthropic-models';
 import type { ProviderModelInfo } from '../../renderer/types';
 
 const STEP_NAMES: DiagnosticStepName[] = ['dns', 'tcp', 'tls', 'auth', 'model'];
@@ -142,7 +143,8 @@ function getApiErrorInfo(err: unknown): { status?: number; message: string } {
 
 function getModelDiagnosticFix(
   errorType: Awaited<ReturnType<typeof probeWithClaudeSdk>>['errorType'],
-  model: string
+  model: string,
+  details?: string
 ): string {
   switch (errorType) {
     case 'unauthorized':
@@ -156,7 +158,9 @@ function getModelDiagnosticFix(
     case 'ollama_loading':
       return `ollama_model_loading:${model}`;
     default:
-      return `model_unavailable:${model}`;
+      return /\b404\b|\bnot_found_error\b|\bmodel\b.*\bnot found\b/i.test(details || '')
+        ? `model_unavailable:${model}`
+        : `model_client_error:${model}`;
   }
 }
 
@@ -496,6 +500,25 @@ async function stepModel(input: DiagnosticInput, step: DiagnosticStep): Promise<
     const verificationLevel: DiagnosticVerificationLevel = input.verificationLevel ?? 'deep';
     const modelId = input.model.trim();
 
+    if (isAnthropicCompatible(input) && verificationLevel === 'fast') {
+      try {
+        const models = await listAnthropicModels({
+          provider: input.provider === 'custom' ? 'custom' : 'anthropic',
+          customProtocol: input.customProtocol,
+          apiKey: input.apiKey,
+          baseUrl: input.baseUrl,
+        });
+        if (models.some((model) => model.id === modelId)) {
+          step.status = 'ok';
+          step.latencyMs = Date.now() - start;
+          return;
+        }
+        // Aliases and models on subsequent catalog pages still need a live probe.
+      } catch {
+        // Some compatible proxies do not implement /v1/models.
+      }
+    }
+
     if (input.provider === 'ollama' && verificationLevel === 'fast') {
       const result = await fetchOllamaModelIndex({
         baseUrl: input.baseUrl,
@@ -532,12 +555,12 @@ async function stepModel(input: DiagnosticInput, step: DiagnosticStep): Promise<
     } else {
       step.status = 'fail';
       step.error = result.details;
-      step.fix = getModelDiagnosticFix(result.errorType, input.model);
+      step.fix = getModelDiagnosticFix(result.errorType, input.model, result.details);
     }
   } catch (err) {
     step.status = 'fail';
     step.error = getErrorMessage(err);
-    step.fix = `model_unavailable:${input.model}`;
+    step.fix = getModelDiagnosticFix('unknown', input.model, step.error);
   }
   step.latencyMs = Date.now() - start;
 }

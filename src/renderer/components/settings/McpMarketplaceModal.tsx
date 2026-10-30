@@ -238,7 +238,7 @@ export function McpMarketplaceModal({ onClose, onAdd, isLoading }: McpMarketplac
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="relative flex w-full max-w-2xl max-h-[80vh] flex-col rounded-2xl border border-border-subtle bg-surface shadow-2xl">
+      <div className="app-floating-surface relative flex w-full max-w-2xl max-h-[80vh] flex-col rounded-2xl border border-border-subtle shadow-2xl">
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border-muted">
           <div>
             <h2 className="text-[15px] font-semibold text-text-primary flex items-center gap-2">

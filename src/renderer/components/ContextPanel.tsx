@@ -512,7 +512,7 @@ function ContextUsageRing({
 
       {tooltipOpen && tooltipStyle && createPortal(
         <div
-          className="pointer-events-none fixed z-[100] w-52 -translate-y-full rounded-xl border border-border-muted bg-surface px-3 py-2.5 shadow-lg"
+          className="app-floating-surface pointer-events-none fixed z-[100] w-52 -translate-y-full rounded-xl border border-border-muted px-3 py-2.5 shadow-lg"
           style={{ top: tooltipStyle.top, left: tooltipStyle.left }}
         >
           <div className="flex items-center justify-between gap-3">

@@ -35,7 +35,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-      <div className="card w-full max-w-md p-6 m-4 shadow-elevated animate-slide-up">
+      <div className="app-floating-surface card w-full max-w-md p-6 m-4 shadow-elevated animate-slide-up">
         {/* Header */}
         <div className="flex items-start gap-4">
           <div

@@ -346,7 +346,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
               />
             </button>
             {addMenuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 min-w-[10rem] rounded-lg border border-border-subtle bg-surface shadow-lg py-1">
+              <div className="app-floating-surface absolute right-0 top-full z-20 mt-1 min-w-[10rem] rounded-lg border border-border-subtle shadow-lg py-1">
                 <button
                   type="button"
                   onClick={() => openAddPanel('local')}

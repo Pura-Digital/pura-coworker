@@ -38,21 +38,21 @@ describe('SettingsPanel skills plugin browse entry', () => {
   });
 
   it('functional: uses plugins API for catalog and management', () => {
-    expect(settingsPanelContent).toContain('window.electronAPI.plugins.listCatalog');
     expect(settingsPanelContent).toContain('window.electronAPI.plugins.listInstalled');
-    expect(settingsPanelContent).toContain('window.electronAPI.plugins.install(installTarget)');
+    expect(settingsPanelContent).toContain('window.electronAPI.plugins.installFromDirectory');
+    expect(settingsPanelContent).toContain('window.electronAPI.skills.classifyImportFolder');
+    expect(settingsPanelContent).toContain('window.electronAPI.skills.browseMarketplace');
+    expect(settingsPanelContent).toContain('window.electronAPI.skills.installFromMarketplace');
+    expect(settingsPanelContent).toContain("t('skills.installSkillFromFolder')");
+    expect(settingsPanelContent).toContain("t('skills.installSkillPackageFromFolder')");
+    expect(settingsPanelContent).toContain('handleInstallSkillFromFolder');
+    expect(settingsPanelContent).toContain('handleInstallPackageFromFolder');
     expect(settingsPanelContent).toContain('window.electronAPI.plugins.setComponentEnabled');
     expect(settingsPanelContent).toContain("t('skills.pluginManageUninstall')");
   });
 
   it('functional: handles marketplace catalog items with unknown component counts', () => {
-    expect(settingsPanelContent).toContain("plugin.catalogSource === 'claude-marketplace'");
-    expect(settingsPanelContent).toContain("t('skills.pluginComponentsAvailableAfterInstall')");
-  });
-
-  it('functional: matches installed plugins using normalized lookup keys', () => {
-    expect(settingsPanelContent).toContain('normalizePluginLookupKey');
-    expect(settingsPanelContent).toContain('getCatalogLookupKeys');
-    expect(settingsPanelContent).toContain('installedPluginsByKey');
+    expect(settingsPanelContent).toContain('installedSkillNames');
+    expect(settingsPanelContent).toContain('handleInstallMarketplaceSkill');
   });
 });

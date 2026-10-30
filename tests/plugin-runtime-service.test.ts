@@ -366,6 +366,19 @@ describe('PluginRuntimeService', () => {
     expect(fs.existsSync(path.join(result.plugin.runtimePath, '.mcp.json'))).toBe(false);
   });
 
+  it('uses a custom display name when importing from directory', async () => {
+    const fixturesRoot = path.join(testRoot, 'fixtures');
+    const pluginRoot = createPluginFixture(fixturesRoot, 'folder-name');
+    const service = await createRuntimeService();
+
+    const result = await service.installFromDirectory(pluginRoot, {
+      displayName: 'My Custom Pack',
+    });
+
+    expect(result.plugin.name).toBe('My Custom Pack');
+    expect(result.plugin.pluginId).toBe('my-custom-pack');
+  });
+
   it('re-materializes runtime when hooks and mcp are enabled', async () => {
     const fixturesRoot = path.join(testRoot, 'fixtures');
     const pluginRoot = createPluginFixture(fixturesRoot, 'runtime-toggle');

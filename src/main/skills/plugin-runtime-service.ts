@@ -144,14 +144,22 @@ export class PluginRuntimeService {
     return result;
   }
 
-  async installFromDirectory(pluginRootPath: string): Promise<PluginInstallResultV2> {
+  async installFromDirectory(
+    pluginRootPath: string,
+    options?: { displayName?: string }
+  ): Promise<PluginInstallResultV2> {
     if (!fs.existsSync(pluginRootPath) || !fs.statSync(pluginRootPath).isDirectory()) {
       throw new Error('Plugin directory does not exist');
     }
     log(`[PluginRuntime] Importing plugin directory: ${pluginRootPath}`);
 
     const sourceManifest = this.readManifest(pluginRootPath);
-    const displayName = sourceManifest?.name?.trim() || path.basename(pluginRootPath);
+    const overrideName = options?.displayName?.trim();
+    if (overrideName !== undefined && overrideName.length === 0) {
+      throw new Error('Plugin package name is required');
+    }
+    const displayName =
+      overrideName || sourceManifest?.name?.trim() || path.basename(pluginRootPath);
     const pluginId = this.sanitizePluginId(displayName);
     const sourcePath = this.getSourcePath(pluginId);
     const runtimePath = this.getRuntimePath(pluginId);

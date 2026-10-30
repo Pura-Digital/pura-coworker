@@ -70,7 +70,7 @@
     "test:anonymization:smoke": "node scripts/test-anonymization-smoke.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "0.91.1",
     "@google/genai": "^1.44.0",
     "@mariozechner/pi-ai": "0.73.1",
     "@mariozechner/pi-coding-agent": "0.73.1",

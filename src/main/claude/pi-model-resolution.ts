@@ -6,6 +6,7 @@ const INVALID_REGISTRY_PROVIDERS = new Set(['', 'custom']);
 const REASONING_MODEL_PATTERN =
   /\bthinking\b|\breasoner\b|deepseek-r1|deepseek-v4|kimi-k2|qwen3(?:\.5)?(?=[:/-]|$)/i;
 const DEEPSEEK_V4_MODEL_PATTERN = /(?:^|\/)deepseek-v4(?:$|[-:])/i;
+const GEMINI_REASONING_MODEL_PATTERN = /^gemini-(?:2\.5|3(?:\.\d+)?)-(?:flash|pro)(?:[-:]|$)/i;
 type PiRegistryProvider = Parameters<typeof getModel>[0];
 
 export interface PiModelStringInput {
@@ -132,7 +133,10 @@ export function buildSyntheticPiModel(
   maxTokens?: number
 ): Model<Api> {
   const api = apiOverride || inferPiApi(protocol);
-  const autoReasoning = reasoning ?? REASONING_MODEL_PATTERN.test(modelId);
+  const autoReasoning = reasoning ?? (
+    REASONING_MODEL_PATTERN.test(modelId) ||
+    (api === 'google-generative-ai' && GEMINI_REASONING_MODEL_PATTERN.test(modelId))
+  );
   const knownSpecs = lookupModelSpecs(modelId);
   return {
     id: modelId,
@@ -312,6 +316,16 @@ export function applyPiModelRuntimeOverrides(
     if (nextModel.api !== targetApi) {
       nextModel = { ...nextModel, api: targetApi } as typeof nextModel;
     }
+  }
+
+  // pi-ai disables the Google SDK's automatic API version when baseUrl is set.
+  // Config URLs are shared with diagnostics, which accept an unversioned host.
+  if (nextModel.api === 'google-generative-ai' && nextModel.baseUrl) {
+    const baseUrl = nextModel.baseUrl.trim().replace(/\/+$/, '');
+    const versionedBaseUrl = /\/v\d+(?:beta\d*|alpha\d*)?$/.test(baseUrl)
+      ? baseUrl
+      : `${baseUrl}/v1beta`;
+    nextModel = { ...nextModel, baseUrl: versionedBaseUrl } as typeof nextModel;
   }
 
   // Native DeepSeek replay keeps reasoning_content on assistant/tool-call turns.
