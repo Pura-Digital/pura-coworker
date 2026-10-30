@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.4] - 2026-10-30
+
+### Added
+
+- Skills marketplace in settings: browse and install agent skills from [skills.sh](https://skills.sh), with server-side search and infinite-scroll catalog loading
+
+### Changed
+
+- Settings skills UI loads the marketplace on demand and installs skills into the global skills storage path
+
 ## [3.5.3] - 2026-10-29
 
 ### Changed
@@ -292,7 +302,8 @@ First stable release of the 3.3.x series. Graduated from 9 beta releases with 30
 
 - Initial release of Aiden — AI agent desktop app with one-click install for Windows and macOS
 
-[Unreleased]: https://github.com/Pura-Digital/pura-coworker/compare/v3.3.0-beta.8...HEAD
+[Unreleased]: https://github.com/Pura-Digital/pura-coworker/compare/v3.5.4...HEAD
+[3.5.4]: https://github.com/Pura-Digital/pura-coworker/compare/v3.5.3...v3.5.4
 [3.3.0-beta.8]: https://github.com/Pura-Digital/pura-coworker/compare/v3.2.0...v3.3.0-beta.8
 [3.2.0]: https://github.com/Pura-Digital/pura-coworker/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/Pura-Digital/pura-coworker/compare/v3.0.0...v3.1.0

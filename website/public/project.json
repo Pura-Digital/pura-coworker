@@ -9,7 +9,7 @@
     "name": "Proprietary",
     "summary": "All rights reserved. Not open source."
   },
-  "version": "3.5.3",
+  "version": "3.5.4",
   "lastReviewed": "2026-10-29",
   "description": "Proprietary AI agent desktop app for Windows and macOS with one-click installation, sandbox isolation, multi-model support, built-in Skills, MCP integration, GUI automation, Pura LLM connect, and remote control.",
   "applicationCategory": "DeveloperApplication",
